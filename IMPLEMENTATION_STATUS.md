@@ -31,7 +31,7 @@ Last updated: 2026-11-10 (session 2). **Not production-ready** — see "Not star
 
 ## Source control
 
-`git init` ran, but **nothing is committed**. Git refuses to work in `D:\lupin` because the folder is owned by a different Windows account ID than the signed-in user ("dubious ownership"). The owner must either run `git config --global --add safe.directory D:/lupin` or take ownership of the folder; that is a security setting and was not changed automatically.
+The work is committed locally on `main` (first commit `d8418b0`, 149 files). There is no remote yet: nothing is pushed anywhere. `D:\lupin` is still owned by a different Windows account ID, so git was told to trust it (`safe.directory D:/lupin` in the user's global git config, added with the owner's approval). The commit author is `cleve` with the owner's email, set for this repository only; change it with `git config user.name` if another name is wanted.
 
 ## Built but not verified
 
