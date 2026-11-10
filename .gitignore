@@ -1,0 +1,31 @@
+# secrets — never commit
+.env
+.env.*
+!.env.example
+.dev.vars
+*.pem
+*.key
+
+# backend
+backend/target/
+backend/.localdb/
+backend/.local-pg/
+backend/.local-owner-password
+
+# frontend
+node_modules/
+frontend/build/
+frontend/.react-router/
+frontend/.wrangler/
+frontend/worker-configuration.d.ts
+frontend/test-results/
+frontend/playwright-report/
+*.tsbuildinfo
+
+# editors / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+.claude/

@@ -1,0 +1,62 @@
+# Decisions
+
+Each entry: what was chosen, why, and whether the owner needs to confirm. "Owner: confirm" items are reversible defaults, not blockers.
+
+| ID | Decision | Why | Owner |
+|---|---|---|---|
+| D-01 | React Router **7.18** (not 8, which is now current), Vite 8, Tailwind 4, TypeScript 6 | The brief names v7 framework mode. TypeScript 7 is outside React Router 7's supported range. | — |
+| D-02 | Browser talks only to `lupinwear.store`; the Worker proxies `/api/*` to Cloud Run | First-party HttpOnly cookies, no CORS in production, backend URL swappable. | — |
+| D-03 | Auth = 15 min JWT access cookie + 30 day rotating refresh cookie (hashed in DB), CSRF double-submit | Matches the brief; revocable sessions; nothing in localStorage. | — |
+| D-04 | Argon2id password hashing; customer passwords ≥ 10 chars, staff ≥ 12 | OWASP guidance; length over composition rules. | — |
+| D-05 | No default admin. First owner is created once from `LUPIN_BOOTSTRAP_OWNER_*` env vars | The PDF's printed demo credentials must not exist. | — |
+| D-06 | Admin signs in with email, not "username" | One hardened login path. | — |
+| D-07 | Tests use Testcontainers when Docker runs, else an embedded PostgreSQL binary (`io.zonky.test:embedded-postgres`) | This machine has no Docker; the tests still hit a real PostgreSQL with real migrations. CI uses Testcontainers. | Install Docker Desktop? (optional) |
+| D-08 | Catalog reads/writes use `JdbcClient` with explicit SQL; identity uses JPA | Listing pages are 3 queries regardless of size (no N+1); JPA where aggregates benefit. Orders will use JPA with optimistic locking. | — |
+| D-09 | Stock per variant in `inventory(on_hand, reserved)` with atomic conditional updates + movement ledger | Prevents overselling without table locks. | — |
+| D-10 | "At most 10 photos per colour" is a database constraint (`position 0..9`, unique per colour) | Cannot be bypassed by any client. | — |
+| D-11 | Order status and payment status are separate columns | PDF mixes them; the brief asks for separation. | — |
+| D-12 | Order reference prefix default `LP-` (PDF shows `SH-`, a leftover from "SHADOW.") | Brand consistency. Stored in settings. | **Confirm prefix** |
+| D-13 | Cancel-undo window default 30 minutes, configurable | The PDF promises undo but gives no limit; unlimited undo is unsafe once refunds start. | **Confirm window** |
+| D-14 | No card form on the site (PDF p.18 shows one). Cards go to Paymob hosted checkout | We must never touch card data. Visual difference from the PDF is intentional. | Informed |
+| D-15 | InstaPay = manual transfer with reference + admin verification | Not assumed to be a Paymob method. | Informed |
+| D-16 | Policies are seeded as empty drafts; publishing needs an OWNER and records who approved | No invented legal commitments, incl. the 14-day exchange. | **Supply policy text** |
+| D-17 | No fees, thresholds, contact details, promo codes or products in migrations. PDF demo data exists only in `db/devdata` (local profile) | Nothing hardcoded; demo data cannot reach production. | **Supply real data** |
+| D-18 | All three departments start as "Coming soon"; the owner switches each on | Department structure is data, not code. | — |
+| D-19 | Header logo = the L mark and the cap wordmark row, each an exact crop of the supplied PNG, side by side as in the PDF header. Full lockup (with STEAL THE LOOK) in the intro, footer, sign-in and admin sign-in | The full lockup is unreadable at header height (PDF minimum for the full logo is 120 px wide). No pixels are redrawn. | **Confirm header arrangement** |
+| D-20 | Transparent logo assets are derived by script (`tools/derive-logo-assets.py`): background removal + crops only. A 1-pixel grey column on the right edge of the supplied PNG is dropped | Pure-black PNG on the `#0B0B0C` header would show a box. Checked by eye against the original. | — |
+| D-21 | Opening animation plays once per browser session, skippable, off for reduced-motion | "Every visit" (PDF) vs "don't delay interaction" (brief). | Confirm |
+| D-22 | URLs: English at `/`, Arabic at `/ar/…` | Crawlable, shareable, correct `hreflang`. | — |
+| D-23 | Fonts load from Google Fonts for now | Fastest start. Self-hosting is a later privacy/performance task. | — |
+| D-24 | Rate limiting is in-memory per instance; lockout in the database is the durable control | No paid Redis. Acceptable at launch scale; revisit if instances multiply. | — |
+| D-25 | Registration answers "email already registered" | Needed for usable sign-up until email delivery exists; rate limited. Revisit with email verification. | — |
+| D-26 | Local toolchain is portable in `%USERPROFILE%\.lupin-tools` (JDK 21, Maven, MinGit) | Nothing was installed system-wide and no admin rights were used. Delete the folder to remove. | — |
+| D-27 | One item discount per order: the larger of the best automatic promotion and the entered promo code. A code that is not the discount used is not consumed. Free delivery (promotion or threshold) is separate and can combine with it | Simple to explain and cannot stack into a loss. | Confirm |
+| D-28 | Promotions apply to the current price, including products already on a discount price. The free-delivery threshold is compared with the subtotal after discount | No rule was given; this is the simplest default. | Confirm |
+| D-29 | A customer can cancel on their own while the order is `PENDING`, `AWAITING_PAYMENT` or `CONFIRMED` and not paid. Cancelling releases stock and the promo code at once; undo re-reserves them and fails if the stock has gone | Paid orders need the refund flow (payments phase). Stock is not held for cancelled orders. | Confirm |
+| D-30 | Order placement requires the client's expected total and an idempotency key. A different server total → `409 PRICE_CHANGED`; a repeated key returns the first order | The customer never pays a total they did not see; double clicks cannot create two orders. | — |
+| D-31 | Until the payments module exists, only cash on delivery is accepted, and only when the owner has enabled it in settings (off by default) | Nothing may be marked paid without Paymob verification. | — |
+| D-32 | Orders keep English and Arabic snapshots of product, colour, governorate, delivery option and discount names (migration V3) | An order must read the same later in either language. | — |
+| D-33 | Paymob: server creates an "intention" with the secret key, the customer pays on Paymob's hosted checkout, and an order becomes paid only from the "transaction processed" webhook after its HMAC-SHA512 signature, amount (in piastres) and currency are checked. The browser redirect changes nothing. Webhook deliveries are stored once (`payment_events`) so retries are harmless | Paymob developer docs (create intention, unified checkout, HMAC transaction callback), read 2026-11-10. No card data touches our servers. | Supply test keys |
+| D-34 | A payment method is offered only if the owner switched it on **and** it can work: Paymob keys + that method's integration id, or an InstaPay address. Without keys, card / wallet / Fawry never appear | Nothing half-working is shown to customers. | — |
+| D-35 | Manual InstaPay: the order waits as `AWAITING_PAYMENT`; the customer enters the transfer reference; staff confirm or reject after checking the bank app; every decision is audit-logged. No screenshot upload yet (needs Cloudinary) | Required by the brief: manual transfer with admin verification. | — |
+| D-36 | Online-payment orders that stay unpaid are cancelled automatically and their stock released after 60 minutes (`checkout.unpaidOrderMinutes`, 10 min – 7 days). Orders whose transfer is being checked are not touched | Otherwise abandoned payments hold stock forever. | Confirm the time |
+| D-37 | Money that arrives for an order that is already cancelled or already paid is never ignored: the order is marked `REFUND_PENDING` and an audit entry is written. The refund itself is manual for now | The Paymob refund API has not been verified against a merchant account. | — |
+| D-38 | Paymob addresses are configuration (`PAYMOB_INTENTION_URL`, `PAYMOB_CHECKOUT_URL`). Defaults are `accept.paymob.com/v1/intention/` and `accept.paymob.com/unifiedcheckout/`; Paymob's newer page shows `eg.checkout.paymob.com` for the hosted page | The docs disagree between pages; confirm in the merchant dashboard before go-live. | Confirm with Paymob |
+| D-39 | Staff order workflow: cash `PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED`; online `PAID → [CONFIRMED →] PROCESSING → SHIPPED → DELIVERED`; staff may cancel any time before `SHIPPED`. Stock leaves the count at `SHIPPED`; cash is recorded as collected at `DELIVERED`. A staff cancel has no customer undo | One fixed path keeps stock and money consistent. Returns after shipment are a later feature. | Confirm |
+| D-40 | Payment and checkout settings can be changed by the owner only; other settings and delivery fees by any staff member. Every change is audit-logged | Payment settings decide where customers send money. | — |
+| D-41 | The staff dashboard is English only for now | Keeps the first version small; Arabic can follow if staff need it. | Confirm |
+| D-42 | Policies: staff write drafts; only the owner publishes, takes down, or edits a policy that is live (an owner's edit of a live policy counts as approving the new wording). A policy cannot be published with empty English or Arabic text | Policy wording is a legal commitment and must be the owner's. | — |
+| D-43 | Policy and FAQ text is stored and shown as plain text split into paragraphs, never as HTML | No script-injection risk from content; formatting can be added later with a safe format. | — |
+| D-44 | New products are created as hidden drafts with their sizes and colours fixed at creation; staff edit names, text, category, price and labels afterwards. An offer's kind (automatic or code) and its code text cannot be changed after creation | Keeps stock rows and used codes consistent. | — |
+| D-45 | Fonts (Archivo, Michroma, IBM Plex Sans Arabic; all open-licensed) are bundled from Fontsource packages and served from the site's own origin. Replaces D-23. The Arabic font carries Arabic glyphs only; Latin letters and digits in Arabic text use Archivo | No third-party request on any page, nothing render-blocking from another host, and the security policy no longer needs to allow Google's font hosts. | — |
+| D-46 | The smallest text on the site is 12 px (labels and buttons were 11 px, two tags were 9–10 px) | Lighthouse flagged about half the home page text as too small to read on a phone. Slightly larger than the PDF's labels. | Confirm |
+| D-47 | After moving to another page, keyboard focus is placed on the page's main content | Otherwise keyboard and screen-reader users are left at the bottom of the previous page. | — |
+| D-48 | The API accepts only requests that carry a shared key added by the storefront Worker; everything else gets 403 (health probes excepted). The key is a random secret held in both secret stores, never in code. Paymob's webhook also arrives through the Worker, so it is covered | Stops anyone calling the Cloud Run address directly to forge client addresses or hosts, or to skip the same-origin setup. Chosen over a network ingress rule because it needs no paid networking and works the same locally. | Set the secret at deployment |
+
+## Open questions that will block later phases
+
+1. Paymob: merchant account status and which methods are enabled (blocks Phase 7 live work; sandbox boundary can still be built).
+2. Cloudinary account (blocks real image upload; signing endpoint can be built and tested without it).
+3. SMS provider and Google/Apple/Facebook developer apps (those buttons stay hidden until configured).
+4. Transactional email provider (password reset, verification).
+5. GitHub repository, Cloudflare, Google Cloud (billing account required even for free tier) and Neon accounts for deployment.

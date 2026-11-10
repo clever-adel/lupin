@@ -1,0 +1,19 @@
+lupin:
+  security:
+    # Test-only signing key. Never used outside the test JVM.
+    jwt-secret: dGVzdC1vbmx5LXNpZ25pbmcta2V5LWZvci1sdXBpbi1iYWNrZW5kLXRlc3Rz
+    cookie-secure: false
+  public-base-url: https://shop.example.test
+  jobs:
+    enabled: false
+  # Test-only values; the Paymob HTTP client is replaced by a fake in tests.
+  paymob:
+    secret-key: test-secret-key
+    public-key: test-public-key
+    hmac-secret: test-hmac-secret
+    integration-card: 111
+    integration-wallet: 222
+logging:
+  level:
+    org.testcontainers: WARN
+    io.zonky: WARN

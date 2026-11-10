@@ -1,0 +1,212 @@
+@import "tailwindcss";
+/* Fonts are served from our own origin (open-licensed, via Fontsource): no third-party request,
+   nothing render-blocking from another host. Browsers fetch only the subsets a page uses. */
+@import "@fontsource-variable/archivo/wght.css";
+@import "@fontsource/michroma/latin-400.css";
+/* Arabic glyphs only: Latin letters and digits inside Arabic text use Archivo, as elsewhere. */
+@import "@fontsource/ibm-plex-sans-arabic/arabic-400.css";
+@import "@fontsource/ibm-plex-sans-arabic/arabic-500.css";
+@import "@fontsource/ibm-plex-sans-arabic/arabic-600.css";
+@import "@fontsource/ibm-plex-sans-arabic/arabic-700.css";
+
+/* Brand tokens from the identity PDF (p.5). Campaign accents are deliberately absent. */
+@theme {
+  --color-ink: #0b0b0c;
+  --color-paper: #f6f5f1;
+  --color-bone: #eeede9;
+  --color-stone: #62605b;
+  --color-line: #dcdad4;
+  --color-card: #ffffff;
+  /* Functional only: destructive actions and errors, as in the prototype's cancel controls. */
+  --color-danger: #b3261e;
+
+  --font-display: "Michroma", "Archivo Variable", sans-serif;
+  --font-sans: "Archivo Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-arabic: "IBM Plex Sans Arabic", "Archivo Variable", system-ui, sans-serif;
+
+  --tracking-label: 0.22em;
+}
+
+@layer base {
+  html {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-text-size-adjust: 100%;
+  }
+  html[lang="ar"] {
+    font-family: var(--font-arabic);
+  }
+  body {
+    min-height: 100dvh;
+  }
+  :focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+  }
+  ::selection {
+    background: var(--color-ink);
+    color: var(--color-bone);
+  }
+}
+
+@layer components {
+  /* Michroma headings; Arabic has no Michroma glyphs, so it falls to IBM Plex Sans Arabic. */
+  .display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    line-height: 1.12;
+  }
+  html[lang="ar"] .display {
+    font-family: var(--font-arabic);
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.35;
+  }
+  /* 12px is the smallest text on the site: anything smaller is hard to read on a phone. */
+  .label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+  html[lang="ar"] .label {
+    letter-spacing: 0;
+    font-size: 0.8125rem;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.75rem 1.5rem;
+    border: 1px solid var(--color-ink);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+    transition: background-color 150ms, color 150ms, opacity 150ms;
+    cursor: pointer;
+  }
+  html[lang="ar"] .btn {
+    letter-spacing: 0;
+    font-size: 0.875rem;
+  }
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--color-ink);
+    color: var(--color-bone);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #26262a;
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--color-ink);
+  }
+  .btn-outline:hover:not(:disabled) {
+    background: var(--color-ink);
+    color: var(--color-bone);
+  }
+  .btn-light {
+    background: var(--color-bone);
+    color: var(--color-ink);
+    border-color: var(--color-bone);
+  }
+  .btn-ghost-light {
+    background: transparent;
+    color: var(--color-bone);
+    border-color: color-mix(in srgb, var(--color-bone) 35%, transparent);
+  }
+  .btn-ghost-light:hover {
+    border-color: var(--color-bone);
+  }
+  .field {
+    width: 100%;
+    min-height: 2.75rem;
+    padding: 0.625rem 0.75rem;
+    background: var(--color-card);
+    border: 1px solid var(--color-line);
+    font-size: 0.9375rem;
+  }
+  .field:focus-visible {
+    outline-offset: 0;
+    border-color: var(--color-ink);
+  }
+  .field[aria-invalid="true"] {
+    border-color: var(--color-danger);
+  }
+  .shell {
+    width: 100%;
+    max-width: 76rem;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+  @media (min-width: 768px) {
+    .shell {
+      padding-inline: 2.5rem;
+    }
+  }
+}
+
+/* ── Opening animation ──
+   Server-rendered so there is no flash; plays once per browser session (an inline script adds
+   .intro-seen before first paint on later page loads), never blocks clicks for longer than it shows,
+   and is skipped entirely for people who ask for reduced motion. */
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: #000;
+  animation: intro-out 500ms ease 1900ms forwards;
+}
+.intro img {
+  width: min(62vw, 26rem);
+  height: auto;
+  opacity: 0;
+  animation: intro-in 900ms ease 150ms forwards;
+}
+.intro-skip {
+  position: absolute;
+  inset-block-end: 2rem;
+  inset-inline: 0;
+  text-align: center;
+  color: color-mix(in srgb, var(--color-bone) 55%, transparent);
+}
+.intro-seen .intro {
+  display: none;
+}
+@keyframes intro-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes intro-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro {
+    display: none;
+  }
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

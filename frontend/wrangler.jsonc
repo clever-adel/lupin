@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lupin-storefront",
+  "main": "./workers/app.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  // Where the Worker forwards /api/* and fetches data during server rendering.
+  // Local default; staging and production override it below (set the real Cloud Run URLs at deploy time).
+  "vars": {
+    "API_ORIGIN": "http://localhost:8080",
+    "SITE_ORIGIN": "http://localhost:5173"
+  },
+  "env": {
+    "staging": {
+      "vars": { "API_ORIGIN": "https://REPLACE-WITH-STAGING-CLOUD-RUN-URL", "SITE_ORIGIN": "https://staging.lupinwear.store" }
+    },
+    "production": {
+      "vars": { "API_ORIGIN": "https://REPLACE-WITH-PRODUCTION-CLOUD-RUN-URL", "SITE_ORIGIN": "https://lupinwear.store" }
+    }
+  }
+}
