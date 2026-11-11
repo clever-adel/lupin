@@ -1,0 +1,9 @@
+# Keep local data, build output and secrets out of the image build.
+target/
+.localdb/
+.local-pg/
+.e2e-db/
+.local-owner-password
+*.log
+.idea/
+.vscode/

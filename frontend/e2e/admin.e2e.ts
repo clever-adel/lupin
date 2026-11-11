@@ -105,6 +105,16 @@ test.describe.serial("staff dashboard", () => {
     await row.getByLabel("Add or remove stock for Black M").fill("abc");
     await expect(row.getByRole("button", { name: "Apply" })).toBeDisabled();
 
+    // Departments: closing Men hides its products from customers, opening it brings them back.
+    const departments = page.getByRole("region", { name: "Departments" });
+    await departments.getByRole("button", { name: "Close Men" }).click();
+    await expect(departments.getByRole("button", { name: "Open Men" })).toBeVisible();
+    expect((await page.request.get(`/api/v1/catalog${productPath.replace("/product/", "/products/")}`)).status()).toBe(404);
+    await departments.getByRole("button", { name: "Open Men" }).click();
+    await expect(departments.getByRole("button", { name: "Close Men" })).toBeVisible();
+    expect((await page.request.get(`/api/v1/catalog${productPath.replace("/product/", "/products/")}`)).status()).toBe(200);
+    await expect(departments.getByRole("button", { name: "Open Women" })).toBeVisible();
+
     // Customers see it; taking it off sale hides it again.
     await page.goto(productPath);
     await expect(page.getByRole("heading", { name: productName })).toBeVisible();

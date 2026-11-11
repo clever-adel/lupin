@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { errorText, money, type AdminProduct, type AdminVariant } from "~/features/admin/shared";
 import { api } from "~/lib/http";
-import type { Page } from "~/lib/types";
+import type { Department, Page } from "~/lib/types";
 
 const PRODUCT_STATUS: Record<string, string> = { DRAFT: "Draft (hidden)", ACTIVE: "On sale", ARCHIVED: "Archived (hidden)" };
 
@@ -48,6 +48,51 @@ function StockCell({ variant, onDone }: { variant: AdminVariant; onDone: () => v
   );
 }
 
+/** Open a department for sale, or put it back to "coming soon". Hidden departments are not listed. */
+function Departments() {
+  const client = useQueryClient();
+  const departments = useQuery({
+    queryKey: ["admin", "departments"],
+    queryFn: () => api<Department[]>("GET", "/api/v1/catalog/departments"),
+  });
+  const setStatus = useMutation({
+    mutationFn: ({ slug, status }: { slug: string; status: string }) =>
+      api<void>("PATCH", `/api/v1/admin/departments/${slug}`, { status }),
+    onSettled: () => client.invalidateQueries({ queryKey: ["admin", "departments"] }),
+  });
+  if (!departments.data) return null;
+  return (
+    <section className="mt-6 border border-line bg-card p-4" aria-labelledby="departments-title">
+      <h2 id="departments-title" className="text-sm font-semibold">Departments</h2>
+      <p className="mt-1 text-xs text-stone">
+        Customers can only shop a department that is open. “Coming soon” shows its name with a “Soon” tag and hides its products.
+      </p>
+      {setStatus.isError && <p role="alert" className="mt-2 text-sm text-danger">{errorText(setStatus.error)}</p>}
+      <ul className="mt-3 flex flex-wrap gap-3">
+        {departments.data.map((d) => {
+          const open = d.status === "ACTIVE";
+          return (
+            <li key={d.slug} className="flex items-center gap-3 border border-line px-3 py-2 text-sm">
+              <span>
+                <span className="font-semibold">{d.nameEn}</span>
+                <span className="block text-xs text-stone">{open ? `Open · ${d.productCount} on sale` : "Coming soon"}</span>
+              </span>
+              <button
+                type="button"
+                className="btn btn-outline"
+                disabled={setStatus.isPending}
+                onClick={() => setStatus.mutate({ slug: d.slug, status: open ? "COMING_SOON" : "ACTIVE" })}
+              >
+                {open ? `Close ${d.nameEn}` : `Open ${d.nameEn}`}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 export default function AdminProducts() {
   const client = useQueryClient();
   const [params, setParams] = useSearchParams();
@@ -76,6 +121,8 @@ export default function AdminProducts() {
       <p className="mt-2 text-sm text-stone">
         “Reserved” is stock held for orders that have not shipped yet. “Can sell” is what customers can still buy.
       </p>
+
+      <Departments />
 
       <form
         className="mt-5 flex items-end gap-3"

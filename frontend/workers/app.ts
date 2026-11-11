@@ -56,7 +56,14 @@ const SECURITY_HEADERS: Record<string, string> = {
 
 export default {
   async fetch(request, env, ctx) {
-    const { pathname } = new URL(request.url);
+    const { pathname, hostname } = new URL(request.url);
+    // One address for the store: www.lupinwear.store permanently redirects to lupinwear.store, so
+    // cookies, search engines and shared links all agree on a single origin.
+    if (hostname.startsWith("www.")) {
+      const target = new URL(request.url);
+      target.hostname = hostname.slice(4);
+      return Response.redirect(target.toString(), 301);
+    }
     if (pathname.startsWith("/api/")) {
       return proxyApi(request, env);
     }
