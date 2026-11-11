@@ -37,3 +37,6 @@ Thumbs.db
 backend/.e2e-db/
 frontend/test-results-e2e-web*.log
 .neon
+
+# Cloudflare CLI cache
+.wrangler/
