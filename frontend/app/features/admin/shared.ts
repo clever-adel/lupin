@@ -119,6 +119,7 @@ export const PAYMENT_STATUS_LABEL: Record<string, string> = {
   PAID: "Paid",
   FAILED: "Failed",
   REFUND_PENDING: "Refund needed",
+  PARTIALLY_REFUNDED: "Partly refunded",
   REFUNDED: "Refunded",
   NOT_REQUIRED: "Not required",
 };

@@ -47,7 +47,10 @@ export function useBag() {
       }
       return api<Cart>("DELETE", `/api/v1/cart/items/${c.variantId}`);
     },
-    onSuccess: (cart) => client.setQueryData(CART_KEY, cart),
+    onSuccess: async (cart) => {
+      await client.cancelQueries({ queryKey: CART_KEY }); // same reason as in useBagSync below
+      client.setQueryData(CART_KEY, cart);
+    },
     onError: () => client.invalidateQueries({ queryKey: CART_KEY }),
   });
 
@@ -107,9 +110,12 @@ export function useBagSync() {
     if (!me.data || bag.length === 0 || busy.current) return;
     busy.current = true;
     api<Cart>("POST", "/api/v1/cart/merge", { items: bag.slice(0, MAX_LINES) })
-      .then((cart) => {
-        bagActions.clearBag();
+      .then(async (cart) => {
+        // A "load my bag" request may still be in flight from before the merge; its older (empty)
+        // answer must not overwrite the merged bag when it arrives late.
+        await client.cancelQueries({ queryKey: CART_KEY });
         client.setQueryData(CART_KEY, cart);
+        bagActions.clearBag();
       })
       .catch(() => {
         // Left in this browser; the next page view tries again.

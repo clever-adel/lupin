@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/account";
 import { useRequireSignIn, useSignOut } from "~/features/auth/session";
-import { api } from "~/lib/http";
+import { api, ApiError } from "~/lib/http";
 import { toLang, translate, useT, type MessageKey } from "~/lib/i18n";
 import { layoutOrigin, seo } from "~/lib/seo";
 import type { OrderSummary, Page } from "~/lib/types";
@@ -30,9 +32,16 @@ export default function Account() {
     return <p className="shell py-20 text-stone" aria-busy="true">{t("auth.working")}</p>;
   }
   const user = me.data;
+  const isStaff = user.roles.some((r) => r === "ADMIN" || r === "OWNER");
 
   return (
     <div className="shell max-w-3xl pt-10">
+      {isStaff && (
+        <Link to="/admin" className="mb-6 flex items-center justify-between border border-ink bg-card px-4 py-3 text-sm font-semibold">
+          <span>{t("account.dashboard")}</span>
+          <span aria-hidden="true" className="rtl:rotate-180">→</span>
+        </Link>
+      )}
       <p className="label text-stone">{t("account.label")}</p>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
         <h1 className="display text-3xl">{t("account.hi", { name: user.fullName.split(" ")[0] ?? user.fullName })}</h1>
@@ -84,6 +93,57 @@ export default function Account() {
           </div>
         </dl>
       </section>
+
+      <ChangePassword staff={isStaff} />
     </div>
+  );
+}
+
+/** Changing the password ends every session, so the customer signs in again with the new one. */
+function ChangePassword({ staff }: { staff: boolean }) {
+  const { t, href, code } = useT();
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const minimum = staff ? 12 : 10;
+  const change = useMutation({
+    mutationFn: () => api<void>("POST", "/api/v1/auth/password", { currentPassword: current, newPassword: next }),
+    // A full page load, not a client-side move: every cached private response is dropped with the
+    // page, and no "you are signed out" redirect can race this one and lose the confirmation.
+    onSuccess: () => window.location.replace(`${href("/sign-in")}?changed=1`),
+  });
+  const failure = change.error instanceof ApiError ? change.error : null;
+
+  return (
+    <section aria-labelledby="password-title">
+      <h2 id="password-title" className="border-b border-line pb-3 text-sm font-semibold">{t("account.password")}</h2>
+      <form
+        noValidate
+        className="grid gap-4 py-5 sm:grid-cols-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (current && next.length >= minimum) change.mutate();
+        }}
+      >
+        <div>
+          <label htmlFor="current-password" className="mb-1.5 block text-sm font-medium">{t("account.currentPassword")}</label>
+          <input id="current-password" type="password" dir="ltr" autoComplete="current-password" className="field" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor="new-password" className="mb-1.5 block text-sm font-medium">{t("account.newPassword")}</label>
+          <input id="new-password" type="password" dir="ltr" autoComplete="new-password" aria-describedby="new-password-hint" className="field" value={next} onChange={(e) => setNext(e.target.value)} />
+          <p id="new-password-hint" className="mt-1 text-xs text-stone">{t("account.passwordHint", { count: minimum })}</p>
+        </div>
+        <div className="sm:col-span-2">
+          <button type="submit" className="btn btn-outline" disabled={change.isPending || !current || next.length < minimum}>
+            {change.isPending ? t("auth.working") : t("account.password")}
+          </button>
+          {change.isError && (
+            <p role="alert" className="mt-3 text-sm text-danger">
+              {failure?.fields?.newPassword ?? code("err", failure?.code)}
+            </p>
+          )}
+        </div>
+      </form>
+    </section>
   );
 }

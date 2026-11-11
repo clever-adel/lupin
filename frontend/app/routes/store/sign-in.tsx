@@ -27,7 +27,9 @@ export default function SignIn() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const me = useMe().data;
-  const next = safeNext(params.get("next"), href("/account"));
+  // Staff who sign in without a specific destination go to the dashboard, customers to their account.
+  const isStaff = Boolean(me?.roles.some((r) => r === "ADMIN" || r === "OWNER"));
+  const next = safeNext(params.get("next"), isStaff ? "/admin" : href("/account"));
 
   // Once only: `navigate` changes identity while a navigation is in flight, and redirecting again on
   // every change loops until the next page has loaded.
@@ -88,6 +90,9 @@ export default function SignIn() {
           </div>
           <div role="tabpanel" id="auth-panel" aria-labelledby={`tab-${mode}`}>
 
+          {params.get("changed") === "1" && !active.isError && (
+            <p role="status" className="mt-6 border border-ink px-3 py-2 text-sm">{t("auth.passwordChanged")}</p>
+          )}
           {formError && (
             <p role="alert" className="mt-6 border border-danger px-3 py-2 text-sm text-danger">{formError}</p>
           )}

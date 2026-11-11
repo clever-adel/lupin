@@ -13,6 +13,7 @@ export default [
     route("products/:id", "routes/admin/product.tsx"),
     route("promotions", "routes/admin/promotions.tsx"),
     route("content", "routes/admin/content.tsx"),
+    route("staff", "routes/admin/staff.tsx"),
     route("settings", "routes/admin/settings.tsx"),
   ]),
   route(":lang?", "routes/store/layout.tsx", [

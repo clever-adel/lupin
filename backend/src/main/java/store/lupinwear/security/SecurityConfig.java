@@ -56,7 +56,8 @@ public class SecurityConfig {
                     .permissionsPolicyHeader(p -> p.policy("camera=(), microphone=(), geolocation=()")))
             .authorizeHttpRequests(a -> a
                     .requestMatchers("/api/v1/admin/**").hasAnyRole("ADMIN", "OWNER")
-                    .requestMatchers("/api/v1/auth/me", "/api/v1/auth/logout-all").authenticated()
+                    .requestMatchers("/api/v1/auth/me", "/api/v1/auth/logout-all", "/api/v1/auth/password")
+                            .authenticated()
                     .requestMatchers("/api/v1/auth/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/catalog/**", "/api/v1/content/**",
                             "/api/v1/delivery/**").permitAll()

@@ -194,6 +194,32 @@ public class OrderAdminService {
         return get(reference);
     }
 
+    /**
+     * Records that money owed back to the customer has actually been returned (by hand, outside this
+     * system). Only possible while the order is waiting for a refund.
+     */
+    public AdminOrderView markRefunded(UUID actor, String reference, String note) {
+        record Row(UUID id, String paymentStatus) {
+        }
+        Row order = jdbc.sql("select id, payment_status from orders where reference = :r for update")
+                .param("r", reference).query((rs, n) -> new Row(rs.getObject(1, UUID.class), rs.getString(2)))
+                .optional().orElseThrow(() -> ApiException.notFound("Order"));
+        if (!"REFUND_PENDING".equals(order.paymentStatus())) {
+            throw ApiException.conflict("NO_REFUND_DUE", "This order is not waiting for a refund.");
+        }
+        String reason = note == null || note.isBlank() ? null : note.trim();
+        jdbc.sql("""
+                insert into refunds (payment_id, amount, status, reason, created_by)
+                select p.id, p.amount, 'SUCCEEDED', :reason, :by from payments p
+                where p.order_id = :o and p.status = 'PAID'
+                """).param("reason", reason).param("by", actor).param("o", order.id()).update();
+        jdbc.sql("update payments set status = 'REFUNDED', updated_at = now() where order_id = :o and status = 'PAID'")
+                .param("o", order.id()).update();
+        orders.setPaymentStatus(order.id(), "REFUNDED");
+        audit.record(actor, "ORDER_REFUNDED", "order", reference, reason == null ? Map.of() : Map.of("note", reason));
+        return get(reference);
+    }
+
     /** The goods leave: reserved stock becomes stock that is gone. */
     private void ship(UUID orderId, String reference, UUID actor, StatusChange change, OffsetDateTime now) {
         for (Reserved item : orders.items(orderId)) {

@@ -27,6 +27,11 @@ public final class AuthDtos {
             @NotBlank @Size(max = 128) String password) {
     }
 
+    public record PasswordChangeRequest(
+            @NotBlank @Size(max = 128) String currentPassword,
+            @NotBlank @Size(min = 10, max = 128, message = "Use at least 10 characters") String newPassword) {
+    }
+
     public record MeResponse(UUID id, String email, String phone, String fullName, Set<String> roles,
             boolean emailVerified, String preferredLang) {
 

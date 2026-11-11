@@ -80,6 +80,15 @@ public class AuthController {
         cookies.clear(res);
     }
 
+    /** Ends every session, this one included: the browser must sign in again with the new password. */
+    @PostMapping("/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void changePassword(@AuthenticationPrincipal CurrentUser user, @Valid @RequestBody AuthDtos.PasswordChangeRequest body,
+            HttpServletResponse res) {
+        auth.changeOwnPassword(user.id(), body.currentPassword(), body.newPassword());
+        cookies.clear(res);
+    }
+
     @GetMapping("/me")
     MeResponse me(@AuthenticationPrincipal CurrentUser user) {
         return MeResponse.of(auth.me(user.id()));

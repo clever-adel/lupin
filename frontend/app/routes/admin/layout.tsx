@@ -1,8 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { Link, NavLink, Outlet } from "react-router";
 import { useRequireSignIn, useSignOut } from "~/features/auth/session";
 import type { Summary } from "~/features/admin/shared";
-import { api } from "~/lib/http";
+import { api, ApiError } from "~/lib/http";
 
 export function meta() {
   return [{ title: "LUPIN. — Staff" }, { name: "robots", content: "noindex, nofollow" }];
@@ -22,7 +23,16 @@ export default function AdminLayout() {
     queryFn: () => api<Summary>("GET", "/api/v1/admin/summary"),
     enabled: isStaff,
     refetchInterval: 60_000,
+    retry: false,
   });
+
+  // The server ended this session (password reset, switched off, signed out elsewhere): the failed
+  // refresh has already cleared the cookies, so asking "who am I" again sends the visitor to sign in.
+  const client = useQueryClient();
+  const ended = summary.error instanceof ApiError && summary.error.status === 401;
+  useEffect(() => {
+    if (ended) client.invalidateQueries({ queryKey: ["me"] });
+  }, [ended, client]);
 
   if (me.isError) {
     return <p className="p-10 text-danger" role="alert">Something went wrong. Reload the page.</p>;
@@ -57,6 +67,7 @@ export default function AdminLayout() {
           </Link>
           <div className="flex items-center gap-4 text-xs text-bone/70">
             <span>{me.data.fullName} · {me.data.roles.includes("OWNER") ? "Owner" : "Admin"}</span>
+            <Link to="/account" className="underline">My password</Link>
             <Link to="/" className="underline">Store</Link>
             <button type="button" className="cursor-pointer underline" onClick={() => signOut.mutate()}>Sign out</button>
           </div>
@@ -68,6 +79,7 @@ export default function AdminLayout() {
           <NavLink to="/admin/promotions" className={link}>Offers</NavLink>
           <NavLink to="/admin/content" className={link}>Content</NavLink>
           <NavLink to="/admin/settings" className={link}>Settings</NavLink>
+          {me.data.roles.includes("OWNER") && <NavLink to="/admin/staff" className={link}>Staff</NavLink>}
         </nav>
       </header>
       <main className="shell py-8">

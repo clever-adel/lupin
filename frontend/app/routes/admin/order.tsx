@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useOutletContext, useParams } from "react-router";
+import type { AdminContext } from "./layout";
 import {
   errorText, money, PAYMENT_LABEL, PAYMENT_STATUS_LABEL, STATUS_LABEL, when, type AdminOrder,
 } from "~/features/admin/shared";
@@ -23,6 +24,8 @@ export default function AdminOrder() {
   const [note, setNote] = useState("");
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
+  const [confirmRefund, setConfirmRefund] = useState(false);
+  const { isOwner } = useOutletContext<AdminContext>();
 
   const query = useQuery({
     queryKey: key,
@@ -47,6 +50,15 @@ export default function AdminOrder() {
     onError: () => client.invalidateQueries({ queryKey: key }),
   });
 
+  const refund = useMutation({
+    mutationFn: () => api<AdminOrder>("POST", `/api/v1/admin/orders/${encodeURIComponent(reference)}/refunded`, {}),
+    onSuccess: (updated) => {
+      client.setQueryData(key, updated);
+      client.invalidateQueries({ queryKey: ["admin", "summary"] });
+      setConfirmRefund(false);
+    },
+  });
+
   if (query.isError) {
     const notFound = query.error instanceof ApiError && query.error.status === 404;
     return <p className="text-danger" role="alert">{notFound ? "There is no order with this reference." : "Could not load the order."}</p>;
@@ -67,9 +79,26 @@ export default function AdminOrder() {
       <p className="mt-1 text-sm text-stone">Placed {when(o.placedAt)}</p>
 
       {o.paymentStatus === "REFUND_PENDING" && (
-        <p className="mt-4 border border-danger bg-card px-3 py-2 text-sm text-danger" role="alert">
-          This order has been paid and is cancelled. The customer must be refunded {money(o.total)} by hand.
-        </p>
+        <div className="mt-4 border border-danger bg-card px-3 py-3 text-sm" role="alert">
+          <p className="text-danger">
+            This order has been paid and is cancelled. The customer must be refunded {money(o.total)} by hand.
+          </p>
+          {refund.isError && <p className="mt-2 text-danger">{errorText(refund.error)}</p>}
+          {!isOwner ? (
+            <p className="mt-2 text-stone">Only the owner can record that the refund was made.</p>
+          ) : confirmRefund ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="font-semibold">Has {money(o.total)} really been sent back to the customer?</span>
+              <button type="button" className="btn btn-primary" disabled={refund.isPending} onClick={() => refund.mutate()}>Yes, refund is done</button>
+              <button type="button" className="btn btn-outline" disabled={refund.isPending} onClick={() => setConfirmRefund(false)}>Back</button>
+            </div>
+          ) : (
+            <button type="button" className="btn btn-outline mt-3" onClick={() => setConfirmRefund(true)}>Refund has been made</button>
+          )}
+        </div>
+      )}
+      {o.paymentStatus === "REFUNDED" && (
+        <p className="mt-4 border border-line bg-card px-3 py-2 text-sm">The customer has been refunded.</p>
       )}
       {o.paymentStatus === "VERIFYING" && (
         <p className="mt-4 border border-ink bg-card px-3 py-2 text-sm">

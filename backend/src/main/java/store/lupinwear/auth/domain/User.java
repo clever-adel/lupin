@@ -96,6 +96,13 @@ public class User {
         lastLoginAt = now;
     }
 
+    /** A new password also clears any lockout from earlier wrong guesses. */
+    public void changePassword(String newHash) {
+        passwordHash = newHash;
+        failedLoginCount = 0;
+        lockedUntil = null;
+    }
+
     public void lockUntil(Instant until) {
         lockedUntil = until;
     }

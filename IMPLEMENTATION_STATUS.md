@@ -19,19 +19,31 @@ Last updated: 2026-11-10 (session 2). **Not production-ready** — see "Not star
 | Hardening | `sitemap.xml` (public pages in EN + AR with hreflang) and `robots.txt` (private and staff pages disallowed; everything disallowed unless the site origin is `https://lupinwear.store`); Content-Security-Policy with a per-request script nonce (no `unsafe-inline` for scripts); guests no longer call `/auth/me` (readable `lw_s` marker cookie, no secret); one shared sign-in redirect for private pages | Playwright `e2e/store.e2e.ts` (5) against the running local stack; `e2e/csp.e2e.ts` (1) against the served production build |
 | Accessibility and performance | Automated WCAG 2.1 A/AA scan (axe) of public, customer and staff pages in EN + AR; keyboard-only run (skip link, visible focus, focus moves to the new page's content, size choice and add to bag, sign-in tabs with arrow keys, focus on first invalid field); fixes: icon links named by content, proper tab semantics on sign-in, heading levels on the shop page, no text under 12 px. Fonts self-hosted (no third-party requests at all). `robots`/CSP unchanged | Playwright `e2e/a11y.e2e.ts` (5). Lighthouse 12 on the production build, mobile emulation, four pages: accessibility 100, best practices 100, performance 71–74, SEO 69 — see the two notes under "Built but not verified" |
 | API locked to the storefront | The Worker adds a shared key (`X-Lupin-Edge-Key`) to every request it makes or forwards and strips any client-sent copy, `Forwarded` and `X-Forwarded-For`; the API refuses requests without the key (403) before anything else runs; health probes exempt; staging and production refuse to start without a key of 32+ characters | `EdgeKeyIT` (2). On the running local stack with the key on: direct API call → 403 (also with a guessed key or forged forwarded headers), through the storefront → 200, 10 browser tests pass |
+| Staff accounts and admin fixes (session 3) | Staff land on the dashboard after sign-in and their account page links to it; Staff screen (owner adds admins/owners, switches them off and on, sets a new password); change-your-own-password for everyone; owner records a manual refund; offers are fully editable; staff requests re-check the account, its roles and a live session on every call, so a switched-off or re-keyed staff member is locked out at once | `StaffIT` (6) and `e2e/admin.e2e.ts` (9 scenarios covering every dashboard screen and button) |
+| Test coverage (session 3) | Backend unit tests for pure logic (signature, Paymob configuration, slugs, discount percent, sort, staff workflow table, lockout); frontend unit tests for form rules, API client (CSRF, one refresh, errors), code-to-text mapping; browser tests for shop filters, product controls, guest bag, language switch, not-found pages, every sign-in/sign-up error, checkout validation | See test results below |
 | Logo assets | Transparent lockup, mark, wordmark, favicon/app icon derived from the master PNG by `tools/derive-logo-assets.py` | Compared by eye with the original; cap on the I intact |
 | Storefront | React Router 7.18 SSR on the Cloudflare Workers runtime, `/api` proxy, design tokens, EN + AR (RTL), opening animation, header/footer, home, shop (URL-driven filters, works without JS), product, bag + favourites, sign in / create account, account | Browser run against the local API: pages render, add to bag, server-priced bag, register → account, Arabic RTL, 375 px with no horizontal scroll |
 | SEO basics | Per-page title/description, canonical, `hreflang`, Open Graph, Product + Breadcrumb JSON-LD, `noindex` on private/filtered pages | `seo.test.ts`; markup not yet run through a validator |
 
 **Test results (actually run, 2026-11-10):**
 
-- `backend`: `./mvnw test` → **46 tests, 0 failures** (session 2).
+**Latest full run (session 3, 2026-11-11):**
+
+- `backend`: `./mvnw test` → **70 tests, 0 failures** (52 against a real PostgreSQL, 18 pure unit tests).
+- `frontend` unit: `npx vitest run` → **42 tests, 0 failures**; `npx tsc` exit 0; `npm run build` succeeds.
+- `frontend` browser: `run-e2e.ps1` → **26 passed** on a throwaway stack (fresh database, API :8090, storefront :5183), plus the production-build check `csp.e2e.ts` → **1 passed** against `vite preview`. 27 browser tests in total: 5 accessibility/keyboard, 9 dashboard, 5 store, 7 storefront, 1 production build.
+- Bugs these tests found and that are now fixed: a changed password was not saved; a re-keyed staff member kept dashboard access until their token expired; a guest's bag could look empty at checkout right after sign-up; the "password changed" message was lost in a redirect.
+- Still not covered by any automated test: the real Paymob round trip (no keys), email flows (none exist), the dashboard in Arabic (it has none), product photos (not built).
+
+Earlier runs, kept for the record:
+
+- `backend`: `./mvnw test` → 46 tests, 0 failures (session 2).
 - `frontend`: `npx tsc` → exit 0 · `npx vitest run` → **13 tests, 0 failures** · `npm run build` → succeeds (session 2). 
 - `frontend` browser tests, latest full run: `E2E_PREVIEW_URL=http://localhost:4173 npx playwright test` → **11 passed** (5 store, 5 accessibility/keyboard, 1 production-build policy and fonts). Earlier note: `npx playwright test` → 5 passed (needs the local API and `npm run dev` running; uses the local owner login for the staff test). `E2E_PREVIEW_URL=http://localhost:4173 npx playwright test csp` → **1 passed** against `npm run build` + `npx vite preview --port 4173`. They cover: sign-up, add to bag, cash checkout, cancel and undo, staff confirm and cancel, customers blocked from the dashboard, Arabic RTL at 375 px, guests redirected from private pages, sitemap and robots, CSP. Not covered by browser tests: InstaPay, promo codes, the dashboard forms (settings, products, offers, content).
 
 ## Source control
 
-The work is committed locally on `main` (first commit `d8418b0`, 149 files). There is no remote yet: nothing is pushed anywhere. `D:\lupin` is still owned by a different Windows account ID, so git was told to trust it (`safe.directory D:/lupin` in the user's global git config, added with the owner's approval). The commit author is `cleve` with the owner's email, set for this repository only; change it with `git config user.name` if another name is wanted.
+The work is committed locally on `main` (first commit `d8418b0`). The remote `origin` is `https://github.com/clever-adel/lupin.git`; see the latest session notes for whether it has been pushed. `D:\lupin` is still owned by a different Windows account ID, so git was told to trust it (`safe.directory D:/lupin` in the user's global git config, added with the owner's approval). The commit author is `cleve` with the owner's email, set for this repository only; change it with `git config user.name` if another name is wanted.
 
 ## Built but not verified
 
@@ -70,7 +82,8 @@ Favourites on the server · product photos (Cloudinary signed upload: nothing bu
 22. Each browser-test run leaves two `e2e-…@example.test` customers and one cancelled order in the local demo database.
 20. The local demo database now holds test content made during verification: a "Demo Form Jacket" draft, promo code `DEMO10`, one demo question, a delivery policy with demo text, and a "Demo label" on the home headline. Delete `backend/.localdb` to start clean.
 21. Policy and FAQ text is plain text (paragraphs only): no headings, lists or links.
-18. Staff permissions are by role (ADMIN / OWNER); the finer permission codes in the database are not enforced yet. Admin MFA is not built.
+18. Staff permissions are by role (ADMIN / OWNER); the finer permission codes in the database are not enforced yet. Admin MFA is not built. A staff member's role cannot be changed after creation (create a new account instead).
+25. Browser tests run on their own stack: `powershell -ExecutionPolicy Bypass -File .\run-e2e.ps1` (optional filter, e.g. `admin`). It deletes and recreates `backend/.e2e-db` each time and never touches the everyday local data.
 19. Local demo staff login: `owner@lupin.local`, password in the git-ignored file `backend/.local-owner-password` (random, generated on this machine; exists only in the local demo database).
 16. The webhook and "start payment" paths lock rows in different orders; under a rare race PostgreSQL may abort one and Paymob retries the webhook.
 14. Some server error texts are English only; the pages translate known error codes and fall back to a generic message.

@@ -57,6 +57,17 @@ public class AdminOrderController {
         return orders.get(reference);
     }
 
+    public record RefundRequest(@Size(max = 300) String note) {
+    }
+
+    /** Giving money back is the owner's call (permission payments:refund). */
+    @PostMapping("/orders/{reference}/refunded")
+    @PreAuthorize("hasRole('OWNER')")
+    AdminOrderView refunded(@AuthenticationPrincipal CurrentUser user, @PathVariable String reference,
+            @Valid @RequestBody RefundRequest body) {
+        return orders.markRefunded(user.id(), reference, body.note());
+    }
+
     @PostMapping("/orders/{reference}/status")
     AdminOrderView changeStatus(@AuthenticationPrincipal CurrentUser user, @PathVariable String reference,
             @Valid @RequestBody StatusRequest body) {

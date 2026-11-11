@@ -16,8 +16,11 @@ import org.springframework.boot.SpringApplication;
 public class LocalDevServer {
 
     public static void main(String[] args) throws Exception {
+        // LUPIN_LOCAL_DB lets a second, separate copy run next to the everyday one (the browser tests
+        // use backend/.e2e-db on another port, so they never touch the data you are looking at).
+        String dataDir = System.getenv().getOrDefault("LUPIN_LOCAL_DB", ".localdb");
         EmbeddedPostgres pg = EmbeddedPostgres.builder()
-                .setDataDirectory(Path.of(".localdb").toAbsolutePath())
+                .setDataDirectory(Path.of(dataDir).toAbsolutePath())
                 .setCleanDataDirectory(false)
                 // Keep the PostgreSQL program files next to the project, not in the system temp folder:
                 // a temp clean-up while the server is running breaks every new database connection.

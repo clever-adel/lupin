@@ -158,11 +158,51 @@ public class AuthService {
                 .orElseThrow(() -> ApiException.unauthorized("UNAUTHENTICATED", "Please sign in."));
     }
 
-    /** Creates a staff account. Used only by the owner bootstrap and, later, staff management. */
+    /**
+     * A signed-in person changes their own password. Every session of theirs ends, including this
+     * one, so they sign in again with the new password and a stolen session stops working.
+     */
+    @Transactional(noRollbackFor = ApiException.class)
+    public void changeOwnPassword(UUID userId, String current, String next) {
+        rateLimiter.check("password:" + userId, 10);
+        User user = users.findById(userId).filter(User::canSignIn)
+                .orElseThrow(() -> ApiException.unauthorized("UNAUTHENTICATED", "Please sign in."));
+        if (user.getPasswordHash() == null || !passwords.matches(current, user.getPasswordHash())) {
+            throw ApiException.badRequest("WRONG_PASSWORD", "Your current password is not correct.");
+        }
+        boolean staff = user.roleCodes().contains(Role.ADMIN) || user.roleCodes().contains(Role.OWNER);
+        if (staff && next.length() < 12) {
+            throw ApiException.badRequest("WEAK_PASSWORD", "Staff passwords need at least 12 characters.");
+        }
+        if (passwords.matches(next, user.getPasswordHash())) {
+            throw ApiException.badRequest("SAME_PASSWORD", "Choose a password you have not just been using.");
+        }
+        user.changePassword(passwords.encode(next));
+        // Written now: the session update below clears pending changes that have not been flushed.
+        users.saveAndFlush(user);
+        sessions.revokeAllForUser(userId, clock.instant());
+    }
+
+    /** An owner sets a new password for a staff member who is locked out. Ends that person's sessions. */
+    @Transactional
+    public void resetStaffPassword(UUID staffId, String next) {
+        if (next.length() < 12) {
+            throw ApiException.badRequest("WEAK_PASSWORD", "Staff passwords need at least 12 characters.");
+        }
+        User user = users.findById(staffId).orElseThrow(() -> ApiException.notFound("Staff member"));
+        user.changePassword(passwords.encode(next));
+        users.saveAndFlush(user);
+        sessions.revokeAllForUser(staffId, clock.instant());
+    }
+
+    /** Creates a staff account. Used by the owner bootstrap and by staff management. */
     @Transactional
     public User createStaff(String email, String rawPassword, String fullName, String roleCode) {
         if (rawPassword.length() < 12) {
             throw ApiException.badRequest("WEAK_PASSWORD", "Staff passwords need at least 12 characters.");
+        }
+        if (users.existsByEmail(normalizeEmail(email))) {
+            throw ApiException.conflict("EMAIL_TAKEN", "An account with this email already exists.");
         }
         User user = new User(normalizeEmail(email), null, passwords.encode(rawPassword), fullName, "en");
         user.grant(role(roleCode));
