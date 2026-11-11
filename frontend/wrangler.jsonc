@@ -21,7 +21,7 @@
       "vars": { "API_ORIGIN": "https://REPLACE-WITH-STAGING-CLOUD-RUN-URL", "SITE_ORIGIN": "https://staging.lupinwear.store" }
     },
     "production": {
-      "vars": { "API_ORIGIN": "https://REPLACE-WITH-PRODUCTION-CLOUD-RUN-URL", "SITE_ORIGIN": "https://lupinwear.store" }
+      "vars": { "API_ORIGIN": "https://lupin-api-racc.onrender.com", "SITE_ORIGIN": "https://lupinwear.store" }
     }
   }
 }
