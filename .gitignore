@@ -36,3 +36,4 @@ Thumbs.db
 # Browser-test stack (run-e2e.ps1)
 backend/.e2e-db/
 frontend/test-results-e2e-web*.log
+.neon

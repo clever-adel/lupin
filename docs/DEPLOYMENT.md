@@ -56,12 +56,12 @@ Steps:
 1. Go to https://render.com and sign up **with GitHub** (as `clever-adel`). No card is asked for.
 2. Press **New → Blueprint**, connect the `clever-adel/lupin` repository when asked, and select it.
    Render reads `render.yaml` from the repository and shows one service, `lupin-api`.
-3. Render asks for five values. Type them into Render's form only:
-   - `DATABASE_URL` — `jdbc:postgresql://NEON_HOST/neondb?sslmode=require` with your Neon host in
-     place of `NEON_HOST` (keep `jdbc:postgresql://` at the start; do not paste Neon's
-     `postgresql://user:password@...` string)
-   - `DATABASE_USERNAME` — your Neon user, e.g. `neondb_owner`
-   - `DATABASE_PASSWORD` — your Neon password
+3. Render asks for three values. Type them into Render's form only:
+   - `DATABASE_URL` — Neon's connection string exactly as Neon shows it
+     (`postgresql://user:password@host/neondb?sslmode=require`), with connection pooling switched
+     off so the host has no `-pooler` in it. On this computer the same value is in `.env.local`
+     (git-ignored) as `DATABASE_URL_UNPOOLED`; copy it from there with
+     `(Get-Content D:\lupin\.env.local | Select-String '^DATABASE_URL_UNPOOLED=').Line.Split('=',2)[1].Trim('"') | Set-Clipboard`
    - `LUPIN_BOOTSTRAP_OWNER_EMAIL` — the email you will sign in to the dashboard with
    - `LUPIN_BOOTSTRAP_OWNER_PASSWORD` — a new password you choose, 12 characters or more
 4. Press **Apply** (or **Deploy Blueprint**). The first build takes 10 to 15 minutes. When the service

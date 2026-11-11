@@ -37,13 +37,10 @@ services:
       - key: LUPIN_EDGE_SECRET
         generateValue: true
 
-      # Asked for once, when the Blueprint is created.
-      # jdbc:postgresql://<neon host>/neondb?sslmode=require
+      # Asked for once, when the Blueprint is created. Paste Neon's connection string exactly as Neon
+      # shows it (postgresql://user:password@host/neondb?sslmode=require); use the one WITHOUT
+      # "-pooler" in the host. The app splits it into address, user and password itself.
       - key: DATABASE_URL
-        sync: false
-      - key: DATABASE_USERNAME
-        sync: false
-      - key: DATABASE_PASSWORD
         sync: false
       # First staff login. Remove both from the Environment page after the first successful sign-in.
       - key: LUPIN_BOOTSTRAP_OWNER_EMAIL
