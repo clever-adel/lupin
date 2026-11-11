@@ -1,0 +1,20 @@
+# The top-level Dockerfile builds only the back end; keep everything else, and anything local or
+# secret, out of the build.
+.git
+.github
+.claude
+.neon
+.env
+.env.*
+frontend
+docs
+brand-assets
+tools
+*.md
+*.ps1
+*.cmd
+backend/target
+backend/.localdb
+backend/.local-pg
+backend/.e2e-db
+backend/.local-owner-password
