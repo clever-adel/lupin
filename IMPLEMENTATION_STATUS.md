@@ -2,6 +2,18 @@
 
 Last updated: 2026-11-10 (session 2). **Not production-ready** — see "Not started".
 
+## Live deployment (2026-11-12)
+
+| Part | Where | Address |
+|---|---|---|
+| Storefront | Cloudflare Workers (`lupin-storefront-production`) | https://lupin-storefront-production.lupinwear.workers.dev (temporary; `lupinwear.store` is not connected yet) |
+| Back end | Render, free plan (`lupin-api`) | https://lupin-api-racc.onrender.com (refuses direct calls by design) |
+| Database | Neon project `lupin` (`old-leaf-69306231`), Frankfurt | — |
+
+Checked from outside on 2026-11-12: pages load in English and Arabic, the storefront reaches the back end with the edge key, script policy with nonce and HSTS are present, guests get 401 on private and staff APIs, the temporary address tells search engines not to index it. Not checked: signing in as the owner (the password is the owner's), and placing an order (the live database has no products, no delivery options and every payment method off until the owner sets them up).
+
+Known limits of this setup: Render's free plan sleeps after 15 minutes idle and took **over three minutes** to wake in a real test, during which the store shows "not reachable". A second back end on Railway (`lupin-api-production.up.railway.app`) was still running against the same database at the time of writing and should be deleted.
+
 ## Done and verified
 
 | Area | What exists | How it was verified |
