@@ -43,7 +43,7 @@ Earlier runs, kept for the record:
 
 ## Source control
 
-The work is committed locally on `main` (first commit `d8418b0`). The remote `origin` is `https://github.com/clever-adel/lupin.git`; see the latest session notes for whether it has been pushed. `D:\lupin` is still owned by a different Windows account ID, so git was told to trust it (`safe.directory D:/lupin` in the user's global git config, added with the owner's approval). The commit author is `cleve` with the owner's email, set for this repository only; change it with `git config user.name` if another name is wanted.
+The work is committed locally on `main` (first commit `d8418b0`). The remote `origin` is `https://github.com/clever-adel/lupin.git` (public); `main` was first pushed on 2026-11-11. `D:\lupin` is still owned by a different Windows account ID, so git was told to trust it (`safe.directory D:/lupin` in the user's global git config, added with the owner's approval). The commit author is `cleve` with the owner's email, set for this repository only; change it with `git config user.name` if another name is wanted.
 
 ## Built but not verified
 
@@ -51,7 +51,7 @@ The work is committed locally on `main` (first commit `d8418b0`). The remote `or
 - The unpaid-order job's timer (`UnpaidOrderJob`) — its logic is tested, the 5-minute schedule itself is not, and on Cloud Run it needs an always-on instance or Cloud Scheduler.
 - `backend/Dockerfile`, `docker-compose.yml`, `.github/workflows/ci.yml` — written, never executed (no Docker here, no GitHub repo yet).
 - Swagger UI (springdoc 2.8.9) — not opened.
-- Browser tests are not wired into CI (`.github/workflows/ci.yml` has never run at all).
+- CI (`.github/workflows/ci.yml`) runs on GitHub and passes as of commit `8b5be13` (2026-11-11): backend `./mvnw verify` with the integration tests on Testcontainers PostgreSQL 17, and frontend typecheck, unit tests and build. The browser tests are not part of CI yet; they run locally with `run-e2e.ps1`.
 - **Real-world performance.** Lighthouse was run against the local preview server, which sends files uncompressed (Lighthouse itself reports ~330 KB that compression would save) and with simulated slow 4G: performance 71–74, first paint about 4.2–4.4 s, no layout shift, no blocking time. Cloudflare compresses automatically, so the deployed number should be better, but it has not been measured. Measure again after deployment.
 - **Lighthouse SEO 69** is entirely the "page is blocked from indexing" check: `robots.txt` deliberately blocks everything unless the site origin is `https://lupinwear.store`. Not yet confirmed on the real domain.
 - **Screen readers.** No pass with a real screen reader (NVDA, VoiceOver, TalkBack) has been done; the automated scan cannot judge reading order or whether announcements make sense, in either language.
