@@ -26,7 +26,8 @@ public class JwtService {
     private final Clock clock;
 
     public JwtService(SecurityProperties props, Clock clock) {
-        byte[] secret = Decoders.BASE64.decode(props.jwtSecret());
+        // Hosts generate this value for us; some use the URL-safe base64 alphabet. Accept both.
+        byte[] secret = Decoders.BASE64.decode(props.jwtSecret().trim().replace('-', '+').replace('_', '/'));
         if (secret.length < 32) {
             throw new IllegalStateException("LUPIN_JWT_SECRET must be at least 32 bytes (base64 encoded)");
         }

@@ -9,7 +9,7 @@ What goes where:
 | Part | Where | Cost |
 |---|---|---|
 | Database | Neon PostgreSQL | Free tier |
-| Back end (Java API) | Google Cloud Run | Free tier covers light use; a billing account is required |
+| Back end (Java API) | Render (free plan, no card) — or Google Cloud Run if you later add billing | Free; sleeps when idle (see Phase 2) |
 | Storefront | Cloudflare Workers | Free tier |
 | Domain `lupinwear.store` | Stays registered at Hostinger; its DNS moves to Cloudflare | Free |
 
@@ -39,9 +39,53 @@ Check: the Neon dashboard shows the project as **Active**.
 
 ---
 
-## Phase 2 — Back end (Google Cloud Run), about 20 minutes
+## Phase 2 — Back end on Render (free, no card), about 15 minutes
 
-Everything in this phase is typed into **Cloud Shell**, a terminal inside the Google Cloud website.
+What "free" means here, so there are no surprises:
+
+- The back end **sleeps after 15 minutes without visitors**. The next visitor waits while it wakes:
+  Render says about a minute; a Java application on the free plan's small CPU share can take longer.
+  During that wait the store shows "not reachable".
+- 512 MB of memory (the settings in `render.yaml` are sized and measured for it) and 750 hours a month.
+- Render's own documentation says **not to run production applications on the free plan**. Use it to see
+  the store live and to test. Before real customers depend on it, switch `plan` in `render.yaml` to a
+  paid one, or move to Cloud Run.
+
+Steps:
+
+1. Go to https://render.com and sign up **with GitHub** (as `clever-adel`). No card is asked for.
+2. Press **New → Blueprint**, connect the `clever-adel/lupin` repository when asked, and select it.
+   Render reads `render.yaml` from the repository and shows one service, `lupin-api`.
+3. Render asks for five values. Type them into Render's form only:
+   - `DATABASE_URL` — `jdbc:postgresql://NEON_HOST/neondb?sslmode=require` with your Neon host in
+     place of `NEON_HOST` (keep `jdbc:postgresql://` at the start; do not paste Neon's
+     `postgresql://user:password@...` string)
+   - `DATABASE_USERNAME` — your Neon user, e.g. `neondb_owner`
+   - `DATABASE_PASSWORD` — your Neon password
+   - `LUPIN_BOOTSTRAP_OWNER_EMAIL` — the email you will sign in to the dashboard with
+   - `LUPIN_BOOTSTRAP_OWNER_PASSWORD` — a new password you choose, 12 characters or more
+4. Press **Apply** (or **Deploy Blueprint**). The first build takes 10 to 15 minutes. When the service
+   shows **Live**, copy its address from the top of the page, like `https://lupin-api-xxxx.onrender.com`.
+
+Check, in your browser:
+
+- `https://YOUR-RENDER-ADDRESS/actuator/health` shows `{"status":"UP"` …
+- `https://YOUR-RENDER-ADDRESS/api/v1/catalog/departments` shows a short "FORBIDDEN" message. That is
+  correct: the API refuses anything that does not come through the storefront.
+
+If it does not go Live, open the service's **Logs** tab and send the last 30 lines (they contain no secrets).
+
+For Phase 3 you need two things from Render:
+
+- the service address (not a secret);
+- the edge key: service → **Environment** → `LUPIN_EDGE_SECRET` → reveal and copy. You paste it once into
+  a terminal prompt in Phase 3; do not put it anywhere else.
+
+---
+
+## Phase 2, alternative — Google Cloud Run (needs a billing account), about 20 minutes
+
+Skip this if you used Render. Everything in this phase is typed into **Cloud Shell**, a terminal inside the Google Cloud website.
 Nothing is installed on your computer.
 
 1. Go to https://console.cloud.google.com, create a project named `lupin-store`, and attach a
@@ -124,7 +168,7 @@ any time with `gcloud run services update lupin-api --region europe-west1 --min-
 This phase runs on your own computer, in PowerShell.
 
 1. Sign up at https://dash.cloudflare.com.
-2. Tell me the Service URL from Phase 2 (it is an address, not a secret). I put it into
+2. Tell me the back end's address from Phase 2 (it is an address, not a secret). I put it into
    `frontend/wrangler.jsonc` as the production `API_ORIGIN` and commit it.
 3. Sign in to Cloudflare from the terminal (a browser window opens; press Allow):
 
@@ -140,13 +184,10 @@ $env:CLOUDFLARE_ENV="production"; npm run build; npx wrangler deploy
 
    It prints an address like `https://lupin-storefront-production.YOUR-NAME.workers.dev`.
 
-5. Give the storefront the same edge key the API has. In Cloud Shell, print it:
+5. Give the storefront the same edge key the API has. On Render it is the `LUPIN_EDGE_SECRET` value on
+   the service's Environment page. (On Cloud Run: `gcloud secrets versions access latest --secret=lupin-edge-secret`.)
 
-```bash
-gcloud secrets versions access latest --secret=lupin-edge-secret
-```
-
-   Back in PowerShell, run the next command and paste that value when it asks. Until this is done
+   In PowerShell, run the next command and paste that value when it asks. Until this is done
    the store shows "not reachable", because the API refuses the storefront:
 
 ```bash
@@ -161,7 +202,9 @@ Phase 2, and the dashboard opens.
 
 ## Phase 4 — First setup in the dashboard (before any customer sees it)
 
-1. **Remove the bootstrap login settings** now that the owner exists (Cloud Shell):
+1. **Remove the bootstrap login settings** now that the owner exists. On Render: service →
+   Environment → delete `LUPIN_BOOTSTRAP_OWNER_EMAIL` and `LUPIN_BOOTSTRAP_OWNER_PASSWORD` → Save.
+   On Cloud Run (Cloud Shell):
 
 ```bash
 gcloud run services update lupin-api --region europe-west1 --remove-env-vars LUPIN_BOOTSTRAP_OWNER_EMAIL --remove-secrets LUPIN_BOOTSTRAP_OWNER_PASSWORD
