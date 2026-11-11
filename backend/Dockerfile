@@ -17,6 +17,11 @@ COPY --from=build /layers/spring-boot-loader/ ./
 COPY --from=build /layers/snapshot-dependencies/ ./
 COPY --from=build /layers/application/ ./
 USER 10001
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
+# Same defaults as the top-level Dockerfile, so a host that builds from this folder without
+# render.yaml (a service created by hand on Render) still gets the measured 512 MB settings.
+ENV SPRING_PROFILES_ACTIVE=production \
+    DATABASE_POOL_SIZE=3 \
+    LUPIN_PUBLIC_BASE_URL=https://lupinwear.store \
+    JAVA_TOOL_OPTIONS="-Xmx200m -XX:MaxMetaspaceSize=140m -XX:ReservedCodeCacheSize=40m -XX:+UseSerialGC -Xss512k -XX:TieredStopAtLevel=1 -XX:+ExitOnOutOfMemoryError"
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "lupin-backend-0.1.0-SNAPSHOT.jar"]
