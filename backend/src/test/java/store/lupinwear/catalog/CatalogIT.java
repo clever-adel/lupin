@@ -181,6 +181,25 @@ class CatalogIT extends IntegrationTest {
     }
 
     @Test
+    void productAcceptsPhotosUploadedToSameOriginMediaPath() throws Exception {
+        String publicId = UUID.randomUUID() + ".webp";
+        ProductRequest base = request("R2 Photo Product", "1000.00", null, 1);
+        List<ColorRequest> colors = List.of(new ColorRequest("Black", "أسود", "#0B0B0C", true,
+                List.of(new ImageRequest(publicId, "/media/" + publicId, "Front", "أمام"))));
+        ProductRequest withUploadedPhoto = new ProductRequest(base.nameEn(), base.nameAr(), base.departmentSlug(),
+                base.categorySlug(), base.descriptionEn(), base.descriptionAr(), base.fabricEn(), base.fabricAr(),
+                base.fitEn(), base.fitAr(), base.brand(), base.badge(), base.price(), base.salePrice(), base.sizeGroup(),
+                List.of("M"), colors, base.initialStockPerVariant());
+
+        JsonNode created = create(withUploadedPhoto);
+        String savedUrl = jdbc.sql("select url from product_images where public_id = :id")
+                .param("id", publicId).query(String.class).single();
+
+        assertThat(savedUrl).isEqualTo("/media/" + publicId);
+        assertThat(created.path("id").asLong()).isPositive();
+    }
+
+    @Test
     void sameNameGetsAUniqueSlugAndWritesAnAuditRow() throws Exception {
         String a = create(request("Twin Jacket", "1000.00", null, 1)).get("slug").asText();
         String b = create(request("Twin Jacket", "1000.00", null, 1)).get("slug").asText();

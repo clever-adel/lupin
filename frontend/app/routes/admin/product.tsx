@@ -216,6 +216,17 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
   });
 
   const coloursOk = colours.every((c) => c.nameEn.trim() && c.nameAr.trim());
+  const missingDraftRequirements = [
+    !f.nameEn.trim() ? "English product name" : "",
+    !f.nameAr.trim() ? "Arabic product name" : "",
+    !f.categorySlug ? (categories.length ? "category" : "create a category first") : "",
+    !(Number(price) > 0) ? "price greater than zero" : "",
+    sizes.length === 0 ? "at least one size" : "",
+    ...colours.flatMap((colour, index) => [
+      !colour.nameEn.trim() ? `colour ${index + 1} English name` : "",
+      !colour.nameAr.trim() ? `colour ${index + 1} Arabic name` : "",
+    ]),
+  ].filter(Boolean);
   const ready = f.nameEn.trim() && f.nameAr.trim() && f.categorySlug && Number(price) > 0
     && (existing || (sizes.length > 0 && coloursOk));
   const box = "border border-line bg-card p-5";
@@ -237,7 +248,7 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
       ) : (
         <p className="text-sm text-stone">
           The product is saved as a hidden draft. Put it on sale from “Products &amp; stock” when it is ready.
-          Add up to 10 HTTPS image links for each colour below.
+          Upload up to 10 photos from your device for each colour below.
         </p>
       )}
 
@@ -266,7 +277,10 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
             </select>
           </div>
         </div>
-        <details className="mt-3 text-sm">
+        {!categories.length && !existing && (
+          <p className="mt-3 text-sm text-danger" role="status">There are no categories in this department yet. Create one below before saving the draft.</p>
+        )}
+        <details className="mt-3 text-sm" open={!categories.length && !existing}>
           <summary className="cursor-pointer">Add a new category to {department?.nameEn ?? "this department"}</summary>
           <div className="mt-3 flex flex-wrap items-end gap-3">
             <Text id="catEn" label="Category name (English)" value={newCategoryEn} onChange={setNewCategoryEn} />
@@ -356,8 +370,8 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
                 return (
                   <li key={i} className="flex flex-wrap items-center gap-2">
                     <input type="radio" name="mainColour" className="accent-ink" aria-label={`Main colour: ${c.nameEn || `colour ${i + 1}`}`} checked={mainColour === i} onChange={() => setMainColour(i)} />
-                    <input className="field w-40" aria-label="Colour name (English)" placeholder="Black" value={c.nameEn} onChange={(e) => update({ nameEn: e.target.value })} />
-                    <input className="field w-40" dir="rtl" aria-label="Colour name (Arabic)" placeholder="أسود" value={c.nameAr} onChange={(e) => update({ nameAr: e.target.value })} />
+                    <input className="field w-40" aria-label="Colour name (English)" placeholder="Black" required={!existing} value={c.nameEn} onChange={(e) => update({ nameEn: e.target.value })} />
+                    <input className="field w-40" dir="rtl" aria-label="Colour name (Arabic)" placeholder="أسود" required={!existing} value={c.nameAr} onChange={(e) => update({ nameAr: e.target.value })} />
                     <input type="color" aria-label="Colour swatch" className="h-11 w-14 cursor-pointer border border-line bg-card" value={c.hex} onChange={(e) => update({ hex: e.target.value })} />
                     {colours.length > 1 && (
                       <button
@@ -413,6 +427,11 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
         {save.isSuccess && existing && <span role="status" className="text-sm">Saved.</span>}
         {save.isError && <span role="alert" className="text-sm text-danger">{errorText(save.error)}</span>}
       </div>
+      {!existing && missingDraftRequirements.length > 0 && (
+        <p role="status" className="text-sm text-stone">
+          To enable “Create draft product”, complete: {missingDraftRequirements.join(", ")}.
+        </p>
+      )}
     </form>
   );
 }

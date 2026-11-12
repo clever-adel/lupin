@@ -77,7 +77,7 @@ public final class CatalogDtos {
 
     public record ImageRequest(
             @NotBlank @Size(max = 255) String publicId,
-            @NotBlank @Size(max = 600) @Pattern(regexp = "^https://.*") String url,
+            @NotBlank @Size(max = 600) @Pattern(regexp = "^(https://.*|/media/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.(jpg|png|webp|avif))$") String url,
             @Size(max = 200) String altEn,
             @Size(max = 200) String altAr) {
     }
