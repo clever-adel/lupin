@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { errorText } from "~/features/admin/shared";
-import { api } from "~/lib/http";
+import { api, deleteUploadedImage, uploadImages } from "~/lib/http";
 import type { Department } from "~/lib/types";
 
 interface Detail {
@@ -64,39 +64,57 @@ function Text({ id, label, value, onChange, rtl, area, required }: {
 }
 
 function ColourPhotos({ colour, onChange }: { colour: Colour; onChange: (images: ImageInput[]) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const update = (index: number, patch: Partial<ImageInput>) =>
     onChange(colour.images.map((image, i) => i === index ? { ...image, ...patch } : image));
+  const addFiles = async (selected: FileList | null) => {
+    if (!selected?.length) return;
+    const files = Array.from(selected);
+    if (colour.images.length + files.length > 10) {
+      setUploadError("Choose up to 10 photos for this colour.");
+      return;
+    }
+    setUploadError("");
+    setUploading(true);
+    try {
+      const uploaded = await uploadImages(files);
+      onChange([...colour.images, ...uploaded.map((image) => ({ ...image, altEn: "", altAr: "" }))]);
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "Could not upload the selected images.");
+    } finally {
+      setUploading(false);
+    }
+  };
   return (
     <div className="mt-4 border-t border-line pt-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-medium">{colour.nameEn || "Colour"} photos ({colour.images.filter((image) => image.url.trim()).length}/10)</h3>
-        <button
-          type="button"
-          className="btn btn-outline"
-          disabled={colour.images.length >= 10}
-          onClick={() => onChange([...colour.images, { publicId: crypto.randomUUID(), url: "", altEn: "", altAr: "" }])}
-        >
-          Add photo
-        </button>
+        <label className={`btn btn-outline ${colour.images.length >= 10 || uploading ? "pointer-events-none opacity-50" : "cursor-pointer"}`}>
+          {uploading ? "Uploading…" : "Choose photos"}
+          <input
+            className="sr-only"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/avif"
+            multiple
+            disabled={colour.images.length >= 10 || uploading}
+            onChange={(event) => {
+              void addFiles(event.target.files);
+              event.currentTarget.value = "";
+            }}
+          />
+        </label>
       </div>
+      <p className="mt-2 text-sm text-stone">Choose up to 10 JPG, PNG, WebP, or AVIF photos from your device (10 MB each, 50 MB per upload).</p>
+      {uploadError && <p className="mt-2 text-sm text-danger" role="alert">{uploadError}</p>}
       {colour.images.length === 0 ? (
-        <p className="mt-2 text-sm text-stone">Add up to 10 HTTPS image links for this colour.</p>
+        <p className="mt-2 text-sm text-stone">No photos added yet.</p>
       ) : (
         <ol className="mt-3 space-y-3">
           {colour.images.map((image, index) => (
-            <li key={image.publicId} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_1fr_1fr_auto]">
-              <label className="text-xs text-stone sm:col-span-4" htmlFor={`photo-${colour.id ?? colour.nameEn}-${index}`}>
-                Photo {index + 1} URL (HTTPS)
-              </label>
-              <input
-                id={`photo-${colour.id ?? colour.nameEn}-${index}`}
-                className="field sm:col-span-4"
-                type="url"
-                inputMode="url"
-                placeholder="https://…"
-                value={image.url}
-                onChange={(event) => update(index, { url: event.target.value })}
-              />
+            <li key={image.publicId} className="grid items-center gap-2 sm:grid-cols-[100px_minmax(0,1fr)_1fr_1fr_auto]">
+              <img src={image.url} alt="" className="h-24 w-24 rounded border border-line object-cover" />
+              <span className="text-xs text-stone">Photo {index + 1}</span>
               <input className="field" aria-label={`Photo ${index + 1} alt text (English)`} placeholder="Alt text (English)" value={image.altEn} onChange={(event) => update(index, { altEn: event.target.value })} />
               <input className="field" aria-label={`Photo ${index + 1} alt text (Arabic)`} dir="rtl" placeholder="النص البديل (عربي)" value={image.altAr} onChange={(event) => update(index, { altAr: event.target.value })} />
               <button type="button" className="cursor-pointer px-2 text-sm underline" onClick={() => onChange(colour.images.filter((_, i) => i !== index))}>
@@ -171,11 +189,14 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
       };
       if (existing) {
         await api("PUT", `/api/v1/admin/products/${existing.id}`, { ...common, featured: f.featured });
+        const removed = (existing.colors ?? []).flatMap((colour) => colour.images)
+          .filter((image) => image.url.startsWith("/media/") && !colours.some((colour) => colour.images.some((next) => next.publicId === image.publicId)));
         await Promise.all(colours.map((colour) =>
           api("PUT", `/api/v1/admin/products/${existing.id}/colors/${colour.id}/images`, {
             images: colour.images.filter((image) => image.url.trim()).map(({ publicId, url, altEn, altAr }) => ({ publicId, url, altEn, altAr })),
           }),
         ));
+        await Promise.allSettled(removed.map((image) => deleteUploadedImage(image.publicId)));
         return existing.id;
       }
       const created = await api<{ id: number }>("POST", "/api/v1/admin/products", {
@@ -371,7 +392,7 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
       {existing && (
         <section className={box}>
           <h2 className="font-semibold">Photos by colour</h2>
-          <p className="mt-1 text-sm text-stone">Add up to 10 HTTPS image links per colour. These appear in the product gallery when shoppers select that colour.</p>
+          <p className="mt-1 text-sm text-stone">Upload up to 10 photos per colour from your device. These appear in the product gallery when shoppers select that colour.</p>
           <div className="mt-4 divide-y divide-line">
             {colours.map((colour, index) => (
               <div key={colour.id} className={index === 0 ? "" : "pt-4"}>

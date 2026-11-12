@@ -11,6 +11,9 @@
     "API_ORIGIN": "http://localhost:8080",
     "SITE_ORIGIN": "http://localhost:5173"
   },
+  "r2_buckets": [
+    { "binding": "MEDIA_BUCKET", "bucket_name": "lupin-product-images" }
+  ],
   "env": {
     // Browser tests: a second local copy on its own ports (CLOUDFLARE_ENV=e2e), so tests never use
     // the database you are looking at on :5173.

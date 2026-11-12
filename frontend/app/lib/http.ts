@@ -15,6 +15,11 @@ export class ApiError extends Error {
   }
 }
 
+export interface UploadedImage {
+  publicId: string;
+  url: string;
+}
+
 function readCookie(name: string): string | undefined {
   const match = document.cookie.split("; ").find((c) => c.startsWith(name + "="));
   return match ? decodeURIComponent(match.slice(name.length + 1)) : undefined;
@@ -67,4 +72,43 @@ export async function api<T>(method: string, path: string, body?: unknown): Prom
     throw new ApiError(response.status, payload?.code ?? "ERROR", payload?.message ?? "", payload?.fields);
   }
   return payload as T;
+}
+
+/** Upload images directly to the same-origin Worker, which stores them in private R2 and serves them publicly. */
+export async function uploadImages(files: File[]): Promise<UploadedImage[]> {
+  const form = new FormData();
+  for (const file of files) form.append("files", file);
+  const sendUpload = async () => fetch("/media/upload", {
+    method: "POST",
+    headers: { "X-XSRF-TOKEN": await csrfToken(), Accept: "application/json" },
+    credentials: "same-origin",
+    body: form,
+  });
+  let response = await sendUpload();
+  if (response.status === 401 && await refreshSession()) response = await sendUpload();
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { message?: string } | null;
+    throw new ApiError(response.status, "IMAGE_UPLOAD_FAILED", payload?.message ?? "Could not upload the selected images.");
+  }
+  return await response.json() as UploadedImage[];
+}
+
+export async function deleteUploadedImage(publicId: string): Promise<void> {
+  const response = await fetch(`/media/${encodeURIComponent(publicId)}`, {
+    method: "DELETE",
+    headers: { "X-XSRF-TOKEN": await csrfToken(), Accept: "application/json" },
+    credentials: "same-origin",
+  });
+  if (response.status === 401 && await refreshSession()) {
+    const retry = await fetch(`/media/${encodeURIComponent(publicId)}`, {
+      method: "DELETE",
+      headers: { "X-XSRF-TOKEN": await csrfToken(), Accept: "application/json" },
+      credentials: "same-origin",
+    });
+    if (retry.ok || retry.status === 404) return;
+    throw new ApiError(retry.status, "IMAGE_DELETE_FAILED", "Could not remove an image from storage.");
+  }
+  if (!response.ok && response.status !== 404) {
+    throw new ApiError(response.status, "IMAGE_DELETE_FAILED", "Could not remove an image from storage.");
+  }
 }

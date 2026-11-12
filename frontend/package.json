@@ -6,7 +6,7 @@
     "dev": "react-router dev",
     "build": "react-router build",
     "preview": "npm run build && vite preview",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "npm run build && wrangler deploy --var API_ORIGIN:https://lupin-api-racc.onrender.com --var SITE_ORIGIN:https://lupinwear.store",
     "typecheck": "wrangler types && react-router typegen && tsc",
     "test": "vitest run",
     "test:e2e": "playwright test"
