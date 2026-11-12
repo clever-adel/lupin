@@ -2,6 +2,7 @@ package store.lupinwear.catalog.application;
 
 import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -19,6 +20,8 @@ import store.lupinwear.catalog.api.CatalogDtos.ProductCreated;
 import store.lupinwear.catalog.api.CatalogDtos.ProductRequest;
 import store.lupinwear.catalog.api.CatalogDtos.StockView;
 import store.lupinwear.catalog.api.CatalogDtos.AdminProductDetail;
+import store.lupinwear.catalog.api.CatalogDtos.AdminColor;
+import store.lupinwear.catalog.api.CatalogDtos.AdminImage;
 import store.lupinwear.catalog.api.CatalogDtos.AdminProductRow;
 import store.lupinwear.catalog.api.CatalogDtos.ProductUpdateRequest;
 import store.lupinwear.catalog.api.CatalogDtos.AdminVariantRow;
@@ -192,7 +195,7 @@ public class CatalogAdminService {
 
     @Transactional(readOnly = true)
     public AdminProductDetail productForEdit(long id) {
-        return jdbc.sql("""
+        AdminProductDetail product = jdbc.sql("""
                 select p.id, p.slug, p.status, d.slug, c.slug, p.name_en, p.name_ar, p.description_en,
                        p.description_ar, p.fabric_en, p.fabric_ar, p.fit_en, p.fit_ar, p.badge, p.price, p.sale_price,
                        p.featured
@@ -202,8 +205,53 @@ public class CatalogAdminService {
                 .query((rs, n) -> new AdminProductDetail(rs.getLong(1), rs.getString(2), rs.getString(3),
                         rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8),
                         rs.getString(9), rs.getString(10), rs.getString(11), rs.getString(12), rs.getString(13),
-                        rs.getString(14), rs.getBigDecimal(15), rs.getBigDecimal(16), rs.getBoolean(17)))
+                        rs.getString(14), rs.getBigDecimal(15), rs.getBigDecimal(16), rs.getBoolean(17), List.of()))
                 .optional().orElseThrow(() -> ApiException.notFound("Product"));
+        record ColorHead(long id, String nameEn, String nameAr, String hex) {
+        }
+        List<ColorHead> colorHeads = jdbc.sql("""
+                select id, name_en, name_ar, hex from product_colors where product_id = :p order by sort_order, id
+                """).param("p", id).query((rs, n) -> new ColorHead(rs.getLong(1), rs.getString(2), rs.getString(3),
+                        rs.getString(4))).list();
+        Map<Long, List<AdminImage>> imagesByColor = new HashMap<>();
+        if (!colorHeads.isEmpty()) {
+            jdbc.sql("""
+                    select pi.color_id, pi.id, pi.public_id, pi.url, pi.alt_en, pi.alt_ar
+                    from product_images pi join product_colors pc on pc.id = pi.color_id
+                    where pc.product_id = :p order by pc.sort_order, pi.position, pi.id
+                    """).param("p", id).query((rs, n) -> imagesByColor
+                    .computeIfAbsent(rs.getLong(1), key -> new ArrayList<>())
+                    .add(new AdminImage(rs.getLong(2), rs.getString(3), rs.getString(4), rs.getString(5),
+                            rs.getString(6)))).list();
+        }
+        List<AdminColor> colors = colorHeads.stream().map(color -> new AdminColor(color.id(), color.nameEn(),
+                color.nameAr(), color.hex(), imagesByColor.getOrDefault(color.id(), List.of()))).toList();
+        return new AdminProductDetail(product.id(), product.slug(), product.status(), product.departmentSlug(),
+                product.categorySlug(), product.nameEn(), product.nameAr(), product.descriptionEn(),
+                product.descriptionAr(), product.fabricEn(), product.fabricAr(), product.fitEn(), product.fitAr(),
+                product.badge(), product.price(), product.salePrice(), product.featured(), colors);
+    }
+
+    public void replaceColorImages(UUID actor, long productId, long colorId, List<ImageRequest> images) {
+        boolean belongs = jdbc.sql("""
+                select count(*) from product_colors c join products p on p.id = c.product_id
+                where c.id = :c and c.product_id = :p and p.deleted_at is null
+                """)
+                .param("c", colorId).param("p", productId).query(Long.class).single() > 0;
+        if (!belongs) throw ApiException.notFound("Colour");
+        jdbc.sql("delete from product_images where color_id = :c").param("c", colorId).update();
+        List<ImageRequest> safeImages = images == null ? List.of() : images;
+        for (int i = 0; i < safeImages.size(); i++) {
+            ImageRequest image = safeImages.get(i);
+            jdbc.sql("""
+                    insert into product_images (color_id, public_id, url, alt_en, alt_ar, position)
+                    values (:c, :pid, :url, :altEn, :altAr, :pos)
+                    """).param("c", colorId).param("pid", image.publicId()).param("url", image.url())
+                    .param("altEn", orEmpty(image.altEn())).param("altAr", orEmpty(image.altAr()))
+                    .param("pos", (short) i).update();
+        }
+        audit.record(actor, "PRODUCT_COLOUR_IMAGES_UPDATE", "product_colour", colorId,
+                Map.of("productId", productId, "imageCount", safeImages.size()));
     }
 
     /** Orders already placed keep the name and price they were bought at; this only affects what is sold next. */

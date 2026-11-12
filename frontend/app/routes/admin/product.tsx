@@ -23,17 +23,27 @@ interface Detail {
   price: number;
   salePrice?: number;
   featured: boolean;
+  colors: Colour[];
+}
+
+interface ImageInput {
+  publicId: string;
+  url: string;
+  altEn: string;
+  altAr: string;
 }
 
 interface Colour {
+  id?: number;
   nameEn: string;
   nameAr: string;
   hex: string;
+  images: ImageInput[];
 }
 
 const ADULT_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "ONE"];
 const KIDS_SIZES = ["2-3Y", "4-5Y", "6-7Y", "8-9Y", "10-11Y", "12-13Y"];
-const EMPTY: Omit<Detail, "id" | "slug" | "status"> = {
+const EMPTY: Omit<Detail, "id" | "slug" | "status" | "colors"> = {
   departmentSlug: "", categorySlug: "", nameEn: "", nameAr: "", descriptionEn: "", descriptionAr: "",
   fabricEn: "", fabricAr: "", fitEn: "", fitAr: "", badge: "", price: 0, featured: false,
 };
@@ -48,6 +58,53 @@ function Text({ id, label, value, onChange, rtl, area, required }: {
         <textarea id={id} className="field h-24 py-2" dir={rtl ? "rtl" : undefined} value={value} onChange={(e) => onChange(e.target.value)} />
       ) : (
         <input id={id} className="field" dir={rtl ? "rtl" : undefined} required={required} value={value} onChange={(e) => onChange(e.target.value)} />
+      )}
+    </div>
+  );
+}
+
+function ColourPhotos({ colour, onChange }: { colour: Colour; onChange: (images: ImageInput[]) => void }) {
+  const update = (index: number, patch: Partial<ImageInput>) =>
+    onChange(colour.images.map((image, i) => i === index ? { ...image, ...patch } : image));
+  return (
+    <div className="mt-4 border-t border-line pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-medium">{colour.nameEn || "Colour"} photos ({colour.images.filter((image) => image.url.trim()).length}/10)</h3>
+        <button
+          type="button"
+          className="btn btn-outline"
+          disabled={colour.images.length >= 10}
+          onClick={() => onChange([...colour.images, { publicId: crypto.randomUUID(), url: "", altEn: "", altAr: "" }])}
+        >
+          Add photo
+        </button>
+      </div>
+      {colour.images.length === 0 ? (
+        <p className="mt-2 text-sm text-stone">Add up to 10 HTTPS image links for this colour.</p>
+      ) : (
+        <ol className="mt-3 space-y-3">
+          {colour.images.map((image, index) => (
+            <li key={image.publicId} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_1fr_1fr_auto]">
+              <label className="text-xs text-stone sm:col-span-4" htmlFor={`photo-${colour.id ?? colour.nameEn}-${index}`}>
+                Photo {index + 1} URL (HTTPS)
+              </label>
+              <input
+                id={`photo-${colour.id ?? colour.nameEn}-${index}`}
+                className="field sm:col-span-4"
+                type="url"
+                inputMode="url"
+                placeholder="https://…"
+                value={image.url}
+                onChange={(event) => update(index, { url: event.target.value })}
+              />
+              <input className="field" aria-label={`Photo ${index + 1} alt text (English)`} placeholder="Alt text (English)" value={image.altEn} onChange={(event) => update(index, { altEn: event.target.value })} />
+              <input className="field" aria-label={`Photo ${index + 1} alt text (Arabic)`} dir="rtl" placeholder="النص البديل (عربي)" value={image.altAr} onChange={(event) => update(index, { altAr: event.target.value })} />
+              <button type="button" className="cursor-pointer px-2 text-sm underline" onClick={() => onChange(colour.images.filter((_, i) => i !== index))}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ol>
       )}
     </div>
   );
@@ -81,7 +138,7 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
   const [salePrice, setSalePrice] = useState(existing?.salePrice ? String(existing.salePrice) : "");
   const [sizeGroup, setSizeGroup] = useState<"ADULT" | "KIDS">("ADULT");
   const [sizes, setSizes] = useState<string[]>([]);
-  const [colours, setColours] = useState<Colour[]>([{ nameEn: "", nameAr: "", hex: "#0B0B0C" }]);
+  const [colours, setColours] = useState<Colour[]>(() => existing?.colors ?? [{ nameEn: "", nameAr: "", hex: "#0B0B0C", images: [] }]);
   const [mainColour, setMainColour] = useState(0);
   const [stock, setStock] = useState("0");
   const [newCategoryEn, setNewCategoryEn] = useState("");
@@ -114,6 +171,11 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
       };
       if (existing) {
         await api("PUT", `/api/v1/admin/products/${existing.id}`, { ...common, featured: f.featured });
+        await Promise.all(colours.map((colour) =>
+          api("PUT", `/api/v1/admin/products/${existing.id}/colors/${colour.id}/images`, {
+            images: colour.images.filter((image) => image.url.trim()).map(({ publicId, url, altEn, altAr }) => ({ publicId, url, altEn, altAr })),
+          }),
+        ));
         return existing.id;
       }
       const created = await api<{ id: number }>("POST", "/api/v1/admin/products", {
@@ -121,7 +183,7 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
         departmentSlug: f.departmentSlug,
         sizeGroup,
         sizes,
-        colors: colours.map((c, i) => ({ ...c, main: i === mainColour, images: [] })),
+        colors: colours.map((c, i) => ({ ...c, main: i === mainColour, images: c.images.filter((image) => image.url.trim()) })),
         initialStockPerVariant: Number(stock) || 0,
       });
       return created.id;
@@ -154,7 +216,7 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
       ) : (
         <p className="text-sm text-stone">
           The product is saved as a hidden draft. Put it on sale from “Products &amp; stock” when it is ready.
-          Photos cannot be added yet; the storefront shows a “Photo coming soon” panel.
+          Add up to 10 HTTPS image links for each colour below.
         </p>
       )}
 
@@ -288,17 +350,37 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
                         Remove
                       </button>
                     )}
+                    <div className="basis-full ps-8">
+                      <ColourPhotos colour={c} onChange={(images) => update({ images })} />
+                    </div>
                   </li>
                 );
               })}
             </ul>
-            <button type="button" className="btn btn-outline mt-3" disabled={colours.length >= 12} onClick={() => setColours((list) => [...list, { nameEn: "", nameAr: "", hex: "#55585C" }])}>
+            <button type="button" className="btn btn-outline mt-3" disabled={colours.length >= 12} onClick={() => setColours((list) => [...list, { nameEn: "", nameAr: "", hex: "#55585C", images: [] }])}>
               Add a colour
             </button>
           </fieldset>
 
           <div className="mt-5 max-w-xs">
             <Text id="stock" label="Pieces in stock for each colour and size" value={stock} onChange={setStock} />
+          </div>
+        </section>
+      )}
+
+      {existing && (
+        <section className={box}>
+          <h2 className="font-semibold">Photos by colour</h2>
+          <p className="mt-1 text-sm text-stone">Add up to 10 HTTPS image links per colour. These appear in the product gallery when shoppers select that colour.</p>
+          <div className="mt-4 divide-y divide-line">
+            {colours.map((colour, index) => (
+              <div key={colour.id} className={index === 0 ? "" : "pt-4"}>
+                <ColourPhotos
+                  colour={colour}
+                  onChange={(images) => setColours((list) => list.map((item) => item.id === colour.id ? { ...item, images } : item))}
+                />
+              </div>
+            ))}
           </div>
         </section>
       )}

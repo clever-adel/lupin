@@ -1,18 +1,20 @@
 # Implementation status
 
-Last updated: 2026-11-10 (session 2). **Not production-ready** — see "Not started".
+Last updated: 2026-11-12 (custom-domain launch). **Public site is live; store is not ready to take real orders** — see "Waiting on the owner".
 
 ## Live deployment (2026-11-12)
 
 | Part | Where | Address |
 |---|---|---|
-| Storefront | Cloudflare Workers (`lupin-storefront-production`) | https://lupin-storefront-production.lupinwear.workers.dev (temporary; `lupinwear.store` is not connected yet) |
-| Back end | Render, free plan (`lupin-api`) | https://lupin-api-racc.onrender.com (refuses direct calls by design) |
-| Database | Neon project `lupin` (`old-leaf-69306231`), Frankfurt | — |
+| Storefront | Cloudflare Workers (`lupin-storefront-production`) | https://lupinwear.store (custom domain) and https://www.lupinwear.store (custom domain; redirects to root). Temporary address: https://lupin-storefront-production.lupinwear.workers.dev |
+| Back end | Render, free plan, Blueprint-managed (`lupin-api`) | https://lupin-api-racc.onrender.com (refuses direct calls by design) |
+| Database | Neon project `lupin` (`winter-morning-26896432`), `main` / `neondb`, Frankfurt | — |
 
-Checked from outside on 2026-11-12: pages load in English and Arabic, the storefront reaches the back end with the edge key, script policy with nonce and HSTS are present, guests get 401 on private and staff APIs, the temporary address tells search engines not to index it. Not checked: signing in as the owner (the password is the owner's), and placing an order (the live database has no products, no delivery options and every payment method off until the owner sets them up).
+Checked from outside on 2026-11-12: the root custom domain serves the storefront; `www` redirects to the root; the Render API health endpoint returns `UP`. Earlier Render logs confirmed the recreated Neon endpoint, Flyway applied migrations V1–V3, and the storefront proxy returned the three fresh departments with zero products. Not checked: signing in as the owner (the password is the owner's), or placing an order. The live database currently has no products, no delivery options, and payment methods are off until the owner sets them up.
 
-Known limits of this setup: Render's free plan sleeps after 15 minutes idle and took **over three minutes** to wake in a real test, during which the store shows "not reachable". A second back end on Railway (`lupin-api-production.up.railway.app`) was still running against the same database at the time of writing and should be deleted.
+On 2026-11-12, removed the Hostinger parking A and `www` CNAME records, added Cloudflare Worker custom domains for `lupinwear.store` and `www.lupinwear.store`, and removed the two overlapping Worker Routes. No email MX records are configured. DNSSEC is not configured in Hostinger.
+
+Known limits of this setup: Render's free plan sleeps after 15 minutes idle and took **over three minutes** to wake in a real test, during which the store shows "not reachable". The old Railway back end (`lupin-api-production.up.railway.app`) and the unused Render PostgreSQL resource named `lupin-api` in Ohio were deleted on 2026-11-12.
 
 ## Done and verified
 
@@ -71,7 +73,7 @@ The work is committed locally on `main` (first commit `d8418b0`). The remote `or
 
 ## Not started
 
-Favourites on the server · product photos (Cloudinary signed upload: nothing built yet, needs the account) · adding colours or sizes to an existing product · editing an existing offer beyond on/off · collections · staff accounts screen · reports · returns after shipment · saved addresses · WhatsApp button · refunds (manual for now; paid orders cannot be cancelled by the customer) · InstaPay proof-image upload · Cloudinary signed upload · reviews · the pages for offers, Q&A, policies · WhatsApp button (needs the owner's number) · password reset, email/phone verification, OAuth, admin MFA · the whole admin dashboard UI · sitemap.xml, robots.txt · Playwright E2E · deployment, DNS, backups, monitoring.
+Favourites on the server · product photos (Cloudinary signed upload: nothing built yet, needs the account) · adding colours or sizes to an existing product · editing an existing offer beyond on/off · collections · staff accounts screen · reports · returns after shipment · saved addresses · WhatsApp button · refunds (manual for now; paid orders cannot be cancelled by the customer) · InstaPay proof-image upload · Cloudinary signed upload · reviews · the pages for offers, Q&A, policies · WhatsApp button (needs the owner's number) · password reset, email/phone verification, OAuth, admin MFA · backups and monitoring.
 
 ## Known gaps in what exists
 
@@ -79,7 +81,7 @@ Favourites on the server · product photos (Cloudinary signed upload: nothing bu
 2. Product photos are labelled placeholders; no image has been uploaded.
 3. Hero shows only the approved brand lines; campaign copy comes with the content module.
 4. (Fixed in session 2.) Guests made two failing auth requests per page.
-5. (Fixed in session 2.) The backend trusted `X-Forwarded-*` from anyone. It now only answers requests carrying the Worker's key (D-48). At deployment the same random value must be set as `LUPIN_EDGE_SECRET` (API) and `EDGE_SHARED_SECRET` (Worker secret).
+5. (Fixed in session 2.) The backend trusted `X-Forwarded-*` from anyone. It now only answers requests carrying the Worker's key (D-48). Production uses the paired `LUPIN_EDGE_SECRET` (API) and `EDGE_SHARED_SECRET` (Worker secret).
 24. Locally the lock is on only if `frontend/.dev.vars` exists (git-ignored; created on this machine with a random key). The local API reads the key from that file. Delete the file to run without the lock.
 6. (Fixed in session 2.) CSP allowed inline scripts. Styles still allow inline, and fonts still load from Google.
 7. Rate limiting is per instance (D-24). Registration reveals existing emails (D-25).
@@ -118,7 +120,7 @@ If the API is stopped uncleanly and will not restart, delete `backend/.localdb` 
 
 ## Next task
 
-Remaining before deployment: a manual screen-reader pass; browser tests for the dashboard forms, InstaPay and promo codes; get CI running once a GitHub repository exists. Then deployment, followed by a Lighthouse run on the real domain (needs the owner's GitHub, Cloudflare, Google Cloud and Neon accounts). Blocked on accounts: product photos (Cloudinary), Paymob test-mode run, password reset and email verification (email provider).
+Deployment is live. Next: publish the owner's real product catalog, stock, delivery fees/options and chosen payment methods; then measure Lighthouse on the real domain. Other follow-up work: a manual screen-reader pass; browser tests for dashboard forms, InstaPay and promo codes; set up backups and monitoring. Blocked on accounts: product photos (Cloudinary), Paymob test-mode run, password reset and email verification (email provider).
 
 ## Waiting on the owner
 

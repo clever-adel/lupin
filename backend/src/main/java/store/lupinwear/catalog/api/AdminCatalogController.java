@@ -83,6 +83,13 @@ public class AdminCatalogController {
         catalog.updateProduct(user.id(), id, body);
     }
 
+    @org.springframework.web.bind.annotation.PutMapping("/products/{productId}/colors/{colorId}/images")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void replaceColorImages(@AuthenticationPrincipal CurrentUser user, @PathVariable long productId,
+            @PathVariable long colorId, @Valid @RequestBody CatalogDtos.ColorImagesRequest body) {
+        catalog.replaceColorImages(user.id(), productId, colorId, body.images());
+    }
+
     @GetMapping("/inventory/{variantId}")
     StockView stock(@PathVariable long variantId) {
         return catalog.stock(variantId);

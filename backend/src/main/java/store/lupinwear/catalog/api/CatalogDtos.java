@@ -140,10 +140,20 @@ public final class CatalogDtos {
             boolean featured) {
     }
 
+    public record ColorImagesRequest(
+            @NotNull @Size(max = 10, message = "A colour can have at most 10 photos") List<@Valid ImageRequest> images) {
+    }
+
+    public record AdminImage(long id, String publicId, String url, String altEn, String altAr) {
+    }
+
+    public record AdminColor(long id, String nameEn, String nameAr, String hex, List<AdminImage> images) {
+    }
+
     public record AdminProductDetail(long id, String slug, String status, String departmentSlug,
             String categorySlug, String nameEn, String nameAr, String descriptionEn, String descriptionAr,
             String fabricEn, String fabricAr, String fitEn, String fitAr, String badge, BigDecimal price,
-            BigDecimal salePrice, boolean featured) {
+            BigDecimal salePrice, boolean featured, List<AdminColor> colors) {
     }
 
     public record AdminVariantRow(long variantId, String color, String sizeCode, String sku, int onHand,
