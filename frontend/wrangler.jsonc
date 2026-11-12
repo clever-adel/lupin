@@ -23,8 +23,14 @@
     "staging": {
       "vars": { "API_ORIGIN": "https://REPLACE-WITH-STAGING-CLOUD-RUN-URL", "SITE_ORIGIN": "https://staging.lupinwear.store" }
     },
+    // Named explicitly: without "name", Wrangler deploys to "<top-level name>-production", a second,
+    // empty Worker. Bindings such as R2 are not inherited by environments, so the bucket is repeated.
     "production": {
-      "vars": { "API_ORIGIN": "https://lupin-api-racc.onrender.com", "SITE_ORIGIN": "https://lupinwear.store" }
+      "name": "lupin-storefront-production",
+      "vars": { "API_ORIGIN": "https://lupin-api-racc.onrender.com", "SITE_ORIGIN": "https://lupinwear.store" },
+      "r2_buckets": [
+        { "binding": "MEDIA_BUCKET", "bucket_name": "lupin-product-images" }
+      ]
     }
   }
 }
