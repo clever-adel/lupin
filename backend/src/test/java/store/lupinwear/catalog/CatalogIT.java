@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import store.lupinwear.catalog.api.CatalogDtos.CategoryRequest;
 import store.lupinwear.catalog.api.CatalogDtos.ColorRequest;
 import store.lupinwear.catalog.api.CatalogDtos.ImageRequest;
+import store.lupinwear.catalog.api.CatalogDtos.InitialVariantStock;
 import store.lupinwear.catalog.api.CatalogDtos.ProductRequest;
 import store.lupinwear.support.IntegrationTest;
 
@@ -200,6 +201,28 @@ class CatalogIT extends IntegrationTest {
     }
 
     @Test
+    void productStartsWithIndependentStockForEveryColorAndSize() throws Exception {
+        ProductRequest base = request("Size Stock Product", "1000.00", null, 0);
+        List<InitialVariantStock> stock = List.of(
+                new InitialVariantStock(0, "S", 4), new InitialVariantStock(0, "M", 2),
+                new InitialVariantStock(0, "L", 0), new InitialVariantStock(1, "S", 3),
+                new InitialVariantStock(1, "M", 5), new InitialVariantStock(1, "L", 1));
+        ProductRequest withStock = new ProductRequest(base.nameEn(), base.nameAr(), base.departmentSlug(),
+                base.categorySlug(), base.descriptionEn(), base.descriptionAr(), base.fabricEn(), base.fabricAr(),
+                base.fitEn(), base.fitAr(), base.brand(), base.badge(), base.price(), base.salePrice(), base.sizeGroup(),
+                base.sizes(), base.colors(), 0, stock);
+
+        long productId = create(withStock).path("id").asLong();
+
+        assertThat(stockFor(productId, "Black", "S")).isEqualTo(4);
+        assertThat(stockFor(productId, "Black", "M")).isEqualTo(2);
+        assertThat(stockFor(productId, "Black", "L")).isZero();
+        assertThat(stockFor(productId, "Navy", "S")).isEqualTo(3);
+        assertThat(stockFor(productId, "Navy", "M")).isEqualTo(5);
+        assertThat(stockFor(productId, "Navy", "L")).isEqualTo(1);
+    }
+
+    @Test
     void sameNameGetsAUniqueSlugAndWritesAnAuditRow() throws Exception {
         String a = create(request("Twin Jacket", "1000.00", null, 1)).get("slug").asText();
         String b = create(request("Twin Jacket", "1000.00", null, 1)).get("slug").asText();
@@ -224,6 +247,17 @@ class CatalogIT extends IntegrationTest {
     private JsonNode create(ProductRequest request) throws Exception {
         return body(mvc.perform(jsonPost("/api/v1/admin/products", request).cookie(owner))
                 .andExpect(status().isCreated()).andReturn());
+    }
+
+    private int stockFor(long productId, String color, String size) {
+        return jdbc.sql("""
+                select i.on_hand from inventory i
+                join product_variants v on v.id = i.variant_id
+                join product_colors c on c.id = v.color_id
+                join sizes s on s.id = v.size_id
+                where v.product_id = :product and c.name_en = :color and s.code = :size
+                """).param("product", productId).param("color", color).param("size", size)
+                .query(Integer.class).single();
     }
 
     private void publish(long id) throws Exception {

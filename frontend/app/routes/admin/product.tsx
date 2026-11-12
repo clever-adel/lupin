@@ -43,6 +43,7 @@ interface Colour {
 
 const ADULT_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "ONE"];
 const KIDS_SIZES = ["2-3Y", "4-5Y", "6-7Y", "8-9Y", "10-11Y", "12-13Y"];
+const stockKey = (colourIndex: number, size: string) => `${colourIndex}:${size}`;
 const EMPTY: Omit<Detail, "id" | "slug" | "status" | "colors"> = {
   departmentSlug: "", categorySlug: "", nameEn: "", nameAr: "", descriptionEn: "", descriptionAr: "",
   fabricEn: "", fabricAr: "", fitEn: "", fitAr: "", badge: "", price: 0, featured: false,
@@ -183,7 +184,7 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
   const [sizes, setSizes] = useState<string[]>([]);
   const [colours, setColours] = useState<Colour[]>(() => existing?.colors ?? [{ nameEn: "", nameAr: "", hex: "#0B0B0C", images: [] }]);
   const [mainColour, setMainColour] = useState(0);
-  const [stock, setStock] = useState("0");
+  const [stockByVariant, setStockByVariant] = useState<Record<string, string>>({});
   const [newCategoryEn, setNewCategoryEn] = useState("");
   const [newCategoryAr, setNewCategoryAr] = useState("");
   const set = (field: keyof typeof EMPTY) => (value: string) => setF((prev) => ({ ...prev, [field]: value }));
@@ -230,7 +231,12 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
         sizeGroup,
         sizes,
         colors: colours.map((c, i) => ({ ...c, main: i === mainColour, images: c.images.filter((image) => image.url.trim()) })),
-        initialStockPerVariant: Number(stock) || 0,
+        initialStockPerVariant: 0,
+        stockByVariant: colours.flatMap((_, colorIndex) => sizes.map((sizeCode) => ({
+          colorIndex,
+          sizeCode,
+          quantity: Number(stockByVariant[stockKey(colorIndex, sizeCode)] ?? 0) || 0,
+        }))),
       });
       return created.id;
     },
@@ -404,6 +410,17 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
                         className="cursor-pointer text-sm underline"
                         onClick={() => {
                           setColours((list) => list.filter((_, j) => j !== i));
+                          setStockByVariant((current) => {
+                            const next: Record<string, string> = {};
+                            for (const [key, value] of Object.entries(current)) {
+                              const [indexText, ...sizeParts] = key.split(":");
+                              const colourIndex = Number(indexText);
+                              if (colourIndex === i) continue;
+                              const nextIndex = colourIndex > i ? colourIndex - 1 : colourIndex;
+                              next[stockKey(nextIndex, sizeParts.join(":"))] = value;
+                            }
+                            return next;
+                          });
                           setMainColour((m) => (m === i ? 0 : m > i ? m - 1 : m));
                         }}
                       >
@@ -422,8 +439,41 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
             </button>
           </fieldset>
 
-          <div className="mt-5 max-w-xs">
-            <Text id="stock" label="Pieces in stock for each colour and size" value={stock} onChange={setStock} />
+          <div className="mt-5">
+            <h3 className="text-sm font-medium">Initial stock by colour and size</h3>
+            <p className="mt-1 text-sm text-stone">Enter a separate quantity for every size in every colour.</p>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              {colours.map((colour, colorIndex) => (
+                <fieldset key={`stock-${colorIndex}`} className="border border-line p-3">
+                  <legend className="px-1 text-sm font-medium">
+                    {colour.nameEn || `Colour ${colorIndex + 1}`}{colour.nameAr ? ` / ${colour.nameAr}` : ""}
+                  </legend>
+                  <div className="grid grid-cols-2 gap-3">
+                    {sizes.map((sizeCode) => {
+                      const id = `stock-${colorIndex}-${sizeCode}`;
+                      return (
+                        <div key={sizeCode}>
+                          <label htmlFor={id} className="mb-1 block text-xs text-stone">{sizeCode}</label>
+                          <input
+                            id={id}
+                            className="field"
+                            type="number"
+                            min="0"
+                            max="100000"
+                            step="1"
+                            value={stockByVariant[stockKey(colorIndex, sizeCode)] ?? "0"}
+                            onChange={(event) => setStockByVariant((current) => ({
+                              ...current,
+                              [stockKey(colorIndex, sizeCode)]: event.target.value,
+                            }))}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ))}
+            </div>
           </div>
         </section>
       )}

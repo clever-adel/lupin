@@ -108,7 +108,24 @@ public final class CatalogDtos {
             @Pattern(regexp = "ADULT|KIDS") String sizeGroup,
             @NotEmpty List<@NotBlank String> sizes,
             @NotEmpty List<@Valid ColorRequest> colors,
-            @Min(0) @Max(100000) Integer initialStockPerVariant) {
+            @Min(0) @Max(100000) Integer initialStockPerVariant,
+            @Size(max = 144) List<@Valid InitialVariantStock> stockByVariant) {
+
+        /** Keeps existing internal clients working; the dashboard sends explicit per-variant stock. */
+        public ProductRequest(String nameEn, String nameAr, String departmentSlug, String categorySlug,
+                String descriptionEn, String descriptionAr, String fabricEn, String fabricAr, String fitEn,
+                String fitAr, String brand, String badge, BigDecimal price, BigDecimal salePrice, String sizeGroup,
+                List<String> sizes, List<ColorRequest> colors, Integer initialStockPerVariant) {
+            this(nameEn, nameAr, departmentSlug, categorySlug, descriptionEn, descriptionAr, fabricEn, fabricAr,
+                    fitEn, fitAr, brand, badge, price, salePrice, sizeGroup, sizes, colors,
+                    initialStockPerVariant, List.of());
+        }
+    }
+
+    public record InitialVariantStock(
+            @NotNull @Min(0) @Max(11) Integer colorIndex,
+            @NotBlank @Size(max = 12) String sizeCode,
+            @NotNull @Min(0) @Max(100000) Integer quantity) {
     }
 
     public record ProductCreated(long id, String slug, List<Long> variantIds) {

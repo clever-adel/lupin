@@ -16,6 +16,7 @@ import store.lupinwear.audit.AuditLog;
 import store.lupinwear.catalog.api.CatalogDtos.CategoryRequest;
 import store.lupinwear.catalog.api.CatalogDtos.ColorRequest;
 import store.lupinwear.catalog.api.CatalogDtos.ImageRequest;
+import store.lupinwear.catalog.api.CatalogDtos.InitialVariantStock;
 import store.lupinwear.catalog.api.CatalogDtos.ProductCreated;
 import store.lupinwear.catalog.api.CatalogDtos.ProductRequest;
 import store.lupinwear.catalog.api.CatalogDtos.StockView;
@@ -71,6 +72,7 @@ public class CatalogAdminService {
     /** Creates a draft product with its colours, photos, one variant per colour × size, and stock rows. */
     public ProductCreated createProduct(UUID actor, ProductRequest req) {
         validate(req);
+        Map<String, Integer> stockByVariant = stockByVariant(req);
         int departmentId = departmentId(req.departmentSlug());
         int categoryId = categoryId(departmentId, req.categorySlug());
         String sizeGroup = req.sizeGroup() == null ? "ADULT" : req.sizeGroup();
@@ -104,6 +106,7 @@ public class CatalogAdminService {
         List<Long> variantIds = new ArrayList<>();
         int colorOrder = 0;
         for (ColorRequest color : req.colors()) {
+            int colorIndex = colorOrder;
             long colorId = jdbc.sql("""
                     insert into product_colors (product_id, name_en, name_ar, hex, is_main, sort_order)
                     values (:p, :en, :ar, :hex, :main, :ord) returning id
@@ -121,7 +124,10 @@ public class CatalogAdminService {
                         .param("altEn", orEmpty(img.altEn())).param("altAr", orEmpty(img.altAr()))
                         .param("pos", (short) i).update();
             }
-            for (int sizeId : sizeIds) {
+            for (int sizeIndex = 0; sizeIndex < sizeIds.size(); sizeIndex++) {
+                int sizeId = sizeIds.get(sizeIndex);
+                String sizeCode = req.sizes().get(sizeIndex).trim().toUpperCase(Locale.ROOT);
+                int variantStock = stockByVariant.getOrDefault(stockKey(colorIndex, sizeCode), stock);
                 long variantId = jdbc.sql("""
                         insert into product_variants (product_id, color_id, size_id, sku)
                         values (:p, :c, :s, :sku) returning id
@@ -129,9 +135,9 @@ public class CatalogAdminService {
                         .param("sku", "LP-" + productId + "-" + colorId + "-" + sizeId)
                         .query(Long.class).single();
                 jdbc.sql("insert into inventory (variant_id, on_hand) values (:v, :q)")
-                        .param("v", variantId).param("q", stock).update();
-                if (stock > 0) {
-                    movement(variantId, "RECEIVE", stock, "Initial stock", actor);
+                        .param("v", variantId).param("q", variantStock).update();
+                if (variantStock > 0) {
+                    movement(variantId, "RECEIVE", variantStock, "Initial stock", actor);
                 }
                 variantIds.add(variantId);
             }
@@ -348,6 +354,31 @@ public class CatalogAdminService {
         if (new HashSet<>(req.sizes()).size() != req.sizes().size()) {
             throw ApiException.badRequest("DUPLICATE_SIZE", "Each size can be added once.");
         }
+    }
+
+    private static Map<String, Integer> stockByVariant(ProductRequest req) {
+        if (req.stockByVariant() == null || req.stockByVariant().isEmpty()) return Map.of();
+        Map<String, Integer> result = new HashMap<>();
+        for (InitialVariantStock stock : req.stockByVariant()) {
+            if (stock.colorIndex() >= req.colors().size()) {
+                throw ApiException.badRequest("UNKNOWN_STOCK_VARIANT", "Stock refers to an unknown colour.");
+            }
+            String sizeCode = stock.sizeCode().trim().toUpperCase(Locale.ROOT);
+            boolean sizeExists = req.sizes().stream()
+                    .anyMatch(size -> size.trim().equalsIgnoreCase(sizeCode));
+            if (!sizeExists) {
+                throw ApiException.badRequest("UNKNOWN_STOCK_VARIANT", "Stock refers to an unknown size.");
+            }
+            String key = stockKey(stock.colorIndex(), sizeCode);
+            if (result.putIfAbsent(key, stock.quantity()) != null) {
+                throw ApiException.badRequest("DUPLICATE_STOCK_VARIANT", "Stock can be set once per colour and size.");
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    private static String stockKey(int colorIndex, String sizeCode) {
+        return colorIndex + ":" + sizeCode;
     }
 
     private int departmentId(String slug) {
