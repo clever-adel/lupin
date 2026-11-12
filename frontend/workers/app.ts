@@ -132,15 +132,15 @@ async function uploadImages(request: Request, env: Env): Promise<Response> {
   if (files.reduce((sum, file) => sum + file.size, 0) > IMAGE_BATCH_MAX_BYTES) {
     return Response.json({ message: "The selected photos are too large. Choose fewer or smaller files." }, { status: 413 });
   }
-  const prepared: { file: File; type: string; extension: string; bytes: ArrayBuffer }[] = [];
+  const prepared: { file: File; type: string; extension: string }[] = [];
   for (const file of files) {
     const extension = IMAGE_TYPES.get(file.type);
     if (!extension) return Response.json({ message: "Use JPG, PNG, WebP, or AVIF photos." }, { status: 415 });
-    const bytes = await file.arrayBuffer();
-    if (!imageSignatureMatches(file.type, new Uint8Array(bytes, 0, Math.min(bytes.byteLength, 16)))) {
+    const header = await file.slice(0, 16).arrayBuffer();
+    if (!imageSignatureMatches(file.type, new Uint8Array(header))) {
       return Response.json({ message: "One of the selected files is not a valid image." }, { status: 415 });
     }
-    prepared.push({ file, type: file.type, extension, bytes });
+    prepared.push({ file, type: file.type, extension });
   }
   const bucket = (env as MediaEnv).MEDIA_BUCKET;
   const saved: string[] = [];
@@ -148,7 +148,7 @@ async function uploadImages(request: Request, env: Env): Promise<Response> {
   try {
     for (const item of prepared) {
       const key = `${crypto.randomUUID()}.${item.extension}`;
-      await bucket.put(key, item.bytes, {
+      await bucket.put(key, item.file.stream(), {
         httpMetadata: { contentType: item.type, cacheControl: "public, max-age=31536000, immutable" },
       });
       saved.push(key);
