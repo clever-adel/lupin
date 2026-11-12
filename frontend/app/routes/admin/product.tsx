@@ -66,6 +66,14 @@ function Text({ id, label, value, onChange, rtl, area, required }: {
 function ColourPhotos({ colour, onChange }: { colour: Colour; onChange: (images: ImageInput[]) => void }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= colour.images.length || from === to) return;
+    const images = [...colour.images];
+    const image = images.splice(from, 1)[0];
+    if (!image) return;
+    images.splice(to, 0, image);
+    onChange(images);
+  };
   const update = (index: number, patch: Partial<ImageInput>) =>
     onChange(colour.images.map((image, i) => i === index ? { ...image, ...patch } : image));
   const addFiles = async (selected: FileList | null) => {
@@ -105,7 +113,7 @@ function ColourPhotos({ colour, onChange }: { colour: Colour; onChange: (images:
           />
         </label>
       </div>
-      <p className="mt-2 text-sm text-stone">Choose up to 10 JPG, PNG, WebP, or AVIF photos from your device (10 MB each, 50 MB per upload).</p>
+      <p className="mt-2 text-sm text-stone">Upload order is kept. The first photo is the main photo for this colour. Choose up to 10 JPG, PNG, WebP, or AVIF photos (10 MB each, 50 MB per upload).</p>
       {uploadError && <p className="mt-2 text-sm text-danger" role="alert">{uploadError}</p>}
       {colour.images.length === 0 ? (
         <p className="mt-2 text-sm text-stone">No photos added yet.</p>
@@ -114,7 +122,24 @@ function ColourPhotos({ colour, onChange }: { colour: Colour; onChange: (images:
           {colour.images.map((image, index) => (
             <li key={image.publicId} className="grid items-center gap-2 sm:grid-cols-[100px_minmax(0,1fr)_1fr_1fr_auto]">
               <img src={image.url} alt="" className="h-24 w-24 rounded border border-line object-cover" />
-              <span className="text-xs text-stone">Photo {index + 1}</span>
+              <div className="flex flex-col items-start gap-1">
+                <span className="text-xs text-stone">Photo {index + 1}</span>
+                {index === 0 ? (
+                  <span className="text-xs font-semibold">Main photo</span>
+                ) : (
+                  <button type="button" className="cursor-pointer text-xs underline" onClick={() => move(index, 0)}>
+                    Make main photo
+                  </button>
+                )}
+                <div className="flex gap-2">
+                  <button type="button" aria-label={`Move photo ${index + 1} up`} className="cursor-pointer text-xs underline disabled:opacity-40" disabled={index === 0} onClick={() => move(index, index - 1)}>
+                    Move up
+                  </button>
+                  <button type="button" aria-label={`Move photo ${index + 1} down`} className="cursor-pointer text-xs underline disabled:opacity-40" disabled={index === colour.images.length - 1} onClick={() => move(index, index + 1)}>
+                    Move down
+                  </button>
+                </div>
+              </div>
               <input className="field" aria-label={`Photo ${index + 1} alt text (English)`} placeholder="Alt text (English)" value={image.altEn} onChange={(event) => update(index, { altEn: event.target.value })} />
               <input className="field" aria-label={`Photo ${index + 1} alt text (Arabic)`} dir="rtl" placeholder="النص البديل (عربي)" value={image.altAr} onChange={(event) => update(index, { altAr: event.target.value })} />
               <button type="button" className="cursor-pointer px-2 text-sm underline" onClick={() => onChange(colour.images.filter((_, i) => i !== index))}>
