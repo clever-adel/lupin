@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router";
 import type { AdminContext } from "./layout";
+import { BostaPanel } from "~/features/admin/BostaPanel";
 import {
-  errorText, money, PAYMENT_LABEL, PAYMENT_STATUS_LABEL, STATUS_LABEL, when, type AdminOrder,
+  COURIER_PROBLEM_STATES, errorText, money, PAYMENT_LABEL, PAYMENT_STATUS_LABEL, STATUS_LABEL, when, type AdminOrder,
 } from "~/features/admin/shared";
 import { api, ApiError } from "~/lib/http";
 import type { OrderStatus } from "~/lib/types";
@@ -159,6 +160,35 @@ export default function AdminOrder() {
           </form>
         )}
       </section>
+
+      {nextStatuses.includes("SHIPPED") && pending === null && (
+        <BostaPanel
+          reference={reference}
+          onSent={(updated) => {
+            client.setQueryData(key, updated);
+            client.invalidateQueries({ queryKey: ["admin", "orders"] });
+            client.invalidateQueries({ queryKey: ["admin", "summary"] });
+          }}
+        />
+      )}
+
+      {shipment?.courierState !== undefined && shipment.courierState !== null && (
+        <section
+          className={`mt-4 border bg-card px-3 py-3 text-sm ${COURIER_PROBLEM_STATES.includes(shipment.courierState) ? "border-danger" : "border-line"}`}
+          aria-labelledby="courier-title"
+          role={COURIER_PROBLEM_STATES.includes(shipment.courierState) ? "alert" : undefined}
+        >
+          <h2 id="courier-title" className="font-semibold">{shipment.carrier ?? "Courier"} · {shipment.trackingReference}</h2>
+          <p className="mt-1">
+            Courier status: <span className="font-semibold">{shipment.courierStateLabel}</span>
+            {shipment.codAmount !== undefined && shipment.codAmount !== null && shipment.codAmount > 0 && ` · collects ${money(shipment.codAmount)}`}
+          </p>
+          {shipment.lastException && <p className="mt-1 text-danger">Last problem reported: {shipment.lastException}</p>}
+          {COURIER_PROBLEM_STATES.includes(shipment.courierState) && (
+            <p className="mt-1 text-stone">Follow this up in the Bosta dashboard or call the customer.</p>
+          )}
+        </section>
+      )}
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_20rem]">
         <section aria-labelledby="items-title">

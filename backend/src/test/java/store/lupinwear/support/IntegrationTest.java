@@ -129,6 +129,40 @@ public abstract class IntegrationTest {
         FakePaymob fakePaymob() {
             return new FakePaymob();
         }
+
+        @Bean
+        @Primary
+        FakeBosta fakeBosta() {
+            return new FakeBosta();
+        }
+    }
+
+    /** Stands in for Bosta's API: two districts per city, and remembers the last delivery it was asked for. */
+    public static class FakeBosta implements store.lupinwear.shipping.BostaGateway {
+        private final java.util.concurrent.atomic.AtomicLong next = new java.util.concurrent.atomic.AtomicLong(7_000_000);
+        public volatile NewDelivery lastDelivery;
+        public volatile RuntimeException failNext;
+        public final java.util.concurrent.atomic.AtomicInteger created = new java.util.concurrent.atomic.AtomicInteger();
+
+        @Override
+        public java.util.List<District> districts(String bostaCityId) {
+            return java.util.List.of(new District("d-nasr-" + bostaCityId, "Nasr City", "مدينة نصر", true),
+                    new District("d-maadi-" + bostaCityId, "Maadi", "المعادي", true),
+                    new District("d-closed-" + bostaCityId, "Closed Area", "", false));
+        }
+
+        @Override
+        public Created createDelivery(NewDelivery delivery) {
+            RuntimeException fail = failNext;
+            if (fail != null) {
+                failNext = null;
+                throw fail;
+            }
+            lastDelivery = delivery;
+            created.incrementAndGet();
+            long n = next.incrementAndGet();
+            return new Created("bosta-id-" + n, String.valueOf(n));
+        }
     }
 
     /** Stands in for Paymob's API: no network in tests. Remembers what it was asked. */

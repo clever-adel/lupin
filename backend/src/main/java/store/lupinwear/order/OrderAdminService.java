@@ -53,7 +53,8 @@ public class OrderAdminService {
     }
 
     public record ShipmentRow(String carrier, String trackingReference, String status, Instant shippedAt,
-            Instant deliveredAt) {
+            Instant deliveredAt, Integer courierState, String courierStateLabel, String lastException,
+            BigDecimal codAmount) {
     }
 
     public record HistoryRow(String fromStatus, String toStatus, String actor, String note, Instant at) {
@@ -64,8 +65,11 @@ public class OrderAdminService {
     }
 
     public record Summary(Map<String, Long> ordersByStatus, long transfersToCheck, long refundsPending,
-            long lowStockVariants) {
+            long lowStockVariants, long shipmentsNeedingAttention) {
     }
+
+    /** Courier states that need a person: returned, exception, cancelled, terminated, lost, damaged, awaiting action. */
+    static final List<Integer> COURIER_PROBLEM_STATES = List.of(46, 47, 48, 49, 100, 101, 103);
 
     public record StatusChange(String status, String note, String carrier, String trackingReference) {
     }
@@ -128,10 +132,13 @@ public class OrderAdminService {
                         rs.getString(4), rs.getBigDecimal(5), rs.getString(6), rs.getString(7),
                         rs.getObject(8, OffsetDateTime.class).toInstant()))
                 .list();
-        ShipmentRow shipment = jdbc.sql("select carrier, tracking_reference, status, shipped_at, delivered_at"
+        ShipmentRow shipment = jdbc.sql("select carrier, tracking_reference, status, shipped_at, delivered_at,"
+                + " provider_state, provider_state_label, last_exception, cod_amount"
                 + " from shipments where order_id = :o order by id desc limit 1").param("o", ids.id())
                 .query((rs, n) -> new ShipmentRow(rs.getString(1), rs.getString(2), rs.getString(3),
-                        instant(rs.getObject(4, OffsetDateTime.class)), instant(rs.getObject(5, OffsetDateTime.class))))
+                        instant(rs.getObject(4, OffsetDateTime.class)), instant(rs.getObject(5, OffsetDateTime.class)),
+                        rs.getObject(6) == null ? null : ((Number) rs.getObject(6)).intValue(),
+                        rs.getString(7), rs.getString(8), rs.getBigDecimal(9)))
                 .optional().orElse(null);
         List<HistoryRow> history = jdbc.sql("""
                 select h.from_status, h.to_status, u.full_name, h.note, h.created_at
@@ -279,7 +286,11 @@ public class OrderAdminService {
                 join products p on p.id = v.product_id
                 where v.active and p.status = 'ACTIVE' and p.deleted_at is null and i.on_hand - i.reserved <= 2
                 """).query(Long.class).single();
-        return new Summary(byStatus, transfers, refunds, lowStock);
+        long shipmentProblems = jdbc.sql("""
+                select count(*) from shipments s join orders o on o.id = s.order_id
+                where o.status = 'SHIPPED' and s.provider_state in (:states)
+                """).param("states", COURIER_PROBLEM_STATES).query(Long.class).single();
+        return new Summary(byStatus, transfers, refunds, lowStock, shipmentProblems);
     }
 
     private static String blankToNull(String s) {

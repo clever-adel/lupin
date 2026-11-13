@@ -268,6 +268,9 @@ export interface Order {
   transferReference?: string;
   items: OrderItem[];
   history: { status: OrderStatus; at: string }[];
+  /** Set once the order has been handed to a courier. */
+  carrier?: string;
+  trackingNumber?: string;
 }
 
 export interface OrderSummary {

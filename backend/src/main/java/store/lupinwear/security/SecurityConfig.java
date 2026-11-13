@@ -29,8 +29,12 @@ import store.lupinwear.shared.GlobalExceptionHandler.ErrorBody;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    /** Provider callbacks cannot carry a CSRF token; they are authenticated by HMAC signature instead. */
+    /**
+     * Provider callbacks cannot carry a CSRF token; they are authenticated by HMAC signature (Paymob) or
+     * a shared secret header (Bosta) instead.
+     */
     public static final String WEBHOOKS = "/api/v1/payments/webhooks/**";
+    public static final String SHIPPING_WEBHOOKS = "/api/v1/shipping/webhooks/**";
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http, JwtCookieAuthFilter jwtFilter, SecurityProperties props,
@@ -44,7 +48,7 @@ public class SecurityConfig {
             // Double-submit cookie: the SPA echoes the XSRF-TOKEN cookie in the X-XSRF-TOKEN header.
             .csrf(c -> c.csrfTokenRepository(csrfRepo)
                     .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                    .ignoringRequestMatchers(WEBHOOKS))
+                    .ignoringRequestMatchers(WEBHOOKS, SHIPPING_WEBHOOKS))
             .formLogin(f -> f.disable())
             .httpBasic(b -> b.disable())
             .logout(l -> l.disable())
@@ -61,7 +65,7 @@ public class SecurityConfig {
                     .requestMatchers("/api/v1/auth/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/catalog/**", "/api/v1/content/**",
                             "/api/v1/delivery/**").permitAll()
-                    .requestMatchers(WEBHOOKS).permitAll()
+                    .requestMatchers(WEBHOOKS, SHIPPING_WEBHOOKS).permitAll()
                     .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                     .requestMatchers("/api/v1/openapi/**", "/api/v1/docs/**", "/swagger-ui/**").permitAll()
                     .anyRequest().authenticated())

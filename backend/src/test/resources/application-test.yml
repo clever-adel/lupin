@@ -13,6 +13,10 @@ lupin:
     hmac-secret: test-hmac-secret
     integration-card: 111
     integration-wallet: 222
+  # Test-only values; the Bosta HTTP client is replaced by a fake in tests.
+  bosta:
+    api-key: test-bosta-key
+    webhook-secret: test-bosta-webhook-secret-0123456789
 logging:
   level:
     org.testcontainers: WARN

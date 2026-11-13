@@ -68,7 +68,8 @@ public class OrderService {
             String governorateEn, String governorateAr, String city, String addressLine, String deliveryNotes,
             String deliveryNameEn, String deliveryNameAr, String deliveryEstimateEn, String deliveryEstimateAr,
             Instant placedAt, Instant cancelledAt, Instant undoExpiresAt, boolean canCancel, boolean canUndo,
-            String paymentAction, String transferReference, List<ItemView> items, List<HistoryView> history) {
+            String paymentAction, String transferReference, List<ItemView> items, List<HistoryView> history,
+            String carrier, String trackingNumber) {
     }
 
     public record OrderSummary(String reference, String status, BigDecimal total, Instant placedAt, int itemCount) {
@@ -376,6 +377,11 @@ public class OrderService {
         String transferReference = jdbc.sql("select manual_reference from payments where order_id = :o"
                 + " and provider = 'MANUAL_TRANSFER' order by created_at desc limit 1").param("o", id)
                 .query((rs, n) -> rs.getString(1)).optional().orElse(null);
+        // What the customer needs to follow the parcel; nothing else about the shipment is shown to them.
+        String[] shipment = jdbc.sql("select carrier, tracking_reference from shipments where order_id = :o"
+                + " order by id desc limit 1").param("o", id)
+                .query((rs, n) -> new String[] {rs.getString(1), rs.getString(2)}).optional()
+                .orElse(new String[] {null, null});
         Instant now = clock.instant();
         return jdbc.sql("select * from orders where id = :id").param("id", id).query((rs, n) -> {
             String status = rs.getString("status");
@@ -395,7 +401,7 @@ public class OrderService {
                     "CANCELLED".equals(status) && rs.getString("status_before_cancel") != null && undo != null
                             && undo.isAfter(now),
                     paymentAction(status, rs.getString("payment_status"), rs.getString("payment_method")),
-                    transferReference, items, history);
+                    transferReference, items, history, shipment[0], shipment[1]);
         }).single();
     }
 

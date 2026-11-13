@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import {
   isRouteErrorResponse,
   Link,
@@ -66,6 +66,26 @@ export default function App() {
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   const lang = langFromPath(useLocation().pathname);
   const notFound = isRouteErrorResponse(error) && error.status === 404;
+  // The back end can be asleep for a minute or more; retry a few times on its own before giving up.
+  useEffect(() => {
+    if (notFound) return;
+    let tries = 0;
+    try {
+      tries = Number(sessionStorage.getItem("lupin.retry") ?? "0");
+    } catch {
+      return;
+    }
+    if (tries >= 6) return;
+    const timer = window.setTimeout(() => {
+      try {
+        sessionStorage.setItem("lupin.retry", String(tries + 1));
+      } catch {
+        /* ignore */
+      }
+      window.location.reload();
+    }, 15000);
+    return () => window.clearTimeout(timer);
+  }, [notFound]);
   return (
     <main className="grid min-h-dvh place-items-center bg-ink px-6 text-center text-bone">
       <div>
@@ -74,11 +94,17 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
           {translate(lang, notFound ? "error.notFoundTitle" : "error.title")}
         </h1>
         <p className="mt-3 text-sm text-bone/70">
-          {translate(lang, notFound ? "error.notFoundText" : "error.generic")}
+          {translate(lang, notFound ? "error.notFoundText" : "error.waking")}
         </p>
-        <Link to={localePath(lang, "/")} className="btn btn-light mt-8">
-          {translate(lang, "error.backHome")}
-        </Link>
+        {notFound ? (
+          <Link to={localePath(lang, "/")} className="btn btn-light mt-8">
+            {translate(lang, "error.backHome")}
+          </Link>
+        ) : (
+          <button type="button" className="btn btn-light mt-8" onClick={() => window.location.reload()}>
+            {translate(lang, "error.retry")}
+          </button>
+        )}
       </div>
     </main>
   );

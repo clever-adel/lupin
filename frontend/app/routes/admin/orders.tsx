@@ -60,6 +60,12 @@ export default function AdminOrders() {
           {summary.refundsPending} order(s) have money to refund. Search for them below and refund the customer.
         </p>
       )}
+      {summary && summary.shipmentsNeedingAttention > 0 && (
+        <p className="mt-3 border border-danger bg-card px-3 py-2 text-sm text-danger" role="alert">
+          {summary.shipmentsNeedingAttention} shipped order(s) have a courier problem (returned, failed attempt, lost or
+          waiting for you). Open the Shipped orders to see which.
+        </p>
+      )}
 
       <form
         className="mt-6 flex flex-wrap items-end gap-3"

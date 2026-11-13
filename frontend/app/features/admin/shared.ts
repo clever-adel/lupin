@@ -32,7 +32,18 @@ export interface AdminOrder {
     providerTransactionId?: string;
     createdAt: string;
   }[];
-  shipment?: { carrier?: string; trackingReference?: string; status: string; shippedAt?: string; deliveredAt?: string };
+  shipment?: {
+    carrier?: string;
+    trackingReference?: string;
+    status: string;
+    shippedAt?: string;
+    deliveredAt?: string;
+    /** Bosta's own delivery state code and label, updated from its webhook. */
+    courierState?: number;
+    courierStateLabel?: string;
+    lastException?: string;
+    codAmount?: number;
+  };
   history: { fromStatus?: string; toStatus: OrderStatus; actor?: string; note?: string; at: string }[];
 }
 
@@ -41,7 +52,25 @@ export interface Summary {
   transfersToCheck: number;
   refundsPending: number;
   lowStockVariants: number;
+  shipmentsNeedingAttention: number;
 }
+
+/** Mirrors ShippingService.BostaInfo. */
+export interface BostaInfo {
+  configured: boolean;
+  governorate: string;
+  cityName?: string;
+  deliverable: boolean;
+  customerCity: string;
+  districts: { districtId: string; name: string; nameAr: string; dropOff: boolean }[];
+  suggestedDistrictId?: string;
+  codAmount: number;
+  canSend: boolean;
+  reason?: string;
+}
+
+/** Bosta states that need a person (ShippingService / OrderAdminService.COURIER_PROBLEM_STATES). */
+export const COURIER_PROBLEM_STATES = [46, 47, 48, 49, 100, 101, 103];
 
 export interface Transfer {
   paymentId: string;

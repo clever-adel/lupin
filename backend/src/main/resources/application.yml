@@ -77,6 +77,13 @@ lupin:
     integration-fawry: ${PAYMOB_INTEGRATION_ID_FAWRY:}
     intention-url: ${PAYMOB_INTENTION_URL:https://accept.paymob.com/v1/intention/}
     checkout-url: ${PAYMOB_CHECKOUT_URL:https://accept.paymob.com/unifiedcheckout/}
+  # Bosta courier. Switched off until the API key and a webhook secret (24+ characters) are both present.
+  bosta:
+    api-key: ${BOSTA_API_KEY:}
+    webhook-secret: ${BOSTA_WEBHOOK_SECRET:}
+    base-url: ${BOSTA_BASE_URL:https://app.bosta.co/api/v2}
+    business-location-id: ${BOSTA_BUSINESS_LOCATION_ID:}
+    package-type: ${BOSTA_PACKAGE_TYPE:Small}
 
 ---
 spring:

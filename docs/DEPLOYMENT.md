@@ -221,6 +221,25 @@ gcloud run services update lupin-api --region europe-west1 --remove-env-vars LUP
      **Open Men** (and any other you sell) or customers will see no products at all.
 3. Place a real test order yourself, end to end, and walk it to "delivered" in the dashboard.
 
+### Bosta courier (optional, when you have a Bosta business account)
+
+1. In Bosta's dashboard (business.bosta.co): **Settings → API integration → Create API key**, with
+   Read/Write permission. Copy it there; never paste it into chat, email or this repository.
+2. On Render: service `lupin-api` → **Environment**:
+   - add `BOSTA_API_KEY` = the key from step 1;
+   - check `BOSTA_WEBHOOK_SECRET` exists (the Blueprint generates it). If not, add one of 24+ random
+     characters (any password generator);
+   - `LUPIN_PUBLIC_BASE_URL` must be the address Bosta can reach. Until Phase 5 is done that is the
+     workers.dev address (`https://lupin-storefront-production.lupinwear.workers.dev`), afterwards
+     `https://lupinwear.store`. Bosta sends delivery updates to `<that address>/api/v1/shipping/webhooks/bosta`;
+   - optional `BOSTA_BUSINESS_LOCATION_ID` if your Bosta account has more than one pickup location.
+   - **Save, rebuild and deploy.**
+3. In `/admin`, open an order that is **Being prepared**: the **Send with Bosta** box appears. Choose
+   the district, check the cash to collect, send. The order becomes Shipped with Bosta's tracking number.
+4. Book the pickup from Bosta's dashboard as usual.
+5. First time only: check the delivery in Bosta's dashboard (address, phone, COD amount), and when Bosta
+   updates it, check the order page shows the new courier status.
+
 ---
 
 ## Phase 5 — The domain (the moment the public address changes)

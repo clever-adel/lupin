@@ -61,7 +61,9 @@ test.describe.serial("staff dashboard", () => {
     await page.getByRole("checkbox", { name: "L", exact: true }).check();
     await page.getByLabel("Colour name (English)").fill("Black");
     await page.getByLabel("Colour name (Arabic)").fill("أسود");
-    await page.getByLabel("Pieces in stock for each colour and size").fill("5");
+    // Initial inventory is entered independently for each colour/size variant.
+    await page.locator("#stock-0-M").fill("5");
+    await page.locator("#stock-0-L").fill("2");
     await page.getByRole("button", { name: "Create draft product" }).click();
 
     await expect(page).toHaveURL(/\/admin\/products\/\d+$/);
@@ -94,6 +96,7 @@ test.describe.serial("staff dashboard", () => {
     // Stock: add, then an impossible removal is refused with a reason.
     const row = card.locator("tbody tr", { hasText: "Black · M" });
     await expect(row.locator("td").nth(0)).toHaveText("5");
+    await expect(card.locator("tbody tr", { hasText: "Black · L" }).locator("td").nth(0)).toHaveText("2");
     await row.getByLabel("Add or remove stock for Black M").fill("3");
     await row.getByRole("button", { name: "Apply" }).click();
     await expect(row.locator("td").nth(0)).toHaveText("8");
@@ -437,10 +440,10 @@ test.describe.serial("staff dashboard", () => {
     await expect(page.getByText("Nothing more to do on this order.")).toBeVisible();
     await expect(page.getByText("Cash on delivery · Paid")).toBeVisible();
 
-    // Stock: 5 made, 1 shipped → 4 in the warehouse, nothing reserved.
+    // The order used size L: 2 made, 1 shipped → 1 in the warehouse, nothing reserved.
     await page.goto(`/admin/products?q=${encodeURIComponent(productName)}`);
     const row = page.locator("main li", { hasText: productName }).locator("tbody tr", { hasText: "Black · L" });
-    await expect(row.locator("td").nth(0)).toHaveText("4");
+    await expect(row.locator("td").nth(0)).toHaveText("1");
     await expect(row.locator("td").nth(1)).toHaveText("0");
 
     await customer.reload();

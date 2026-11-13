@@ -1,16 +1,14 @@
-# Render Blueprint for the back end (the Java API). Free plan: no card needed to create it.
+# Render Blueprint for the back end (the Java API). Paid "starter" plan: always on, no sleeping.
 # In Render: New → Blueprint → pick this repository. Render reads this file and asks only for the
 # values marked "sync: false". Nothing secret is stored in this file.
 #
-# Free plan limits to know: 512 MB memory and a fraction of a CPU; the service sleeps after
-# 15 minutes without visitors and takes a minute or more to wake; 750 hours a month.
-# Render itself says not to run production applications on the free plan. Fine for trying the store
-# live; move to a paid plan (change "plan" below) before real customers depend on it.
+# Starter plan: 512 MB memory, always on (no sleeping), billed monthly. To go back to the free plan
+# (sleeps after 15 minutes without visitors, a minute or more to wake), set "plan" below to free.
 services:
   - type: web
     name: lupin-api
     runtime: docker
-    plan: free
+    plan: starter
     region: frankfurt
     rootDir: backend
     dockerfilePath: ./backend/Dockerfile
@@ -36,6 +34,17 @@ services:
       # service's Environment page in Render.
       - key: LUPIN_EDGE_SECRET
         generateValue: true
+      # Bosta sends delivery updates with this value in a header; the app checks it. Never shared.
+      - key: BOSTA_WEBHOOK_SECRET
+        generateValue: true
+
+      # Bosta courier. Create the API key in Bosta's dashboard (Settings → API integration, Read/Write)
+      # and paste it on Render's Environment page. Leave empty to keep Bosta switched off.
+      - key: BOSTA_API_KEY
+        sync: false
+      # Optional: the pickup location id from Bosta when the business has more than one.
+      - key: BOSTA_BUSINESS_LOCATION_ID
+        sync: false
 
       # Asked for once, when the Blueprint is created. Paste Neon's connection string exactly as Neon
       # shows it (postgresql://user:password@host/neondb?sslmode=require); use the one WITHOUT

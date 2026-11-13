@@ -267,6 +267,12 @@ export default function OrderPage() {
               {pick(o, "deliveryEstimate") && ` · ${pick(o, "deliveryEstimate")}`}
             </p>
             {o.paymentMethod && <p className="text-stone">{t(`pay.${o.paymentMethod}`)}</p>}
+            {o.carrier && <p className="pt-2">{t("order.courier", { carrier: o.carrier })}</p>}
+            {o.trackingNumber && (
+              <p className="font-semibold">
+                {t("order.trackingNumber", { tracking: "" })}<span dir="ltr">{o.trackingNumber}</span>
+              </p>
+            )}
           </address>
         </section>
 
