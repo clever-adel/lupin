@@ -11,8 +11,9 @@ services:
     plan: starter
     region: frankfurt
     rootDir: backend
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    # Both paths are read from inside rootDir (backend/), not from the repository root.
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /actuator/health
     autoDeployTrigger: commit
     envVars:
