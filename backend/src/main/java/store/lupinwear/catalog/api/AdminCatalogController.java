@@ -60,6 +60,20 @@ public class AdminCatalogController {
         return Map.of("slug", catalog.createCategory(user.id(), body));
     }
 
+    @org.springframework.web.bind.annotation.PutMapping("/departments/{department}/categories/{slug}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void renameCategory(@AuthenticationPrincipal CurrentUser user, @PathVariable String department,
+            @PathVariable String slug, @Valid @RequestBody CatalogDtos.CategoryRenameRequest body) {
+        catalog.renameCategory(user.id(), department, slug, body.nameEn(), body.nameAr());
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/departments/{department}/categories/{slug}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void deleteCategory(@AuthenticationPrincipal CurrentUser user, @PathVariable String department,
+            @PathVariable String slug) {
+        catalog.deleteCategory(user.id(), department, slug);
+    }
+
     @PostMapping("/products")
     @ResponseStatus(HttpStatus.CREATED)
     ProductCreated createProduct(@AuthenticationPrincipal CurrentUser user, @Valid @RequestBody ProductRequest body) {

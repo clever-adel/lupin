@@ -69,6 +69,9 @@ public final class CatalogDtos {
     public record DepartmentStatusRequest(@NotNull @Pattern(regexp = "ACTIVE|COMING_SOON|HIDDEN") String status) {
     }
 
+    public record CategoryRenameRequest(@NotBlank @Size(max = 80) String nameEn, @NotBlank @Size(max = 80) String nameAr) {
+    }
+
     public record CategoryRequest(
             @NotBlank String departmentSlug,
             String parentSlug,

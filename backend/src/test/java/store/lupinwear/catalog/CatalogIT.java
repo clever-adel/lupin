@@ -22,8 +22,10 @@ import store.lupinwear.support.IntegrationTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -88,6 +90,27 @@ class CatalogIT extends IntegrationTest {
         mvc.perform(get("/api/v1/catalog/departments"))
                 .andExpect(jsonPath("$[?(@.slug=='men')].status").value("COMING_SOON"))
                 .andExpect(jsonPath("$[?(@.slug=='men')].productCount").value(0));
+    }
+
+    @Test
+    void aCategoryCanBeRenamedAndDeletedOnlyOnceItIsEmpty() throws Exception {
+        String path = "/api/v1/admin/departments/men/categories/" + category;
+        mvc.perform(put(path).with(csrf()).cookie(owner).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nameEn\":\"Renamed\",\"nameAr\":\"اسم جديد\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/catalog/departments"))
+                .andExpect(jsonPath("$[?(@.slug=='men')].categories[?(@.slug=='" + category + "')].nameEn").value("Renamed"));
+
+        long product = create(request("Category Keeper", "1000.00", null, 1)).get("id").asLong();
+        mvc.perform(delete(path).with(csrf()).cookie(owner))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CATEGORY_NOT_EMPTY"));
+
+        mvc.perform(delete("/api/v1/admin/products/" + product).with(csrf()).cookie(owner)).andExpect(status().isNoContent());
+        mvc.perform(delete(path).with(csrf()).cookie(owner)).andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/catalog/departments"))
+                .andExpect(jsonPath("$[?(@.slug=='men')].categories[?(@.slug=='" + category + "')]").isEmpty());
+        mvc.perform(delete(path).with(csrf()).cookie(owner)).andExpect(status().isNotFound());
     }
 
     @Test

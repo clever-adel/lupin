@@ -69,6 +69,49 @@ public class CatalogAdminService {
         return slug;
     }
 
+    /** Renames a category. Its address (slug) stays the same, so existing links keep working. */
+    public void renameCategory(UUID actor, String departmentSlug, String slug, String nameEn, String nameAr) {
+        int rows = jdbc.sql("""
+                update categories set name_en = :en, name_ar = :ar, updated_at = now()
+                where department_id = :d and slug = :s and active
+                """).param("en", nameEn.trim()).param("ar", nameAr.trim())
+                .param("d", departmentId(departmentSlug)).param("s", slug).update();
+        if (rows == 0) {
+            throw ApiException.notFound("Category");
+        }
+        audit.record(actor, "CATEGORY_RENAME", "category", slug, Map.of("nameEn", nameEn, "nameAr", nameAr));
+    }
+
+    /**
+     * Deletes an empty category. Refused while any product (not deleted) or sub-category is still in it, so
+     * no product is ever left without a category. Deleted products keep pointing at the row for their
+     * order history, so the row is switched off and its slug freed (the name can be used again) instead.
+     */
+    public void deleteCategory(UUID actor, String departmentSlug, String slug) {
+        int departmentId = departmentId(departmentSlug);
+        Integer id = jdbc.sql("select id from categories where department_id = :d and slug = :s and active")
+                .param("d", departmentId).param("s", slug).query(Integer.class).optional().orElse(null);
+        if (id == null) {
+            throw ApiException.notFound("Category");
+        }
+        long products = jdbc.sql("select count(*) from products where category_id = :c and deleted_at is null")
+                .param("c", id).query(Long.class).single();
+        if (products > 0) {
+            throw ApiException.conflict("CATEGORY_NOT_EMPTY", products == 1
+                    ? "1 product is still in this category. Move it to another category or delete it first."
+                    : products + " products are still in this category. Move them to another category or delete them first.");
+        }
+        long children = jdbc.sql("select count(*) from categories where parent_id = :c and active")
+                .param("c", id).query(Long.class).single();
+        if (children > 0) {
+            throw ApiException.conflict("CATEGORY_NOT_EMPTY", "Delete the categories inside this one first.");
+        }
+        jdbc.sql("update categories set active = false, slug = :freed, updated_at = now() where id = :c")
+                .param("freed", ("x" + id + "-" + slug).substring(0, Math.min(60, ("x" + id + "-" + slug).length())))
+                .param("c", id).update();
+        audit.record(actor, "CATEGORY_DELETE", "category", slug, Map.of());
+    }
+
     /** Creates a draft product with its colours, photos, one variant per colour × size, and stock rows. */
     public ProductCreated createProduct(UUID actor, ProductRequest req) {
         validate(req);

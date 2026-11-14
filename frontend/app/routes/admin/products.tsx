@@ -84,6 +84,119 @@ function DeleteProduct({ id, name, onDone }: { id: number; name: string; onDone:
   );
 }
 
+function CategoryRow({ department, category }: { department: string; category: Department["categories"][number] }) {
+  const client = useQueryClient();
+  const [mode, setMode] = useState<"view" | "edit" | "delete">("view");
+  const [nameEn, setNameEn] = useState(category.nameEn);
+  const [nameAr, setNameAr] = useState(category.nameAr);
+  const path = `/api/v1/admin/departments/${department}/categories/${category.slug}`;
+  const done = () => {
+    setMode("view");
+    client.invalidateQueries({ queryKey: ["admin", "departments"] });
+  };
+  const rename = useMutation({ mutationFn: () => api<void>("PUT", path, { nameEn, nameAr }), onSuccess: done });
+  const remove = useMutation({ mutationFn: () => api<void>("DELETE", path), onSuccess: done });
+  const failure = rename.error ?? remove.error;
+
+  return (
+    <li className="border-t border-line py-2 text-sm">
+      {mode === "edit" ? (
+        <form
+          className="flex flex-wrap items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            rename.mutate();
+          }}
+        >
+          <label className="text-xs">
+            English
+            <input className="field mt-1 h-9 w-44" maxLength={80} value={nameEn} onChange={(e) => setNameEn(e.target.value)} />
+          </label>
+          <label className="text-xs">
+            Arabic
+            <input className="field mt-1 h-9 w-44" dir="rtl" maxLength={80} value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
+          </label>
+          <button type="submit" className="btn btn-primary h-9" disabled={rename.isPending || !nameEn.trim() || !nameAr.trim()}>
+            Save
+          </button>
+          <button
+            type="button"
+            className="cursor-pointer underline"
+            onClick={() => {
+              setNameEn(category.nameEn);
+              setNameAr(category.nameAr);
+              setMode("view");
+            }}
+          >
+            Cancel
+          </button>
+        </form>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="me-auto">
+            {category.parentSlug && <span className="text-stone">↳ </span>}
+            <span className="font-medium">{category.nameEn}</span> <span className="text-stone" dir="rtl">{category.nameAr}</span>
+          </span>
+          {mode === "delete" ? (
+            <span role="group" aria-label={`Delete ${category.nameEn}?`} className="flex flex-wrap items-center gap-2">
+              <span>Delete “{category.nameEn}”?</span>
+              <button type="button" className="btn h-9 border-danger bg-danger text-bone" disabled={remove.isPending} onClick={() => remove.mutate()}>
+                Yes, delete
+              </button>
+              <button type="button" className="cursor-pointer underline" onClick={() => setMode("view")}>Keep it</button>
+            </span>
+          ) : (
+            <>
+              <button type="button" className="cursor-pointer underline" onClick={() => setMode("edit")}>
+                Edit <span className="sr-only">{category.nameEn}</span>
+              </button>
+              <button type="button" className="cursor-pointer text-danger underline" onClick={() => setMode("delete")}>
+                Delete <span className="sr-only">{category.nameEn}</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      {failure && <p role="alert" className="mt-1 text-danger">{errorText(failure)}</p>}
+    </li>
+  );
+}
+
+/** Rename or delete categories. A category can only be deleted once no product is left in it. */
+function Categories() {
+  const departments = useQuery({
+    queryKey: ["admin", "departments"],
+    queryFn: () => api<AdminDepartment[]>("GET", "/api/v1/admin/departments"),
+  });
+  if (!departments.data) return null;
+  return (
+    <section className="mt-6 border border-line bg-card p-4" aria-labelledby="categories-title">
+      <h2 id="categories-title" className="text-sm font-semibold">Categories</h2>
+      <p className="mt-1 text-xs text-stone">
+        Renaming keeps the category’s link the same. A category can be deleted once no product is in it: move its
+        products to another category (open the product and change “Category”) or delete them first. New categories are
+        added from a product’s page.
+      </p>
+      <div className="mt-3 grid gap-4 md:grid-cols-3">
+        {departments.data.map((d) => (
+          <div key={d.slug}>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-stone">{d.nameEn}</h3>
+            {d.categories.length === 0 ? (
+              <p className="mt-2 text-sm text-stone">No categories.</p>
+            ) : (
+              <ul className="mt-1">
+                {d.categories.map((c) => (
+                  <CategoryRow key={c.slug} department={d.slug} category={c} />
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 const DEPARTMENT_STATE: Record<AdminDepartment["status"], string> = {
   ACTIVE: "Open",
   COMING_SOON: "Coming soon",
@@ -186,6 +299,7 @@ export default function AdminProducts() {
       </p>
 
       <Departments />
+      <Categories />
 
       <form
         className="mt-5 flex items-end gap-3"
