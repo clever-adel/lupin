@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useOutletContext } from "react-router";
 import type { AdminContext } from "./layout";
 import { errorText } from "~/features/admin/shared";
-import { api } from "~/lib/http";
+import { api, deleteUploadedImage, uploadImages } from "~/lib/http";
 
 interface Policy {
   slug: string;
@@ -216,6 +216,80 @@ function TextSettings({ settingKey, value, fields }: { settingKey: string; value
   );
 }
 
+/**
+ * The big photo at the top of the home page. Uploading replaces it straight away (the old file is then
+ * removed from storage); removing it falls back to the first featured product's main photo.
+ */
+function HomePhoto({ value }: { value: Record<string, unknown> }) {
+  const client = useQueryClient();
+  const current = typeof value.imageUrl === "string" && value.imageUrl ? value.imageUrl : "";
+  const currentId = typeof value.imagePublicId === "string" ? value.imagePublicId : "";
+  const [error, setError] = useState("");
+
+  const replace = useMutation({
+    mutationFn: async (file: File | null) => {
+      let next = { imageUrl: "", imagePublicId: "" };
+      if (file) {
+        const [uploaded] = await uploadImages([file]);
+        if (!uploaded) throw new Error("Could not upload the photo.");
+        next = { imageUrl: uploaded.url, imagePublicId: uploaded.publicId };
+      }
+      try {
+        await api("PUT", "/api/v1/admin/settings/hero", next);
+      } catch (e) {
+        if (next.imagePublicId) await deleteUploadedImage(next.imagePublicId).catch(() => undefined);
+        throw e;
+      }
+      // The old file is no longer used anywhere; a failed clean-up only leaves an unused file behind.
+      if (currentId) await deleteUploadedImage(currentId).catch(() => undefined);
+    },
+    onMutate: () => setError(""),
+    onError: (e) => setError(e instanceof Error ? e.message : errorText(e)),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["admin", "settings"] }),
+  });
+
+  return (
+    <div className="flex flex-wrap items-start gap-5">
+      <div className="grid aspect-[4/5] w-40 place-items-center overflow-hidden bg-studio text-center text-xs text-stone">
+        {current ? (
+          <img src={current} alt="Current home page photo" className="h-full w-full object-cover" />
+        ) : (
+          <span className="px-3">No photo chosen: the first featured product’s photo is shown.</span>
+        )}
+      </div>
+      <div className="max-w-sm space-y-3 text-sm">
+        <p className="text-stone">
+          Best: a tall photo (4 by 5), at least 1200 pixels wide, of a model on a plain light grey background, like
+          your product photos. It is shown next to the headline and links to the shop.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className={`btn btn-primary ${replace.isPending ? "pointer-events-none opacity-50" : "cursor-pointer"}`}>
+            {replace.isPending ? "Saving…" : current ? "Change photo" : "Choose photo"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/avif"
+              className="sr-only"
+              disabled={replace.isPending}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) replace.mutate(file);
+              }}
+            />
+          </label>
+          {current && (
+            <button type="button" className="cursor-pointer underline" disabled={replace.isPending} onClick={() => replace.mutate(null)}>
+              Remove photo
+            </button>
+          )}
+        </div>
+        {replace.isSuccess && !error && <p role="status">Saved. Customers see it on their next page load.</p>}
+        {error && <p role="alert" className="text-danger">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminContent() {
   const { isOwner } = useOutletContext<AdminContext>();
   const policies = useQuery({ queryKey: ["admin", "policies"], queryFn: () => api<Policy[]>("GET", "/api/v1/admin/policies") });
@@ -229,6 +303,13 @@ export default function AdminContent() {
   return (
     <div className="max-w-5xl space-y-6">
       <h1 className="display text-2xl">Content</h1>
+
+      <section className={box}>
+        <h2 className="font-semibold">Home page photo</h2>
+        <div className="mt-4">
+          <HomePhoto value={settings.data.hero ?? {}} />
+        </div>
+      </section>
 
       <section className={box}>
         <h2 className="font-semibold">Home page headline</h2>

@@ -73,6 +73,12 @@ public class AdminCatalogController {
         catalog.setProductStatus(user.id(), id, body.status());
     }
 
+    @org.springframework.web.bind.annotation.DeleteMapping("/products/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void deleteProduct(@AuthenticationPrincipal CurrentUser user, @PathVariable long id) {
+        catalog.deleteProduct(user.id(), id);
+    }
+
     @GetMapping("/products")
     store.lupinwear.shared.PageResponse<store.lupinwear.catalog.api.CatalogDtos.AdminProductRow> products(
             @org.springframework.web.bind.annotation.RequestParam(required = false) String q,

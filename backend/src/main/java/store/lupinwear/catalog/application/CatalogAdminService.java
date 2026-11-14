@@ -168,6 +168,21 @@ public class CatalogAdminService {
         audit.record(actor, "PRODUCT_STATUS", "product", productId, Map.of("status", status));
     }
 
+    /**
+     * Removes a product from the store and the dashboard. The row is kept (marked deleted), so orders that
+     * already contain it keep their lines, prices and photos; nobody can view, add or buy it afterwards.
+     */
+    public void deleteProduct(UUID actor, long productId) {
+        int rows = jdbc.sql("""
+                update products set deleted_at = now(), status = 'ARCHIVED', updated_at = now(), version = version + 1
+                where id = :id and deleted_at is null
+                """).param("id", productId).update();
+        if (rows == 0) {
+            throw ApiException.notFound("Product");
+        }
+        audit.record(actor, "PRODUCT_DELETE", "product", productId, Map.of());
+    }
+
     /** Stock can never drop below what is already reserved for open orders. */
     public StockView adjustStock(UUID actor, long variantId, int delta, String note) {
         if (delta == 0) {

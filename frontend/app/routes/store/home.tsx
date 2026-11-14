@@ -66,16 +66,16 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               </p>
             )}
           </div>
-          {hero && (
+          {(campaign?.imageUrl || hero) && (
             <Link
-              to={href(`/product/${hero.slug}`)}
+              to={campaign?.imageUrl || !hero ? href("/shop") : href(`/product/${hero.slug}`)}
               data-reveal="photo"
               style={{ "--reveal-delay": "150ms" } as CSSProperties}
               className="block overflow-hidden"
             >
               <ProductPhoto
-                url={hero.colors[0]?.imageUrl}
-                alt={pick(hero, "name")}
+                url={campaign?.imageUrl || hero?.colors[0]?.imageUrl}
+                alt={campaign?.imageUrl || !hero ? headline : pick(hero, "name")}
                 sizes="(min-width: 768px) 24rem, 90vw"
                 eager
                 className="aspect-[4/5] w-full"

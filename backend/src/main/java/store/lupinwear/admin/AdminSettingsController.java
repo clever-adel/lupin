@@ -71,7 +71,7 @@ public class AdminSettingsController {
 
     /** Settings a staff member may edit, and extra fields allowed beyond those already stored. */
     private static final Map<String, Set<String>> EDITABLE = Map.of(
-            "hero", Set.of(), "announcement", Set.of(), "contact", Set.of(), "home_sections", Set.of(),
+            "hero", Set.of("imageUrl", "imagePublicId"), "announcement", Set.of(), "contact", Set.of(), "home_sections", Set.of(),
             "checkout", Set.of("unpaidOrderMinutes"), "payment_methods", Set.of());
     private static final Set<String> OWNER_ONLY = Set.of("payment_methods", "checkout");
 
@@ -219,6 +219,13 @@ public class AdminSettingsController {
     }
 
     private static void validate(String key, ObjectNode value) {
+        // The home photo must be one of our own uploads (served under /media/), never an outside address.
+        if ("hero".equals(key)) {
+            String url = value.path("imageUrl").asText("");
+            if (!url.isEmpty() && !url.matches("/media/[A-Za-z0-9._-]{1,200}")) {
+                throw ApiException.badRequest("INVALID_SETTING", "The home photo must be uploaded from the dashboard.");
+            }
+        }
         if ("checkout".equals(key)) {
             requireRange(value, "cancelUndoMinutes", 0, 24 * 60, false);
             requireRange(value, "unpaidOrderMinutes", 10, 7 * 24 * 60, true);

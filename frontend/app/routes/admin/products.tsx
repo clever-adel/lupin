@@ -48,6 +48,42 @@ function StockCell({ variant, onDone }: { variant: AdminVariant; onDone: () => v
   );
 }
 
+/**
+ * Deleting asks once more, naming the product, because it cannot be undone from the dashboard.
+ * Orders that already contain the product keep it; customers can no longer see or buy it.
+ */
+function DeleteProduct({ id, name, onDone }: { id: number; name: string; onDone: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const remove = useMutation({
+    mutationFn: () => api<void>("DELETE", `/api/v1/admin/products/${id}`),
+    onSuccess: onDone,
+  });
+  if (!asking) {
+    return (
+      <button type="button" className="cursor-pointer px-2 text-sm text-danger underline" onClick={() => setAsking(true)}>
+        Delete
+      </button>
+    );
+  }
+  return (
+    <span role="group" aria-label={`Delete ${name}?`} className="flex flex-wrap items-center gap-2 border border-danger px-3 py-2 text-sm">
+      <span>Delete “{name}” for good? Past orders keep it.</span>
+      <button
+        type="button"
+        className="btn h-9 border-danger bg-danger text-bone"
+        disabled={remove.isPending}
+        onClick={() => remove.mutate()}
+      >
+        {remove.isPending ? "Deleting…" : "Yes, delete"}
+      </button>
+      <button type="button" className="cursor-pointer underline" onClick={() => setAsking(false)}>
+        Keep it
+      </button>
+      {remove.isError && <span role="alert" className="basis-full text-danger">{errorText(remove.error)}</span>}
+    </span>
+  );
+}
+
 const DEPARTMENT_STATE: Record<AdminDepartment["status"], string> = {
   ACTIVE: "Open",
   COMING_SOON: "Coming soon",
@@ -179,14 +215,17 @@ export default function AdminProducts() {
                   {p.salePrice ? `${money(p.salePrice)} (was ${money(p.price)})` : money(p.price)} · {PRODUCT_STATUS[p.status]}
                 </p>
               </div>
-              <button
-                type="button"
-                className="btn btn-outline"
-                disabled={setStatus.isPending}
-                onClick={() => setStatus.mutate({ id: p.id, status: p.status === "ACTIVE" ? "DRAFT" : "ACTIVE" })}
-              >
-                {p.status === "ACTIVE" ? "Take off sale" : "Put on sale"}
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  disabled={setStatus.isPending}
+                  onClick={() => setStatus.mutate({ id: p.id, status: p.status === "ACTIVE" ? "DRAFT" : "ACTIVE" })}
+                >
+                  {p.status === "ACTIVE" ? "Take off sale" : "Put on sale"}
+                </button>
+                <DeleteProduct id={p.id} name={p.nameEn} onDone={refresh} />
+              </div>
             </div>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[34rem] text-sm">

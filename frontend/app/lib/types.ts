@@ -206,7 +206,12 @@ export interface Faq {
 }
 
 export interface SiteContent {
-  hero: { labelEn: string; labelAr: string; headlineEn: string; headlineAr: string; textEn: string; textAr: string };
+  hero: {
+    labelEn: string; labelAr: string; headlineEn: string; headlineAr: string; textEn: string; textAr: string;
+    /** The home page photo chosen in the dashboard; when empty, the first featured product's photo is used. */
+    imageUrl?: string;
+    imagePublicId?: string;
+  };
   announcement: { itemsEn: string[]; itemsAr: string[] };
   contact: {
     email: string; phone: string; whatsappNumber: string; hoursEn: string; hoursAr: string;

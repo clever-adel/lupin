@@ -22,6 +22,7 @@ import store.lupinwear.support.IntegrationTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -231,6 +232,36 @@ class AdminIT extends IntegrationTest {
     private ResultActions move(String reference, String status, Cookie staff) throws Exception {
         return mvc.perform(jsonPost("/api/v1/admin/orders/" + reference + "/status", Map.of("status", status))
                 .cookie(staff));
+    }
+
+    @Test
+    void theHomePhotoIsOneOfOurUploadsAndReachesTheSite() throws Exception {
+        putSetting("hero", Map.of("imageUrl", "https://elsewhere.example/x.png"), admin)
+                .andExpect(status().isBadRequest());
+        putSetting("hero", Map.of("imageUrl", "/media/hero-1.jpg", "imagePublicId", "hero-1.jpg"), admin)
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/content/site")).andExpect(jsonPath("$.hero.imageUrl").value("/media/hero-1.jpg"));
+
+        putSetting("hero", Map.of("imageUrl", "", "imagePublicId", ""), admin).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/content/site")).andExpect(jsonPath("$.hero.imageUrl").value(""));
+    }
+
+    @Test
+    void aDeletedProductLeavesTheStoreAndTheDashboard() throws Exception {
+        long product = jdbc.sql("select product_id from product_variants where id = :v").param("v", variant)
+                .query(Long.class).single();
+        String slug = jdbc.sql("select slug from products where id = :p").param("p", product).query(String.class).single();
+        mvc.perform(get("/api/v1/catalog/products/" + slug)).andExpect(status().isOk());
+
+        mvc.perform(delete("/api/v1/admin/products/" + product).with(csrf()).cookie(customer))
+                .andExpect(status().isForbidden());
+        mvc.perform(delete("/api/v1/admin/products/" + product).with(csrf()).cookie(admin))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(get("/api/v1/catalog/products/" + slug)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/admin/products/" + product).cookie(owner)).andExpect(status().isNotFound());
+        mvc.perform(delete("/api/v1/admin/products/" + product).with(csrf()).cookie(admin))
+                .andExpect(status().isNotFound());
     }
 
     private ResultActions putSetting(String key, Map<String, Object> body, Cookie staff) throws Exception {
