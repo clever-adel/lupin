@@ -90,12 +90,13 @@ export function FavouriteButton({ slug, className = "" }: { slug: string; classN
 export function ProductCard({ product, eager, heading: Heading = "h3" }: { product: Card; eager?: boolean; heading?: "h2" | "h3" }) {
   const { t, href, pick } = useT();
   const name = pick(product, "name");
-  const badge =
-    product.discountPercent != null
-      ? `−${product.discountPercent}%`
+  const label =
+    product.badge === "CUSTOM"
+      ? pick(product, "badge") || null
       : product.badge
         ? t(`badge.${product.badge}`)
         : null;
+  const discount = product.discountPercent != null ? `−${product.discountPercent}%` : null;
   return (
     <article className="group relative">
       <Link to={href(`/product/${product.slug}`)} className="block">
@@ -115,9 +116,14 @@ export function ProductCard({ product, eager, heading: Heading = "h3" }: { produ
               className="card-hover-photo absolute inset-0 h-full w-full"
             />
           )}
-          {badge && (
-            <span className="label absolute start-2 top-2 bg-ink px-2 py-1 text-bone" dir="ltr">
-              {badge}
+          {(label || discount) && (
+            <span className="absolute start-2 top-2 flex flex-col items-start gap-1">
+              {label && <span className="label bg-ink px-2 py-1 text-bone">{label}</span>}
+              {discount && (
+                <span className="label bg-ink px-2 py-1 text-bone" dir="ltr">
+                  {discount}
+                </span>
+              )}
             </span>
           )}
           {!product.inStock && (

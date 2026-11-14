@@ -166,18 +166,18 @@ public class CatalogQueryService {
         }
 
         record Row(long id, String slug, String nameEn, String nameAr, String catEn, String catAr, BigDecimal price,
-                BigDecimal salePrice, String badge, boolean inStock) {
+                BigDecimal salePrice, String badge, String badgeEn, String badgeAr, boolean inStock) {
         }
         params.put("limit", size);
         params.put("offset", (long) page * size);
         List<Row> rows = jdbc.sql("select p.id, p.slug, p.name_en, p.name_ar, c.name_en as cat_en, c.name_ar as cat_ar,"
-                + " p.price, p.sale_price, p.badge, " + IN_STOCK + " as in_stock " + where
+                + " p.price, p.sale_price, p.badge, p.badge_en, p.badge_ar, " + IN_STOCK + " as in_stock " + where
                 + " order by " + f.sort().orderBy + " limit :limit offset :offset")
                 .params(params)
                 .query((rs, n) -> new Row(rs.getLong("id"), rs.getString("slug"), rs.getString("name_en"),
                         rs.getString("name_ar"), rs.getString("cat_en"), rs.getString("cat_ar"),
                         rs.getBigDecimal("price"), rs.getBigDecimal("sale_price"), rs.getString("badge"),
-                        rs.getBoolean("in_stock")))
+                        rs.getString("badge_en"), rs.getString("badge_ar"), rs.getBoolean("in_stock")))
                 .list();
 
         Map<Long, List<ColorDot>> dots = new HashMap<>();
@@ -197,7 +197,7 @@ public class CatalogQueryService {
 
         List<ProductCard> cards = rows.stream().map(r -> new ProductCard(r.slug(), r.nameEn(), r.nameAr(), r.catEn(),
                 r.catAr(), r.price(), r.salePrice(), discountPercent(r.price(), r.salePrice()), r.badge(),
-                r.inStock(), dots.getOrDefault(r.id(), List.of()))).toList();
+                r.badgeEn(), r.badgeAr(), r.inStock(), dots.getOrDefault(r.id(), List.of()))).toList();
         return PageResponse.of(cards, page, size, total);
     }
 
@@ -233,7 +233,7 @@ public class CatalogQueryService {
                         rs.getString("name_en"), rs.getString("name_ar"), rs.getString("description_en"),
                         rs.getString("description_ar"), rs.getString("fabric_en"), rs.getString("fabric_ar"),
                         rs.getString("fit_en"), rs.getString("fit_ar"), rs.getString("brand"), rs.getString("badge"),
-                        rs.getBigDecimal("price"), rs.getBigDecimal("sale_price"),
+                        rs.getString("badge_en"), rs.getString("badge_ar"), rs.getBigDecimal("price"), rs.getBigDecimal("sale_price"),
                         discountPercent(rs.getBigDecimal("price"), rs.getBigDecimal("sale_price")),
                         new Crumb(rs.getString("d_slug"), rs.getString("d_en"), rs.getString("d_ar")),
                         new Crumb(rs.getString("c_slug"), rs.getString("c_en"), rs.getString("c_ar")), null)))
@@ -279,7 +279,7 @@ public class CatalogQueryService {
 
         ProductDetail p = head.partial();
         return new ProductDetail(p.id(), p.slug(), p.nameEn(), p.nameAr(), p.descriptionEn(), p.descriptionAr(),
-                p.fabricEn(), p.fabricAr(), p.fitEn(), p.fitAr(), p.brand(), p.badge(), p.price(), p.salePrice(),
+                p.fabricEn(), p.fabricAr(), p.fitEn(), p.fitAr(), p.brand(), p.badge(), p.badgeEn(), p.badgeAr(), p.price(), p.salePrice(),
                 p.discountPercent(), p.department(), p.category(), List.copyOf(colors.values()));
     }
 

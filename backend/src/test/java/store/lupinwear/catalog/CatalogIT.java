@@ -247,8 +247,8 @@ class CatalogIT extends IntegrationTest {
                 new InitialVariantStock(1, "M", 5), new InitialVariantStock(1, "L", 1));
         ProductRequest withStock = new ProductRequest(base.nameEn(), base.nameAr(), base.departmentSlug(),
                 base.categorySlug(), base.descriptionEn(), base.descriptionAr(), base.fabricEn(), base.fabricAr(),
-                base.fitEn(), base.fitAr(), base.brand(), base.badge(), base.price(), base.salePrice(), base.sizeGroup(),
-                base.sizes(), base.colors(), 0, stock);
+                base.fitEn(), base.fitAr(), base.brand(), base.badge(), null, null, base.price(), base.salePrice(),
+                base.sizeGroup(), base.sizes(), base.colors(), 0, stock);
 
         long productId = create(withStock).path("id").asLong();
 
@@ -258,6 +258,33 @@ class CatalogIT extends IntegrationTest {
         assertThat(stockFor(productId, "Navy", "S")).isEqualTo(3);
         assertThat(stockFor(productId, "Navy", "M")).isEqualTo(5);
         assertThat(stockFor(productId, "Navy", "L")).isEqualTo(1);
+    }
+
+    @Test
+    void ownerCanWriteHisOwnLabelInBothLanguages() throws Exception {
+        ProductRequest base = request("Custom Label Product", "1100.00", "800.00", 1);
+        ProductRequest custom = new ProductRequest(base.nameEn(), base.nameAr(), base.departmentSlug(),
+                base.categorySlug(), base.descriptionEn(), base.descriptionAr(), base.fabricEn(), base.fabricAr(),
+                base.fitEn(), base.fitAr(), base.brand(), "CUSTOM", " Last pieces ", "آخر قطع", base.price(),
+                base.salePrice(), base.sizeGroup(), base.sizes(), base.colors(), 1, List.of());
+        long id = create(custom).path("id").asLong();
+        String saved = jdbc.sql("select badge || '|' || badge_en || '|' || badge_ar from products where id = :id")
+                .param("id", id).query(String.class).single();
+        assertThat(saved).isEqualTo("CUSTOM|Last pieces|آخر قطع");
+
+        ProductRequest missingArabic = new ProductRequest("No Arabic Label", "منتج", "men", category, "", "", "",
+                "", "", "", null, "CUSTOM", "Hot", " ", new BigDecimal("1000.00"), null, "ADULT", List.of("M"),
+                base.colors(), 1, List.of());
+        mvc.perform(jsonPost("/api/v1/admin/products", missingArabic).cookie(owner))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("BADGE_TEXT_REQUIRED"));
+
+        ProductRequest sale = new ProductRequest("Sale Label Product", "منتج", "men", category, "", "", "", "", "",
+                "", null, "SALE", "ignored", "ignored", new BigDecimal("1000.00"), null, "ADULT", List.of("M"),
+                base.colors(), 1, List.of());
+        long saleId = create(sale).path("id").asLong();
+        String saleRow = jdbc.sql("select badge || '|' || coalesce(badge_en, '-') from products where id = :id")
+                .param("id", saleId).query(String.class).single();
+        assertThat(saleRow).isEqualTo("SALE|-");
     }
 
     @Test

@@ -27,6 +27,9 @@ export interface ColorDot {
   hoverImageUrl?: string;
 }
 
+/** The label on a product photo. CUSTOM shows the owner's own text (badgeEn / badgeAr). */
+export type Badge = "NEW" | "BESTSELLER" | "SALE" | "CUSTOM";
+
 export interface ProductCard {
   slug: string;
   nameEn: string;
@@ -36,7 +39,9 @@ export interface ProductCard {
   price: number;
   salePrice?: number;
   discountPercent?: number;
-  badge?: "NEW" | "BESTSELLER";
+  badge?: Badge;
+  badgeEn?: string;
+  badgeAr?: string;
   inStock: boolean;
   colors: ColorDot[];
 }
@@ -92,7 +97,9 @@ export interface ProductDetail {
   fitEn: string;
   fitAr: string;
   brand?: string;
-  badge?: "NEW" | "BESTSELLER";
+  badge?: Badge;
+  badgeEn?: string;
+  badgeAr?: string;
   price: number;
   salePrice?: number;
   discountPercent?: number;

@@ -128,12 +128,14 @@ public class CatalogAdminService {
                     .orElseThrow(() -> ApiException.badRequest("UNKNOWN_SIZE", "Unknown size: " + code)));
         }
 
+        String[] badgeText = badgeText(req.badge(), req.badgeEn(), req.badgeAr());
         String slug = uniqueSlug(slugify(req.nameEn()));
         long productId = jdbc.sql("""
                 insert into products (slug, department_id, category_id, name_en, name_ar, description_en, description_ar,
-                                      fabric_en, fabric_ar, fit_en, fit_ar, brand, badge, price, sale_price)
+                                      fabric_en, fabric_ar, fit_en, fit_ar, brand, badge, badge_en, badge_ar, price,
+                                      sale_price)
                 values (:slug, :dep, :cat, :nameEn, :nameAr, :descEn, :descAr, :fabricEn, :fabricAr, :fitEn, :fitAr,
-                        :brand, :badge, :price, :salePrice)
+                        :brand, :badge, :badgeEn, :badgeAr, :price, :salePrice)
                 returning id
                 """)
                 .param("slug", slug).param("dep", departmentId).param("cat", categoryId)
@@ -142,6 +144,7 @@ public class CatalogAdminService {
                 .param("fabricEn", orEmpty(req.fabricEn())).param("fabricAr", orEmpty(req.fabricAr()))
                 .param("fitEn", orEmpty(req.fitEn())).param("fitAr", orEmpty(req.fitAr()))
                 .param("brand", req.brand()).param("badge", req.badge())
+                .param("badgeEn", badgeText[0]).param("badgeAr", badgeText[1])
                 .param("price", req.price()).param("salePrice", req.salePrice())
                 .query(Long.class).single();
 
@@ -262,14 +265,15 @@ public class CatalogAdminService {
         AdminProductDetail product = jdbc.sql("""
                 select p.id, p.slug, p.status, d.slug, c.slug, p.name_en, p.name_ar, p.description_en,
                        p.description_ar, p.fabric_en, p.fabric_ar, p.fit_en, p.fit_ar, p.badge, p.price, p.sale_price,
-                       p.featured
+                       p.featured, p.badge_en, p.badge_ar
                 from products p join departments d on d.id = p.department_id join categories c on c.id = p.category_id
                 where p.id = :id and p.deleted_at is null
                 """).param("id", id)
                 .query((rs, n) -> new AdminProductDetail(rs.getLong(1), rs.getString(2), rs.getString(3),
                         rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8),
                         rs.getString(9), rs.getString(10), rs.getString(11), rs.getString(12), rs.getString(13),
-                        rs.getString(14), rs.getBigDecimal(15), rs.getBigDecimal(16), rs.getBoolean(17), List.of()))
+                        rs.getString(14), rs.getString(18), rs.getString(19), rs.getBigDecimal(15),
+                        rs.getBigDecimal(16), rs.getBoolean(17), List.of()))
                 .optional().orElseThrow(() -> ApiException.notFound("Product"));
         record ColorHead(long id, String nameEn, String nameAr, String hex) {
         }
@@ -293,7 +297,8 @@ public class CatalogAdminService {
         return new AdminProductDetail(product.id(), product.slug(), product.status(), product.departmentSlug(),
                 product.categorySlug(), product.nameEn(), product.nameAr(), product.descriptionEn(),
                 product.descriptionAr(), product.fabricEn(), product.fabricAr(), product.fitEn(), product.fitAr(),
-                product.badge(), product.price(), product.salePrice(), product.featured(), colors);
+                product.badge(), product.badgeEn(), product.badgeAr(), product.price(), product.salePrice(),
+                product.featured(), colors);
     }
 
     public void replaceColorImages(UUID actor, long productId, long colorId, List<ImageRequest> images) {
@@ -323,13 +328,15 @@ public class CatalogAdminService {
         if (req.salePrice() != null && req.salePrice().compareTo(req.price()) >= 0) {
             throw ApiException.badRequest("SALE_PRICE_TOO_HIGH", "The discount price must be lower than the price.");
         }
+        String[] badgeText = badgeText(req.badge(), req.badgeEn(), req.badgeAr());
         Integer departmentId = jdbc.sql("select department_id from products where id = :id and deleted_at is null"
                 + " for update").param("id", id).query(Integer.class).optional()
                 .orElseThrow(() -> ApiException.notFound("Product"));
         jdbc.sql("""
                 update products set name_en = :nameEn, name_ar = :nameAr, category_id = :cat,
                        description_en = :descEn, description_ar = :descAr, fabric_en = :fabricEn, fabric_ar = :fabricAr,
-                       fit_en = :fitEn, fit_ar = :fitAr, badge = :badge, price = :price, sale_price = :salePrice,
+                       fit_en = :fitEn, fit_ar = :fitAr, badge = :badge, badge_en = :badgeEn, badge_ar = :badgeAr,
+                       price = :price, sale_price = :salePrice,
                        featured = :featured, updated_at = now(), version = version + 1
                 where id = :id
                 """).param("nameEn", req.nameEn().trim()).param("nameAr", req.nameAr().trim())
@@ -337,7 +344,8 @@ public class CatalogAdminService {
                 .param("descEn", orEmpty(req.descriptionEn())).param("descAr", orEmpty(req.descriptionAr()))
                 .param("fabricEn", orEmpty(req.fabricEn())).param("fabricAr", orEmpty(req.fabricAr()))
                 .param("fitEn", orEmpty(req.fitEn())).param("fitAr", orEmpty(req.fitAr()))
-                .param("badge", req.badge()).param("price", req.price()).param("salePrice", req.salePrice())
+                .param("badge", req.badge()).param("badgeEn", badgeText[0]).param("badgeAr", badgeText[1])
+                .param("price", req.price()).param("salePrice", req.salePrice())
                 .param("featured", req.featured()).param("id", id).update();
         audit.record(actor, "PRODUCT_UPDATE", "product", id,
                 Map.of("price", req.price(), "salePrice", req.salePrice() == null ? "" : req.salePrice()));
@@ -473,5 +481,19 @@ public class CatalogAdminService {
 
     private static String orEmpty(String s) {
         return s == null ? "" : s.trim();
+    }
+
+    /** The owner's own label text, English then Arabic: required for CUSTOM, dropped for every other label. */
+    static String[] badgeText(String badge, String en, String ar) {
+        if (!"CUSTOM".equals(badge)) {
+            return new String[] {null, null};
+        }
+        String english = orEmpty(en);
+        String arabic = orEmpty(ar);
+        if (english.isEmpty() || arabic.isEmpty()) {
+            throw ApiException.badRequest("BADGE_TEXT_REQUIRED",
+                    "Write your label in English and in Arabic, or choose another label.");
+        }
+        return new String[] {english, arabic};
     }
 }

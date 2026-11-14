@@ -20,6 +20,8 @@ interface Detail {
   fitEn: string;
   fitAr: string;
   badge?: string;
+  badgeEn?: string;
+  badgeAr?: string;
   price: number;
   salePrice?: number;
   featured: boolean;
@@ -46,7 +48,8 @@ const KIDS_SIZES = ["2-3Y", "4-5Y", "6-7Y", "8-9Y", "10-11Y", "12-13Y"];
 const stockKey = (colourIndex: number, size: string) => `${colourIndex}:${size}`;
 const EMPTY: Omit<Detail, "id" | "slug" | "status" | "colors"> = {
   departmentSlug: "", categorySlug: "", nameEn: "", nameAr: "", descriptionEn: "", descriptionAr: "",
-  fabricEn: "", fabricAr: "", fitEn: "", fitAr: "", badge: "", price: 0, featured: false,
+  fabricEn: "", fabricAr: "", fitEn: "", fitAr: "", badge: "", badgeEn: "", badgeAr: "", price: 0,
+  featured: false,
 };
 
 function Text({ id, label, value, onChange, rtl, area, required }: {
@@ -211,6 +214,8 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
         nameEn: f.nameEn, nameAr: f.nameAr, categorySlug: f.categorySlug,
         descriptionEn: f.descriptionEn, descriptionAr: f.descriptionAr, fabricEn: f.fabricEn, fabricAr: f.fabricAr,
         fitEn: f.fitEn, fitAr: f.fitAr, badge: f.badge || null,
+        badgeEn: f.badge === "CUSTOM" ? (f.badgeEn ?? "").trim() : null,
+        badgeAr: f.badge === "CUSTOM" ? (f.badgeAr ?? "").trim() : null,
         price: Number(price), salePrice: salePrice.trim() === "" ? null : Number(salePrice),
       };
       if (existing) {
@@ -340,9 +345,26 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
               <option value="">None</option>
               <option value="NEW">New</option>
               <option value="BESTSELLER">Bestseller</option>
+              <option value="SALE">Sale</option>
+              <option value="CUSTOM">Write my own label…</option>
             </select>
           </div>
         </div>
+        {f.badge === "CUSTOM" && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="badgeEn" className="mb-1 block text-xs font-medium">Your label (English)</label>
+              <input id="badgeEn" className="field" maxLength={30} required placeholder="Last pieces"
+                value={f.badgeEn ?? ""} onChange={(e) => set("badgeEn")(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor="badgeAr" className="mb-1 block text-xs font-medium">Your label (Arabic)</label>
+              <input id="badgeAr" className="field" dir="rtl" maxLength={30} required placeholder="آخر قطع"
+                value={f.badgeAr ?? ""} onChange={(e) => set("badgeAr")(e.target.value)} />
+            </div>
+            <p className="text-xs text-stone sm:col-span-2">Up to 30 letters. It shows on the photo in the shopper's language. The discount percentage still shows under it when there is a discount price.</p>
+          </div>
+        )}
         {existing && (
           <label className="mt-3 flex items-center gap-2 text-sm">
             <input type="checkbox" className="accent-ink" checked={f.featured} onChange={(e) => setF((prev) => ({ ...prev, featured: e.target.checked }))} />

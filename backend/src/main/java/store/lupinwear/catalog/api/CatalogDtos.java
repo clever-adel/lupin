@@ -32,8 +32,8 @@ public final class CatalogDtos {
     }
 
     public record ProductCard(String slug, String nameEn, String nameAr, String categoryEn, String categoryAr,
-            BigDecimal price, BigDecimal salePrice, Integer discountPercent, String badge, boolean inStock,
-            List<ColorDot> colors) {
+            BigDecimal price, BigDecimal salePrice, Integer discountPercent, String badge, String badgeEn,
+            String badgeAr, boolean inStock, List<ColorDot> colors) {
     }
 
     public record ImageView(String url, String altEn, String altAr, Integer width, Integer height) {
@@ -51,7 +51,8 @@ public final class CatalogDtos {
 
     public record ProductDetail(long id, String slug, String nameEn, String nameAr, String descriptionEn,
             String descriptionAr, String fabricEn, String fabricAr, String fitEn, String fitAr, String brand,
-            String badge, BigDecimal price, BigDecimal salePrice, Integer discountPercent, Crumb department,
+            String badge, String badgeEn, String badgeAr, BigDecimal price, BigDecimal salePrice,
+            Integer discountPercent, Crumb department,
             Crumb category, List<ColorView> colors) {
     }
 
@@ -106,7 +107,9 @@ public final class CatalogDtos {
             @Size(max = 300) String fitEn,
             @Size(max = 300) String fitAr,
             @Size(max = 80) String brand,
-            @Pattern(regexp = "NEW|BESTSELLER") String badge,
+            @Pattern(regexp = BADGES) String badge,
+            @Size(max = 30) String badgeEn,
+            @Size(max = 30) String badgeAr,
             @NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal price,
             @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal salePrice,
             @Pattern(regexp = "ADULT|KIDS") String sizeGroup,
@@ -121,10 +124,13 @@ public final class CatalogDtos {
                 String fitAr, String brand, String badge, BigDecimal price, BigDecimal salePrice, String sizeGroup,
                 List<String> sizes, List<ColorRequest> colors, Integer initialStockPerVariant) {
             this(nameEn, nameAr, departmentSlug, categorySlug, descriptionEn, descriptionAr, fabricEn, fabricAr,
-                    fitEn, fitAr, brand, badge, price, salePrice, sizeGroup, sizes, colors,
+                    fitEn, fitAr, brand, badge, null, null, price, salePrice, sizeGroup, sizes, colors,
                     initialStockPerVariant, List.of());
         }
     }
+
+    /** Labels on the product photo. CUSTOM uses the owner's own English and Arabic text. */
+    public static final String BADGES = "NEW|BESTSELLER|SALE|CUSTOM";
 
     public record InitialVariantStock(
             @NotNull @Min(0) @Max(11) Integer colorIndex,
@@ -155,7 +161,9 @@ public final class CatalogDtos {
             @Size(max = 300) String fabricAr,
             @Size(max = 300) String fitEn,
             @Size(max = 300) String fitAr,
-            @Pattern(regexp = "NEW|BESTSELLER") String badge,
+            @Pattern(regexp = BADGES) String badge,
+            @Size(max = 30) String badgeEn,
+            @Size(max = 30) String badgeAr,
             @NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal price,
             @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal salePrice,
             boolean featured) {
@@ -173,8 +181,8 @@ public final class CatalogDtos {
 
     public record AdminProductDetail(long id, String slug, String status, String departmentSlug,
             String categorySlug, String nameEn, String nameAr, String descriptionEn, String descriptionAr,
-            String fabricEn, String fabricAr, String fitEn, String fitAr, String badge, BigDecimal price,
-            BigDecimal salePrice, boolean featured, List<AdminColor> colors) {
+            String fabricEn, String fabricAr, String fitEn, String fitAr, String badge, String badgeEn,
+            String badgeAr, BigDecimal price, BigDecimal salePrice, boolean featured, List<AdminColor> colors) {
     }
 
     public record AdminVariantRow(long variantId, String color, String sizeCode, String sku, int onHand,
