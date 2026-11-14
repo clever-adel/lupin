@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/product";
 import { ShareIcon } from "~/components/icons";
@@ -84,7 +84,6 @@ function ProductView({ product }: { product: ProductDetail }) {
   const name = p(product, "name");
   const anyAvailable = color.variants.some((v) => v.available);
   const max = variant?.maxQuantity ?? 1;
-  const shown = color.images[photo] ?? color.images[0];
   const unit = product.salePrice ?? product.price;
 
   const chooseColor = (id: number) => {
@@ -143,38 +142,59 @@ function ProductView({ product }: { product: ProductDetail }) {
         </ol>
       </nav>
 
-      <div className="mt-5 grid gap-8 md:grid-cols-2 md:gap-12">
-        <div>
-          <ProductPhoto
-            url={shown?.url}
-            alt={(shown && p(shown, "alt")) || `${name} — ${p(color, "name")}`}
-            sizes="(min-width: 768px) 45vw, 100vw"
-            eager
-            className="aspect-[4/5] w-full"
-          />
-          {color.images.length > 1 && (
-            <ul className="mt-2 flex gap-2 overflow-x-auto">
-              {color.images.map((image, i) => (
-                <li key={image.url}>
-                  <button
-                    type="button"
-                    onClick={() => setPhoto(i)}
-                    aria-label={t("product.photoOf", { n: i + 1, total: color.images.length })}
-                    aria-current={i === photo}
-                    className={`block cursor-pointer border-2 ${i === photo ? "border-ink" : "border-transparent"}`}
+      <div className="mt-5 grid gap-8 md:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] md:gap-14">
+        {/* Phones: one photo at a time, swiped sideways. Larger screens: every photo, large, one under
+            another, each unveiled as it scrolls in while the details stay beside them. */}
+        <div className="-mx-5 md:mx-0">
+          {color.images.length === 0 ? (
+            <ProductPhoto url={undefined} alt={name} sizes="100vw" className="aspect-[4/5] w-full" />
+          ) : (
+            <>
+              <ul
+                key={color.id}
+                aria-label={p(color, "name")}
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  setPhoto(Math.round(Math.abs(el.scrollLeft) / el.clientWidth));
+                }}
+                className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] md:block md:space-y-3 md:overflow-visible"
+              >
+                {color.images.map((image, i) => (
+                  <li
+                    key={image.url}
+                    data-reveal={i === 0 ? undefined : "photo"}
+                    className="w-full shrink-0 snap-center overflow-hidden bg-studio"
                   >
-                    <ProductPhoto url={image.url} alt="" sizes="64px" className="h-20 w-16" />
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    <ProductPhoto
+                      url={image.url}
+                      alt={p(image, "alt") || `${name} — ${p(color, "name")} (${t("product.photoOf", { n: i + 1, total: color.images.length })})`}
+                      sizes="(min-width: 768px) 55vw, 100vw"
+                      eager={i === 0}
+                      className="aspect-[4/5] w-full"
+                    />
+                  </li>
+                ))}
+              </ul>
+              {color.images.length > 1 && (
+                <p className="mt-3 flex items-center justify-center gap-1.5 md:hidden" aria-hidden="true">
+                  {color.images.map((image, i) => (
+                    <span
+                      key={image.url}
+                      className={`h-px transition-all duration-500 ${i === photo ? "w-8 bg-ink" : "w-4 bg-ink/25"}`}
+                    />
+                  ))}
+                </p>
+              )}
+            </>
           )}
         </div>
 
-        <div>
-          <p className="label text-stone">{p(product.category, "name")}</p>
-          <h1 className="mt-2 text-3xl font-bold md:text-4xl">{name}</h1>
-          <div className="mt-3">
+        <div className="md:sticky md:top-24 md:self-start">
+          <p data-reveal className="label text-stone">{p(product.category, "name")}</p>
+          <h1 data-reveal className="display mt-3 text-2xl md:text-3xl" style={{ "--reveal-delay": "80ms" } as CSSProperties}>
+            {name}
+          </h1>
+          <div data-reveal className="mt-4" style={{ "--reveal-delay": "160ms" } as CSSProperties}>
             <Price price={product.price} salePrice={product.salePrice} large />
           </div>
           {p(product, "description") && (
@@ -234,8 +254,8 @@ function ProductView({ product }: { product: ProductDetail }) {
             </div>
           </fieldset>
 
-          <div className="mt-7 flex gap-2">
-            <div className="flex h-12 items-center border border-ink" role="group" aria-label={t("product.quantity")}>
+          <div className="mt-7 flex flex-wrap gap-2">
+            <div className="flex h-12 flex-1 items-center justify-between border border-ink" role="group" aria-label={t("product.quantity")}>
               <button
                 type="button"
                 className="h-full w-11 cursor-pointer disabled:opacity-40"
@@ -256,7 +276,7 @@ function ProductView({ product }: { product: ProductDetail }) {
                 +
               </button>
             </div>
-            <button type="button" onClick={addToBag} disabled={!anyAvailable} className="btn btn-primary h-12 flex-1">
+            <button type="button" onClick={addToBag} disabled={!anyAvailable} className="btn btn-primary order-last h-14 basis-full whitespace-nowrap">
               {t("product.addToBag")} · <span dir="ltr">{money(unit * quantity)}</span>
             </button>
             <FavouriteButton slug={product.slug} className={`${square} h-12 w-12`} />

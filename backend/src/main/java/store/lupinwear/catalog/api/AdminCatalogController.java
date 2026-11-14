@@ -1,6 +1,7 @@
 package store.lupinwear.catalog.api;
 
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,12 +16,14 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import store.lupinwear.catalog.api.CatalogDtos.CategoryRequest;
 import store.lupinwear.catalog.api.CatalogDtos.DepartmentStatusRequest;
+import store.lupinwear.catalog.api.CatalogDtos.DepartmentView;
 import store.lupinwear.catalog.api.CatalogDtos.ProductCreated;
 import store.lupinwear.catalog.api.CatalogDtos.ProductRequest;
 import store.lupinwear.catalog.api.CatalogDtos.ProductStatusRequest;
 import store.lupinwear.catalog.api.CatalogDtos.StockAdjustRequest;
 import store.lupinwear.catalog.api.CatalogDtos.StockView;
 import store.lupinwear.catalog.application.CatalogAdminService;
+import store.lupinwear.catalog.application.CatalogQueryService;
 import store.lupinwear.security.CurrentUser;
 
 /** Staff only. Guarded twice: the /api/v1/admin/** URL rule and the class-level role check. */
@@ -30,9 +33,17 @@ import store.lupinwear.security.CurrentUser;
 public class AdminCatalogController {
 
     private final CatalogAdminService catalog;
+    private final CatalogQueryService queries;
 
-    public AdminCatalogController(CatalogAdminService catalog) {
+    public AdminCatalogController(CatalogAdminService catalog, CatalogQueryService queries) {
         this.catalog = catalog;
+        this.queries = queries;
+    }
+
+    /** Every department with its status, hidden ones included (the public list leaves those out). */
+    @GetMapping("/departments")
+    List<DepartmentView> departments() {
+        return queries.allDepartments();
     }
 
     @PatchMapping("/departments/{slug}")

@@ -17,6 +17,8 @@
   --color-stone: #62605b;
   --color-line: #dcdad4;
   --color-card: #ffffff;
+  /* The neutral grey of the product photo backdrops, so photos sit in the page without a visible edge. */
+  --color-studio: #efefef;
   /* Functional only: destructive actions and errors, as in the prototype's cancel controls. */
   --color-danger: #b3261e;
 
@@ -200,9 +202,111 @@
     visibility: hidden;
   }
 }
+/* ── Motion ──
+   Slow, quiet, one direction: things rise into place as they come into view and photos are unveiled
+   from below. Everything starts visible without JavaScript (.js is set by the inline script in root.tsx),
+   and reduced motion shows the final state at once. */
+:root {
+  --ease-out: cubic-bezier(0.2, 0.7, 0.1, 1);
+  --ease-curtain: cubic-bezier(0.7, 0, 0.2, 1);
+}
+.js [data-reveal] {
+  opacity: 0;
+  transform: translateY(1.5rem);
+  transition:
+    opacity 900ms var(--ease-out),
+    transform 1100ms var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.js [data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+}
+/* A photo unveiled from the bottom up while it settles from a slight zoom. The mask sits on the
+   photo, not on the watched frame: IntersectionObserver treats a fully masked element as off screen. */
+.js [data-reveal="photo"] {
+  opacity: 1;
+  transform: none;
+}
+.js [data-reveal="photo"] > * {
+  clip-path: inset(100% 0 0 0);
+  transform: scale(1.15);
+  transition:
+    clip-path 1300ms var(--ease-curtain),
+    transform 2200ms var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.js [data-reveal="photo"].is-in > * {
+  clip-path: inset(0 0 0 0);
+  transform: none;
+}
+
+/* Hero: the headline's words rise one after another; the backdrop word drifts very slowly. */
+.hero-word {
+  display: inline-block;
+}
+.js .hero-word {
+  opacity: 0;
+  transform: translateY(0.6em);
+  animation: hero-word 1000ms var(--ease-out) forwards;
+  animation-delay: calc(500ms + var(--i, 0) * 110ms);
+}
+@keyframes hero-word {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.hero-backdrop {
+  animation: hero-drift 28s linear infinite alternate;
+}
+@keyframes hero-drift {
+  from {
+    transform: translateX(-3%);
+  }
+  to {
+    transform: translateX(3%);
+  }
+}
+
+/* Product cards: the second photo fades in on hover and a hairline draws under the name. */
+.card-hover-photo {
+  opacity: 0;
+  transition:
+    opacity 700ms ease,
+    transform 1200ms var(--ease-out);
+}
+.card-rule {
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 600ms var(--ease-out);
+}
+[dir="rtl"] .card-rule {
+  transform-origin: right;
+}
+@media (hover: hover) {
+  .group:hover .card-hover-photo {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+  .group:hover .card-rule {
+    transform: scaleX(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .intro {
     display: none;
+  }
+  .js [data-reveal],
+  .js [data-reveal="photo"] > *,
+  .js .hero-word {
+    opacity: 1 !important;
+    transform: none !important;
+    clip-path: none !important;
+  }
+  .hero-backdrop {
+    animation: none;
   }
   * {
     animation-duration: 0.01ms !important;

@@ -40,3 +40,8 @@ frontend/test-results-e2e-web*.log
 
 # Cloudflare CLI cache
 .wrangler/
+
+# Brainstorm mockups (local only)
+.superpowers/
+# Local-only demo photos (not ours to publish)
+frontend/public/local-demo/

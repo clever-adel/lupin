@@ -48,12 +48,23 @@ function StockCell({ variant, onDone }: { variant: AdminVariant; onDone: () => v
   );
 }
 
-/** Open a department for sale, or put it back to "coming soon". Hidden departments are not listed. */
+const DEPARTMENT_STATE: Record<AdminDepartment["status"], string> = {
+  ACTIVE: "Open",
+  COMING_SOON: "Coming soon",
+  HIDDEN: "Hidden from the store",
+};
+
+type AdminDepartment = Omit<Department, "status"> & { status: "ACTIVE" | "COMING_SOON" | "HIDDEN" };
+
+/**
+ * Each department is open, coming soon (name shown with a "Soon" tag, products hidden) or hidden
+ * (not shown anywhere in the store: menu, home page or shop). Hidden ones stay listed here to show again.
+ */
 function Departments() {
   const client = useQueryClient();
   const departments = useQuery({
     queryKey: ["admin", "departments"],
-    queryFn: () => api<Department[]>("GET", "/api/v1/catalog/departments"),
+    queryFn: () => api<AdminDepartment[]>("GET", "/api/v1/admin/departments"),
   });
   const setStatus = useMutation({
     mutationFn: ({ slug, status }: { slug: string; status: string }) =>
@@ -65,26 +76,42 @@ function Departments() {
     <section className="mt-6 border border-line bg-card p-4" aria-labelledby="departments-title">
       <h2 id="departments-title" className="text-sm font-semibold">Departments</h2>
       <p className="mt-1 text-xs text-stone">
-        Customers can only shop a department that is open. “Coming soon” shows its name with a “Soon” tag and hides its products.
+        Customers can only shop a department that is open. “Coming soon” shows its name with a “Soon” tag and hides its
+        products. “Hide” removes it from the store completely: the menu, the home page and the shop.
       </p>
       {setStatus.isError && <p role="alert" className="mt-2 text-sm text-danger">{errorText(setStatus.error)}</p>}
       <ul className="mt-3 flex flex-wrap gap-3">
         {departments.data.map((d) => {
-          const open = d.status === "ACTIVE";
+          const hidden = d.status === "HIDDEN";
+          const choices = (["ACTIVE", "COMING_SOON", "HIDDEN"] as const).filter((s) => s !== d.status);
+          const label = {
+            ACTIVE: `Open ${d.nameEn}`,
+            COMING_SOON: hidden ? `Show ${d.nameEn} as coming soon` : `Close ${d.nameEn}`,
+            HIDDEN: `Hide ${d.nameEn}`,
+          };
           return (
-            <li key={d.slug} className="flex items-center gap-3 border border-line px-3 py-2 text-sm">
-              <span>
+            <li
+              key={d.slug}
+              className={`flex flex-wrap items-center gap-3 border px-3 py-2 text-sm ${hidden ? "border-dashed border-stone/60 text-stone" : "border-line"}`}
+            >
+              <span className="me-auto">
                 <span className="font-semibold">{d.nameEn}</span>
-                <span className="block text-xs text-stone">{open ? `Open · ${d.productCount} on sale` : "Coming soon"}</span>
+                <span className="block text-xs text-stone">
+                  {DEPARTMENT_STATE[d.status]}
+                  {d.status === "ACTIVE" && ` · ${d.productCount} on sale`}
+                </span>
               </span>
-              <button
-                type="button"
-                className="btn btn-outline"
-                disabled={setStatus.isPending}
-                onClick={() => setStatus.mutate({ slug: d.slug, status: open ? "COMING_SOON" : "ACTIVE" })}
-              >
-                {open ? `Close ${d.nameEn}` : `Open ${d.nameEn}`}
-              </button>
+              {choices.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={s === "ACTIVE" ? "btn btn-primary" : "btn btn-outline"}
+                  disabled={setStatus.isPending}
+                  onClick={() => setStatus.mutate({ slug: d.slug, status: s })}
+                >
+                  {label[s]}
+                </button>
+              ))}
             </li>
           );
         })}

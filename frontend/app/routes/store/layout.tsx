@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router";
 import type { Route } from "./+types/layout";
 import { HeaderLogo, Intro, LogoLockup, replayIntro } from "~/components/brand";
 import { BagIcon, HeartIcon, UserIcon } from "~/components/icons";
+import { useScrollReveal } from "~/components/reveal";
 import { useMe } from "~/features/auth/session";
 import { useBagState } from "~/features/bag/store";
 import { useBag, useBagSync } from "~/features/bag/useBag";
@@ -195,6 +196,7 @@ function Footer({ departments, site }: { departments: Department[]; site: SiteCo
 }
 
 export default function StoreLayout({ loaderData }: Route.ComponentProps) {
+  useScrollReveal();
   // After moving to another page, put keyboard and screen-reader focus at the start of the new
   // content instead of leaving it on the link that was pressed, far down the previous page.
   const { pathname } = useLocation();

@@ -23,6 +23,8 @@ export interface ColorDot {
   nameAr: string;
   hex: string;
   imageUrl?: string;
+  /** The colour's second photo, shown while the card is pointed at. */
+  hoverImageUrl?: string;
 }
 
 export interface ProductCard {

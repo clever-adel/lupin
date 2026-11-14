@@ -26,8 +26,9 @@ function langFromPath(pathname: string): Lang {
 }
 
 // Runs before first paint: on later page loads in the same session the opening animation never shows.
+// Also marks that JavaScript runs, so scroll reveals hide content only when they can show it again.
 const INTRO_SCRIPT =
-  "try{if(sessionStorage.getItem('lupin.intro')){document.documentElement.classList.add('intro-seen')}" +
+  "document.documentElement.classList.add('js');try{if(sessionStorage.getItem('lupin.intro')){document.documentElement.classList.add('intro-seen')}" +
   "else{sessionStorage.setItem('lupin.intro','1')}}catch(e){}";
 
 export function Layout({ children }: { children: React.ReactNode }) {

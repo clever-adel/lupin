@@ -118,6 +118,14 @@ test.describe.serial("staff dashboard", () => {
     expect((await page.request.get(`/api/v1/catalog${productPath.replace("/product/", "/products/")}`)).status()).toBe(200);
     await expect(departments.getByRole("button", { name: "Open Women" })).toBeVisible();
 
+    // Hiding Kids takes it out of the store's list; it stays here so it can be shown again.
+    await departments.getByRole("button", { name: "Hide Kids" }).click();
+    await expect(departments.getByText("Hidden from the store")).toBeVisible();
+    const listed = await (await page.request.get("/api/v1/catalog/departments")).json();
+    expect(listed.map((d: { slug: string }) => d.slug)).not.toContain("kids");
+    await departments.getByRole("button", { name: "Show Kids as coming soon" }).click();
+    await expect(departments.getByRole("button", { name: "Hide Kids" })).toBeVisible();
+
     // Customers see it; taking it off sale hides it again.
     await page.goto(productPath);
     await expect(page.getByRole("heading", { name: productName })).toBeVisible();

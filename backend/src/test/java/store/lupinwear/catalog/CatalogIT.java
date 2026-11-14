@@ -91,6 +91,21 @@ class CatalogIT extends IntegrationTest {
     }
 
     @Test
+    void aHiddenDepartmentLeavesTheStoreButStaysInTheDashboard() throws Exception {
+        setDepartment("kids", "HIDDEN");
+        try {
+            mvc.perform(get("/api/v1/catalog/departments"))
+                    .andExpect(jsonPath("$[?(@.slug=='kids')]").isEmpty());
+            mvc.perform(get("/api/v1/admin/departments").cookie(owner))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[?(@.slug=='kids')].status").value("HIDDEN"));
+            mvc.perform(get("/api/v1/admin/departments")).andExpect(status().isUnauthorized());
+        } finally {
+            setDepartment("kids", "COMING_SOON");
+        }
+    }
+
+    @Test
     void filtersBySaleSizeStockPriceAndSearch() throws Exception {
         long onSale = create(request("Filter Alpha", "2000.00", "1500.00", 2)).get("id").asLong();
         long fullPrice = create(request("Filter Beta", "3000.00", null, 0)).get("id").asLong();

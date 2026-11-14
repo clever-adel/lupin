@@ -27,7 +27,8 @@ public final class CatalogDtos {
             List<CategoryView> categories) {
     }
 
-    public record ColorDot(String nameEn, String nameAr, String hex, String imageUrl) {
+    /** {@code hoverImageUrl} is the colour's second photo, shown when a shopper points at the card; null if there is one. */
+    public record ColorDot(String nameEn, String nameAr, String hex, String imageUrl, String hoverImageUrl) {
     }
 
     public record ProductCard(String slug, String nameEn, String nameAr, String categoryEn, String categoryAr,

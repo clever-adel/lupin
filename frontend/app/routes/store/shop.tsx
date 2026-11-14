@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Form, Link, useSubmit } from "react-router";
 import type { Route } from "./+types/shop";
 import { ProductGrid } from "~/components/product";
@@ -96,9 +97,11 @@ export default function Shop({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="shell pt-10">
-      <p className="label text-stone">{t("shop.label")}</p>
+      <p data-reveal className="label text-stone">{t("shop.label")}</p>
       <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
-        <h1 className="display text-3xl md:text-4xl">{title}</h1>
+        <h1 data-reveal className="display text-4xl md:text-6xl" style={{ "--reveal-delay": "100ms" } as CSSProperties}>
+          {title}
+        </h1>
         <ul className="flex gap-1.5">
           {departments.map((d) => (
             <li key={d.slug}>

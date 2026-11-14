@@ -1,3 +1,4 @@
+import { Fragment, type CSSProperties } from "react";
 import { Link, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/home";
 import type { loader as layoutLoader } from "./layout";
@@ -29,37 +30,64 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const campaign = layout?.site.hero;
   const products = loaderData.collection.items;
   const hero = products[0];
+  const headline = (campaign && pick(campaign, "headline")) || t("brand.slogan");
 
   return (
     <>
       {/* Hero: the owner's campaign copy from the dashboard, or the brand lines while there is none. */}
-      <section className="bg-ink text-bone">
-        <div className="shell grid items-center gap-10 py-14 md:grid-cols-2 md:py-20">
+      {/* Direction B: the page takes the photos' studio grey, so the model stands in the page itself. */}
+      <section className="relative overflow-hidden bg-studio text-ink">
+        <p
+          aria-hidden="true"
+          className="hero-backdrop display pointer-events-none absolute max-md:hidden inset-x-0 bottom-[3%] select-none whitespace-nowrap text-center text-[11vw] leading-none text-ink/[0.05]"
+        >
+          {t("brand.slogan")}
+        </p>
+        <div className="shell relative grid items-center gap-8 py-10 md:grid-cols-[1fr_minmax(0,24rem)_1fr] md:gap-10 md:py-16">
           <div>
-            {campaign && pick(campaign, "label") && <p className="label mb-4 text-bone/60">{pick(campaign, "label")}</p>}
-            <h1 className="display text-4xl md:text-6xl">{(campaign && pick(campaign, "headline")) || t("brand.slogan")}</h1>
-            {campaign && pick(campaign, "text") ? (
-              <p className="mt-5 max-w-md text-bone/75">{pick(campaign, "text")}</p>
-            ) : (
-              <p className="label mt-5 text-bone/60">{t("brand.supporting")}</p>
+            {campaign && pick(campaign, "label") && (
+              <p data-reveal className="label mb-4 text-stone">
+                {pick(campaign, "label")}
+              </p>
             )}
-            <div className="mt-9 flex flex-wrap gap-3">
-              <Link to={href("/shop")} className="btn btn-light">
-                {t("home.heroCta")}
-              </Link>
-            </div>
+            <h1 className="display text-4xl md:text-5xl">
+              {headline.split(" ").map((word, i) => (
+                <Fragment key={i}>
+                  {i > 0 && " "}
+                  <span className="hero-word" style={{ "--i": i } as CSSProperties}>
+                    {word}
+                  </span>
+                </Fragment>
+              ))}
+            </h1>
+            {campaign && pick(campaign, "text") && (
+              <p data-reveal className="mt-5 max-w-xs text-stone" style={{ "--reveal-delay": "900ms" } as CSSProperties}>
+                {pick(campaign, "text")}
+              </p>
+            )}
           </div>
           {hero && (
-            <Link to={href(`/product/${hero.slug}`)} className="block md:justify-self-end">
+            <Link
+              to={href(`/product/${hero.slug}`)}
+              data-reveal="photo"
+              style={{ "--reveal-delay": "150ms" } as CSSProperties}
+              className="block overflow-hidden"
+            >
               <ProductPhoto
                 url={hero.colors[0]?.imageUrl}
                 alt={pick(hero, "name")}
-                sizes="(min-width: 768px) 40vw, 90vw"
+                sizes="(min-width: 768px) 24rem, 90vw"
                 eager
-                className="aspect-[4/5] w-full md:w-[26rem]"
+                className="aspect-[4/5] w-full"
               />
             </Link>
           )}
+          <div data-reveal className="md:text-end" style={{ "--reveal-delay": "1100ms" } as CSSProperties}>
+            <p className="label text-stone">{t("brand.supporting")}</p>
+            <Link to={href("/shop")} className="btn btn-outline mt-5">
+              {t("home.heroCta")}
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -67,12 +95,16 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         <h2 id="departments-title" className="sr-only">
           {t("home.departments")}
         </h2>
-        <ul className="grid gap-3 md:grid-cols-3">
-          {departments.map((d) => {
+        {/* As many columns as visible departments, so hiding some never leaves empty space. */}
+        <ul
+          className="grid gap-3 md:grid-cols-[repeat(var(--n),minmax(0,1fr))]"
+          style={{ "--n": Math.max(departments.length, 1) } as CSSProperties}
+        >
+          {departments.map((d, i) => {
             const name = pick(d, "name");
             const live = d.status === "ACTIVE";
             const body = (
-              <div className="relative flex aspect-[3/2] flex-col justify-end overflow-hidden bg-ink p-5 text-bone">
+              <div className="relative flex aspect-[3/2] flex-col justify-end md:aspect-auto md:h-64 overflow-hidden bg-ink p-5 text-bone">
                 <span
                   aria-hidden="true"
                   className="display pointer-events-none absolute -top-2 start-3 text-6xl text-transparent opacity-40 [-webkit-text-stroke:1px_var(--color-bone)]"
@@ -89,7 +121,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               </div>
             );
             return (
-              <li key={d.slug}>
+              <li key={d.slug} data-reveal style={{ "--reveal-delay": `${i * 110}ms` } as CSSProperties}>
                 {live ? (
                   <Link to={href(`/shop/${d.slug}`)} className="block">
                     {body}
@@ -104,7 +136,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       </section>
 
       <section className="shell pt-16" aria-labelledby="collection-title">
-        <div className="mb-8 flex items-end justify-between gap-4">
+        <div data-reveal className="mb-8 flex items-end justify-between gap-4">
           <div>
             <p className="label text-stone">{t("home.newIn")}</p>
             <h2 id="collection-title" className="display mt-2 text-2xl md:text-3xl">

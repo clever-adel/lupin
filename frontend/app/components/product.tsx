@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Link } from "react-router";
 import { bagActions, useBagState } from "~/features/bag/store";
 import { useT } from "~/lib/i18n";
@@ -35,7 +36,7 @@ export function ProductPhoto({ url, alt, sizes, eager, className = "" }: PhotoPr
       <div
         role="img"
         aria-label={`${alt} — ${t("product.photoSoon")}`}
-        className={`grid place-items-center bg-bone text-stone ${className}`}
+        className={`grid place-items-center bg-studio text-stone ${className}`}
       >
         <span className="label px-3 text-center">{t("product.photoSoon")}</span>
       </div>
@@ -50,7 +51,7 @@ export function ProductPhoto({ url, alt, sizes, eager, className = "" }: PhotoPr
       loading={eager ? "eager" : "lazy"}
       decoding="async"
       fetchPriority={eager ? "high" : undefined}
-      className={`bg-bone object-cover ${className}`}
+      className={`bg-studio object-cover ${className}`}
     />
   );
 }
@@ -98,14 +99,22 @@ export function ProductCard({ product, eager, heading: Heading = "h3" }: { produ
   return (
     <article className="group relative">
       <Link to={href(`/product/${product.slug}`)} className="block">
-        <div className="relative aspect-[4/5] overflow-hidden">
+        <div className="relative aspect-[4/5] overflow-hidden bg-studio">
           <ProductPhoto
             url={product.colors[0]?.imageUrl}
             alt={name}
             sizes="(min-width: 1024px) 25vw, 50vw"
             eager={eager}
-            className="h-full w-full transition-transform duration-500 group-hover:scale-[1.03]"
+            className="h-full w-full transition-transform duration-[1200ms] ease-[var(--ease-out)] group-hover:scale-[1.03]"
           />
+          {product.colors[0]?.hoverImageUrl && (
+            <ProductPhoto
+              url={product.colors[0].hoverImageUrl}
+              alt=""
+              sizes="(min-width: 1024px) 25vw, 50vw"
+              className="card-hover-photo absolute inset-0 h-full w-full"
+            />
+          )}
           {badge && (
             <span className="label absolute start-2 top-2 bg-ink px-2 py-1 text-bone" dir="ltr">
               {badge}
@@ -117,6 +126,7 @@ export function ProductCard({ product, eager, heading: Heading = "h3" }: { produ
             </span>
           )}
         </div>
+        <span aria-hidden="true" className="card-rule block h-px bg-ink" />
         <p className="label mt-3 text-stone">{pick(product, "category")}</p>
         <Heading className="mt-1 text-sm font-medium">{name}</Heading>
       </Link>
@@ -146,7 +156,7 @@ export function ProductGrid({ products, heading }: { products: Card[]; heading?:
   return (
     <ul className="grid grid-cols-2 gap-x-4 gap-y-10 lg:grid-cols-4">
       {products.map((product, i) => (
-        <li key={product.slug}>
+        <li key={product.slug} data-reveal style={{ "--reveal-delay": `${(i % 4) * 90}ms` } as CSSProperties}>
           <ProductCard product={product} eager={i < 4} heading={heading} />
         </li>
       ))}

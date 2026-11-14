@@ -79,7 +79,17 @@ public class CatalogQueryService {
         this.jdbc = jdbc;
     }
 
+    /** What the storefront lists: open and coming-soon departments; hidden ones are left out entirely. */
     public List<DepartmentView> departments() {
+        return departments(false);
+    }
+
+    /** Staff view: every department, hidden ones too, so a hidden department can be shown again. */
+    public List<DepartmentView> allDepartments() {
+        return departments(true);
+    }
+
+    private List<DepartmentView> departments(boolean includeHidden) {
         Map<Integer, List<CategoryView>> categories = new HashMap<>();
         jdbc.sql("""
                 select c.department_id, c.slug, c.name_en, c.name_ar, parent.slug as parent_slug
@@ -95,8 +105,8 @@ public class CatalogQueryService {
                 select d.id, d.slug, d.name_en, d.name_ar, d.status,
                        (select count(*) from products p join categories c on c.id = p.category_id
                          where p.department_id = d.id and p.status = 'ACTIVE' and p.deleted_at is null and c.active) as product_count
-                from departments d where d.status in ('ACTIVE', 'COMING_SOON') order by d.sort_order, d.id
-                """).query((rs, n) -> new DepartmentView(rs.getString("slug"), rs.getString("name_en"),
+                from departments d where :all or d.status in ('ACTIVE', 'COMING_SOON') order by d.sort_order, d.id
+                """).param("all", includeHidden).query((rs, n) -> new DepartmentView(rs.getString("slug"), rs.getString("name_en"),
                         rs.getString("name_ar"), rs.getString("status"),
                         "ACTIVE".equals(rs.getString("status")) ? rs.getLong("product_count") : 0,
                         categories.getOrDefault(rs.getInt("id"), List.of())))
@@ -173,14 +183,15 @@ public class CatalogQueryService {
         Map<Long, List<ColorDot>> dots = new HashMap<>();
         jdbc.sql("""
                 select pc.product_id, pc.name_en, pc.name_ar, pc.hex,
-                       (select pi.url from product_images pi where pi.color_id = pc.id order by pi.position limit 1) as image_url
+                       (select pi.url from product_images pi where pi.color_id = pc.id order by pi.position limit 1) as image_url,
+                       (select pi.url from product_images pi where pi.color_id = pc.id order by pi.position offset 1 limit 1) as hover_url
                 from product_colors pc where pc.product_id in (:ids)
                 order by pc.product_id, pc.is_main desc, pc.sort_order, pc.id
                 """).param("ids", rows.stream().map(Row::id).toList())
                 .query((rs, n) -> {
                     dots.computeIfAbsent(rs.getLong("product_id"), k -> new ArrayList<>())
                             .add(new ColorDot(rs.getString("name_en"), rs.getString("name_ar"), rs.getString("hex"),
-                                    rs.getString("image_url")));
+                                    rs.getString("image_url"), rs.getString("hover_url")));
                     return null;
                 }).list();
 
@@ -204,7 +215,7 @@ public class CatalogQueryService {
                 + " from product_colors pc where pc.product_id in (select p.id " + scope + ")"
                 + " group by lower(pc.name_en) order by 1")
                 .params(params)
-                .query((rs, n) -> new ColorDot(rs.getString("name_en"), rs.getString("name_ar"), rs.getString("hex"), null))
+                .query((rs, n) -> new ColorDot(rs.getString("name_en"), rs.getString("name_ar"), rs.getString("hex"), null, null))
                 .list();
         return jdbc.sql("select min(coalesce(p.sale_price, p.price)) as lo, max(coalesce(p.sale_price, p.price)) as hi " + scope)
                 .params(params)
