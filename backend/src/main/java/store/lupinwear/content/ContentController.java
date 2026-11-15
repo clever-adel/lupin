@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import store.lupinwear.payment.PaymentMethods;
 import store.lupinwear.payment.PaymentMethods.Instapay;
+import store.lupinwear.payment.PaymentMethods.VodafoneCash;
 import java.util.Map;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,7 +30,7 @@ public class ContentController {
 
     public record SiteView(JsonNode brand, JsonNode hero, JsonNode announcement, JsonNode contact,
             JsonNode homeSections, BigDecimal freeDeliveryThreshold, Map<String, Boolean> paymentMethods,
-            Instapay instapay, List<PolicyLink> policies) {
+            Instapay instapay, VodafoneCash vodafoneCash, List<PolicyLink> policies) {
     }
 
     private final SiteSettings settings;
@@ -49,7 +50,8 @@ public class ContentController {
                 .query((rs, n) -> new PolicyLink(rs.getString(1), rs.getString(2), rs.getString(3))).list();
         return new SiteView(settings.get("brand"), settings.get("hero"), settings.get("announcement"),
                 settings.get("contact"), settings.get("home_sections"), settings.freeDeliveryThreshold(),
-                paymentMethods.all(), paymentMethods.instapay().orElse(null), policies);
+                paymentMethods.all(), paymentMethods.instapay().orElse(null),
+                paymentMethods.vodafoneCash().orElse(null), policies);
     }
 
     @GetMapping("/policies/{slug}")

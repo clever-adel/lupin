@@ -117,6 +117,45 @@ class PaymentIT extends IntegrationTest {
     }
 
     @Test
+    void vodafoneCashWorksLikeAManualTransferToTheStoreNumber() throws Exception {
+        // Off until a number is set, even with the switch on.
+        setting("payment_methods", "VODAFONE_CASH_MANUAL", "true");
+        setting("payment_methods", "vodafoneCashNumber", "\"\"");
+        mvc.perform(get("/api/v1/content/site"))
+                .andExpect(jsonPath("$.paymentMethods.VODAFONE_CASH_MANUAL").value(false))
+                .andExpect(jsonPath("$.vodafoneCash").doesNotExist());
+
+        // The dashboard refuses a number that is not an Egyptian mobile number.
+        mvc.perform(put("/api/v1/admin/settings/payment_methods").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"vodafoneCashNumber\":\"12345\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/v1/admin/settings/payment_methods").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"vodafoneCashNumber\":\"01012345678\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/content/site"))
+                .andExpect(jsonPath("$.paymentMethods.VODAFONE_CASH_MANUAL").value(true))
+                .andExpect(jsonPath("$.vodafoneCash.number").value("01012345678"));
+
+        String reference = reference(place("VODAFONE_CASH_MANUAL").andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("AWAITING_PAYMENT"))
+                .andExpect(jsonPath("$.paymentAction").value("TRANSFER")));
+        assertThat(paymentStatuses(reference)).containsExactly("MANUAL_TRANSFER:PENDING");
+
+        mvc.perform(jsonPost("/api/v1/orders/" + reference + "/payment/transfer", Map.of("reference", "VF 99887766"))
+                .cookie(customer)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentStatus").value("VERIFYING"));
+        MvcResult listed = mvc.perform(get("/api/v1/admin/payments/transfers").cookie(owner))
+                .andExpect(status().isOk()).andReturn();
+        String method = null;
+        for (JsonNode row : body(listed)) {
+            if (row.get("orderReference").asText().equals(reference)) {
+                method = row.get("method").asText();
+            }
+        }
+        assertThat(method).isEqualTo("VODAFONE_CASH_MANUAL");
+    }
+
+    @Test
     void manualTransferIsPaidOnlyWhenStaffConfirmIt() throws Exception {
         String reference = reference(place("INSTAPAY_MANUAL").andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("AWAITING_PAYMENT"))

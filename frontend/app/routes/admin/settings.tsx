@@ -7,7 +7,13 @@ import { api } from "~/lib/http";
 import type { Governorate, PaymentMethod, SiteContent } from "~/lib/types";
 
 type Settings = Record<string, Record<string, unknown>>;
-const METHODS: PaymentMethod[] = ["COD", "INSTAPAY_MANUAL", "CARD", "WALLET", "FAWRY"];
+const METHODS: PaymentMethod[] = ["COD", "INSTAPAY_MANUAL", "VODAFONE_CASH_MANUAL", "CARD", "WALLET", "FAWRY"];
+
+/** Why a switched-on method still is not offered to customers. */
+const MISSING: Partial<Record<PaymentMethod, string>> = {
+  INSTAPAY_MANUAL: "the InstaPay address is missing",
+  VODAFONE_CASH_MANUAL: "the Vodafone Cash number is missing",
+};
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
@@ -162,6 +168,9 @@ function PaymentForm({ value, isOwner }: { value: Record<string, unknown>; isOwn
   const [handle, setHandle] = useState(String(value.instapayHandle ?? ""));
   const [noteEn, setNoteEn] = useState(String(value.instapayInstructionsEn ?? ""));
   const [noteAr, setNoteAr] = useState(String(value.instapayInstructionsAr ?? ""));
+  const [vfNumber, setVfNumber] = useState(String(value.vodafoneCashNumber ?? ""));
+  const [vfEn, setVfEn] = useState(String(value.vodafoneCashInstructionsEn ?? ""));
+  const [vfAr, setVfAr] = useState(String(value.vodafoneCashInstructionsAr ?? ""));
   // What customers really get: a switch is not enough if Paymob keys or the InstaPay address are missing.
   const site = useQuery({ queryKey: ["site"], queryFn: () => api<SiteContent>("GET", "/api/v1/content/site") });
 
@@ -169,7 +178,15 @@ function PaymentForm({ value, isOwner }: { value: Record<string, unknown>; isOwn
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        save.mutate({ ...on, instapayHandle: handle.trim(), instapayInstructionsEn: noteEn, instapayInstructionsAr: noteAr });
+        save.mutate({
+          ...on,
+          instapayHandle: handle.trim(),
+          instapayInstructionsEn: noteEn,
+          instapayInstructionsAr: noteAr,
+          vodafoneCashNumber: vfNumber.replace(/[\s-]/g, ""),
+          vodafoneCashInstructionsEn: vfEn,
+          vodafoneCashInstructionsAr: vfAr,
+        });
       }}
     >
       <fieldset disabled={!isOwner} className="space-y-2">
@@ -182,7 +199,7 @@ function PaymentForm({ value, isOwner }: { value: Record<string, unknown>; isOwn
               <span className="font-medium">{PAYMENT_LABEL[m]}</span>
               {value[m] === true && live === false && (
                 <span className="text-xs text-danger">
-                  switched on, but customers cannot use it: {m === "INSTAPAY_MANUAL" ? "the InstaPay address is missing" : "Paymob is not set up on the server"}
+                  switched on, but customers cannot use it: {MISSING[m] ?? "Paymob is not set up on the server"}
                 </span>
               )}
               {live === true && <span className="text-xs text-stone">customers can use it</span>}
@@ -201,6 +218,20 @@ function PaymentForm({ value, isOwner }: { value: Record<string, unknown>; isOwn
           <div>
             <label htmlFor="ip-ar" className="mb-1 block text-xs font-medium">Transfer instructions (Arabic)</label>
             <input id="ip-ar" className="field" dir="rtl" maxLength={500} value={noteAr} onChange={(e) => setNoteAr(e.target.value)} />
+          </div>
+        </div>
+        <div className="grid gap-3 pt-3 sm:grid-cols-3">
+          <div>
+            <label htmlFor="vf-number" className="mb-1 block text-xs font-medium">Vodafone Cash number customers send money to</label>
+            <input id="vf-number" className="field" dir="ltr" inputMode="tel" maxLength={20} placeholder="01012345678" value={vfNumber} onChange={(e) => setVfNumber(e.target.value)} />
+          </div>
+          <div>
+            <label htmlFor="vf-en" className="mb-1 block text-xs font-medium">Vodafone Cash instructions (English)</label>
+            <input id="vf-en" className="field" maxLength={500} value={vfEn} onChange={(e) => setVfEn(e.target.value)} />
+          </div>
+          <div>
+            <label htmlFor="vf-ar" className="mb-1 block text-xs font-medium">Vodafone Cash instructions (Arabic)</label>
+            <input id="vf-ar" className="field" dir="rtl" maxLength={500} value={vfAr} onChange={(e) => setVfAr(e.target.value)} />
           </div>
         </div>
       </fieldset>

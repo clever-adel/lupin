@@ -24,7 +24,7 @@ describe("server codes become readable text", () => {
       }
       expect(STATUS_LABEL[status]).toBeTruthy();
     }
-    for (const method of ["COD", "CARD", "WALLET", "FAWRY", "INSTAPAY_MANUAL"]) {
+    for (const method of ["COD", "CARD", "WALLET", "FAWRY", "INSTAPAY_MANUAL", "VODAFONE_CASH_MANUAL"]) {
       expect(translate("en", `pay.${method}` as MessageKey)).toBeTruthy();
       expect(translate("ar", `pay.note.${method}` as MessageKey)).toBeTruthy();
       expect(PAYMENT_LABEL[method]).toBeTruthy();

@@ -73,6 +73,9 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
     );
   }
   if (order.paymentAction === "TRANSFER") {
+    // Where the money goes depends on the method chosen at checkout.
+    const wallet = order.paymentMethod === "VODAFONE_CASH_MANUAL";
+    const destination = wallet ? site.data?.vodafoneCash : site.data?.instapay;
     return (
       <form
         noValidate
@@ -85,10 +88,10 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
         }}
       >
         {failed && <p role="alert" className="mb-3 text-danger">{t("pay.transferRejected")}</p>}
-        <p>{t("pay.transferTitle", { amount: money(order.total) })}</p>
-        <p className="mt-1 text-base font-bold" dir="ltr">{site.data?.instapay?.handle ?? "…"}</p>
-        {site.data?.instapay && pick(site.data.instapay, "instructions") && (
-          <p className="mt-1 text-xs text-stone">{pick(site.data.instapay, "instructions")}</p>
+        <p>{t(wallet ? "pay.vodafoneTitle" : "pay.transferTitle", { amount: money(order.total) })}</p>
+        <p className="mt-1 text-base font-bold" dir="ltr">{(wallet ? site.data?.vodafoneCash?.number : site.data?.instapay?.handle) ?? "…"}</p>
+        {destination && pick(destination, "instructions") && (
+          <p className="mt-1 text-xs text-stone">{pick(destination, "instructions")}</p>
         )}
         <label htmlFor="transfer-ref" className="mb-1.5 mt-4 block font-medium">{t("pay.transferRef")}</label>
         <div className="flex flex-wrap gap-2">
@@ -105,7 +108,9 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
           />
           <button type="submit" className="btn btn-primary" disabled={transfer.isPending}>{t("pay.transferSubmit")}</button>
         </div>
-        {referenceError && <p id="transfer-ref-error" className="mt-1 text-xs text-danger">{t("pay.err.reference")}</p>}
+        {referenceError && (
+          <p id="transfer-ref-error" className="mt-1 text-xs text-danger">{t(wallet ? "pay.err.referenceWallet" : "pay.err.reference")}</p>
+        )}
         {transfer.isError && <p role="alert" className="mt-2 text-danger">{error(transfer.error)}</p>}
       </form>
     );

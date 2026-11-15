@@ -80,6 +80,7 @@ export interface Transfer {
   amount: number;
   transferReference: string;
   submittedAt: string;
+  method?: string;
 }
 
 export interface AdminVariant {
@@ -140,6 +141,7 @@ export const PAYMENT_LABEL: Record<string, string> = {
   WALLET: "Wallet",
   FAWRY: "Fawry",
   INSTAPAY_MANUAL: "InstaPay transfer",
+  VODAFONE_CASH_MANUAL: "Vodafone Cash transfer",
 };
 
 export const PAYMENT_STATUS_LABEL: Record<string, string> = {

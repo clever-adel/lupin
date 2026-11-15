@@ -13,7 +13,7 @@ import { toLang, translate, useT } from "~/lib/i18n";
 import { layoutOrigin, seo } from "~/lib/seo";
 import type { DeliveryOption, Governorate, Order, PaymentMethod, Quote, SiteContent } from "~/lib/types";
 
-const METHOD_ORDER: PaymentMethod[] = ["CARD", "WALLET", "FAWRY", "INSTAPAY_MANUAL", "COD"];
+const METHOD_ORDER: PaymentMethod[] = ["CARD", "WALLET", "FAWRY", "INSTAPAY_MANUAL", "VODAFONE_CASH_MANUAL", "COD"];
 
 export function meta({ params, matches, location }: Route.MetaArgs) {
   const title = translate(toLang(params.lang), "checkout.title");

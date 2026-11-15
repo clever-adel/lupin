@@ -229,9 +229,11 @@ export interface SiteContent {
   paymentMethods: Record<PaymentMethod, boolean>;
   /** Present only while manual InstaPay is usable. */
   instapay?: { handle: string; instructionsEn: string; instructionsAr: string };
+  /** Present only while manual Vodafone Cash is usable. */
+  vodafoneCash?: { number: string; instructionsEn: string; instructionsAr: string };
 }
 
-export type PaymentMethod = "COD" | "CARD" | "WALLET" | "FAWRY" | "INSTAPAY_MANUAL";
+export type PaymentMethod = "COD" | "CARD" | "WALLET" | "FAWRY" | "INSTAPAY_MANUAL" | "VODAFONE_CASH_MANUAL";
 
 export type OrderStatus =
   | "PENDING" | "AWAITING_PAYMENT" | "PAID" | "CONFIRMED" | "PROCESSING" | "SHIPPED" | "DELIVERED"

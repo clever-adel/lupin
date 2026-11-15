@@ -4,7 +4,7 @@ import { Link } from "react-router";
 import { errorText, money, when, type Transfer } from "~/features/admin/shared";
 import { api } from "~/lib/http";
 
-/** InstaPay transfers customers say they made. An order is paid only after someone confirms it here. */
+/** InstaPay and Vodafone Cash transfers customers say they made. An order is paid only after someone confirms it here. */
 export default function AdminTransfers() {
   const client = useQueryClient();
   const [asking, setAsking] = useState<{ id: string; received: boolean } | null>(null);
@@ -26,7 +26,8 @@ export default function AdminTransfers() {
     <div className="max-w-3xl">
       <h1 className="display text-2xl">Transfers to check</h1>
       <p className="mt-2 text-sm text-stone">
-        Open the InstaPay account, find the transfer by its reference and amount, then confirm it. Confirm only
+        Open the InstaPay account or the Vodafone Cash wallet (each transfer says which), find the transfer by its
+        reference and amount, then confirm it. Confirm only
         when the money is really there: confirming marks the order as paid.
       </p>
       {decide.isError && <p role="alert" className="mt-4 text-sm text-danger">{errorText(decide.error)}</p>}
@@ -36,7 +37,12 @@ export default function AdminTransfers() {
           <li key={tr.paymentId} className="border border-line bg-card p-4 text-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-lg font-bold">{money(tr.amount)}</p>
+                <p className="text-lg font-bold">
+                  {money(tr.amount)}{" "}
+                  <span className="ms-1 border border-line px-2 py-0.5 align-middle text-xs font-semibold">
+                    {tr.method === "VODAFONE_CASH_MANUAL" ? "Vodafone Cash" : "InstaPay"}
+                  </span>
+                </p>
                 <p>Reference: <span className="font-semibold">{tr.transferReference}</span></p>
                 <p className="text-stone">
                   {tr.customerName} · {tr.customerPhone} · order{" "}

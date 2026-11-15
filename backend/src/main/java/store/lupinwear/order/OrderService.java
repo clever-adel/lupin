@@ -50,7 +50,7 @@ public class OrderService {
             @Size(max = 300) String notes,
             @NotNull Integer deliveryOptionId,
             @Size(max = 30) String promoCode,
-            @NotBlank @Pattern(regexp = "COD|CARD|WALLET|FAWRY|INSTAPAY_MANUAL") String paymentMethod,
+            @NotBlank @Pattern(regexp = "COD|CARD|WALLET|FAWRY|INSTAPAY_MANUAL|VODAFONE_CASH_MANUAL") String paymentMethod,
             @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) BigDecimal expectedTotal,
             @NotBlank @Size(min = 8, max = 80) @Pattern(regexp = "^[A-Za-z0-9_-]+$") String idempotencyKey) {
     }
@@ -196,7 +196,7 @@ public class OrderService {
                     .param("c", quote.promoCodeId()).param("u", user).param("o", orderId).update();
         }
         // Cash and manual transfer get their payment row now; a Paymob row is created per payment attempt.
-        if (cash || "INSTAPAY_MANUAL".equals(req.paymentMethod())) {
+        if (cash || PaymentMethods.MANUAL.contains(req.paymentMethod())) {
             jdbc.sql("""
                     insert into payments (order_id, provider, method, amount, idempotency_key)
                     values (:o, :provider, :method, :amount, :key)
@@ -411,7 +411,7 @@ public class OrderService {
                 || !("PENDING".equals(paymentStatus) || "FAILED".equals(paymentStatus))) {
             return null;
         }
-        if ("INSTAPAY_MANUAL".equals(method)) {
+        if (PaymentMethods.MANUAL.contains(method)) {
             return "TRANSFER";
         }
         return PaymentMethods.PAYMOB.contains(method) ? "PAYMOB" : null;

@@ -42,7 +42,7 @@ public class PaymentService {
     }
 
     public record TransferView(UUID paymentId, String orderReference, String customerName, String customerPhone,
-            BigDecimal amount, String transferReference, Instant submittedAt) {
+            BigDecimal amount, String transferReference, Instant submittedAt, String method) {
     }
 
     private record OrderRow(UUID id, String reference, String status, String paymentStatus, String method,
@@ -243,7 +243,7 @@ public class PaymentService {
         return node.path(field).asText("");
     }
 
-    // ── Manual InstaPay transfer ──
+    // ── Manual transfer (InstaPay or Vodafone Cash) ──
 
     /** The customer tells us the reference of the transfer they made. Staff then check the bank app. */
     public void submitTransfer(UUID user, String reference, String transferReference) {
@@ -262,12 +262,13 @@ public class PaymentService {
 
     public List<TransferView> transfersToVerify() {
         return jdbc.sql("""
-                select p.id, o.reference, o.customer_name, o.customer_phone, p.amount, p.manual_reference, p.updated_at
+                select p.id, o.reference, o.customer_name, o.customer_phone, p.amount, p.manual_reference, p.updated_at,
+                       p.method
                 from payments p join orders o on o.id = p.order_id
                 where p.provider = 'MANUAL_TRANSFER' and p.status = 'VERIFYING' order by p.updated_at limit 200
                 """).query((rs, n) -> new TransferView(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3),
                         rs.getString(4), rs.getBigDecimal(5), rs.getString(6),
-                        rs.getObject(7, OffsetDateTime.class).toInstant()))
+                        rs.getObject(7, OffsetDateTime.class).toInstant(), rs.getString(8)))
                 .list();
     }
 

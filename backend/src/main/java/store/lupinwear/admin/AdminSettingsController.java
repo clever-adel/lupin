@@ -234,6 +234,16 @@ public class AdminSettingsController {
                 throw ApiException.badRequest("INVALID_SETTING", "The order prefix is 1 to 6 capital letters.");
             }
         }
+        if ("payment_methods".equals(key)) {
+            String number = value.path("vodafoneCashNumber").asText("").replaceAll("[\\s-]", "");
+            if (!number.isEmpty() && !number.matches("01[0125]\\d{8}")) {
+                throw ApiException.badRequest("INVALID_SETTING",
+                        "The Vodafone Cash number is an Egyptian mobile number of 11 digits, like 01012345678.");
+            }
+            if (value.path("VODAFONE_CASH_MANUAL").asBoolean() && number.isEmpty()) {
+                throw ApiException.badRequest("INVALID_SETTING", "Enter the Vodafone Cash number before switching it on.");
+            }
+        }
         if ("payment_methods".equals(key) && value.path("INSTAPAY_MANUAL").asBoolean()
                 && value.path("instapayHandle").asText("").isBlank()) {
             throw ApiException.badRequest("INVALID_SETTING", "Enter the InstaPay address before switching InstaPay on.");
