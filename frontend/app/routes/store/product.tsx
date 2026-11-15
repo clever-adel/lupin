@@ -6,7 +6,7 @@ import { FavouriteButton, Price, ProductPhoto } from "~/components/product";
 import { useBag } from "~/features/bag/useBag";
 import { apiGet } from "~/lib/api.server";
 import { localePath, pick, toLang, translate, useT } from "~/lib/i18n";
-import { layoutOrigin, seo } from "~/lib/seo";
+import { absoluteUrl, layoutOrigin, seo } from "~/lib/seo";
 import type { ProductDetail } from "~/lib/types";
 
 export async function loader({ params, context }: Route.LoaderArgs) {
@@ -21,7 +21,7 @@ export function meta({ params, matches, location, data }: Route.MetaArgs) {
   const origin = layoutOrigin(matches);
   const name = pick(lang, product, "name");
   const description = (pick(lang, product, "description") || name).slice(0, 160);
-  const images = product.colors.flatMap((c) => c.images.map((i) => i.url));
+  const images = product.colors.flatMap((c) => c.images.map((i) => absoluteUrl(origin, i.url)));
   const url = origin + location.pathname;
   const inStock = product.colors.some((c) => c.variants.some((v) => v.available));
   const crumbs = [
@@ -30,7 +30,9 @@ export function meta({ params, matches, location, data }: Route.MetaArgs) {
     { name, path: `/product/${product.slug}` },
   ];
   return [
-    ...seo({ origin, pathname: location.pathname, title: name, description, image: images[0] }),
+    ...seo({ origin, pathname: location.pathname, title: name, description, image: images[0], type: "product" }),
+    { property: "product:price:amount", content: (product.salePrice ?? product.price).toFixed(2) },
+    { property: "product:price:currency", content: "EGP" },
     {
       "script:ld+json": {
         "@context": "https://schema.org",
@@ -38,7 +40,9 @@ export function meta({ params, matches, location, data }: Route.MetaArgs) {
         name,
         description,
         ...(images.length ? { image: images } : {}),
-        ...(product.brand ? { brand: { "@type": "Brand", name: product.brand } } : { brand: { "@type": "Brand", name: "LUPIN." } }),
+        // Only the maker the owner entered. Many pieces are other labels' (e.g. Bershka), so naming
+        // LUPIN. as the brand when the field is empty would tell Google something untrue.
+        ...(product.brand ? { brand: { "@type": "Brand", name: product.brand } } : {}),
         category: pick(lang, product.category, "name"),
         offers: {
           "@type": "Offer",

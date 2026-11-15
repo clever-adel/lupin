@@ -5,8 +5,8 @@ import type { loader as layoutLoader } from "./layout";
 import { ProductGrid, ProductPhoto } from "~/components/product";
 import { apiGet } from "~/lib/api.server";
 import { toLang, translate, useT } from "~/lib/i18n";
-import { layoutOrigin, seo } from "~/lib/seo";
-import type { Page, ProductCard } from "~/lib/types";
+import { absoluteUrl, DEFAULT_SHARE_IMAGE, layoutOrigin, seo } from "~/lib/seo";
+import type { Page, ProductCard, SiteContent } from "~/lib/types";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const collection = await apiGet<Page<ProductCard>>(context, "/api/v1/catalog/products?pageSize=8&sort=featured");
@@ -15,12 +15,42 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 export function meta({ params, matches, location }: Route.MetaArgs) {
   const lang = toLang(params.lang);
-  return seo({
-    origin: layoutOrigin(matches),
-    pathname: location.pathname,
-    title: "LUPIN.",
-    description: `LUPIN. ${translate(lang, "brand.slogan")} ${translate(lang, "brand.supporting")}`,
-  });
+  const origin = layoutOrigin(matches);
+  const site = (matches.find((m) => m?.id === "routes/store/layout")?.data as { site?: SiteContent } | undefined)?.site;
+  // Only the owner's real profile links; the footer applies the same https-only rule.
+  const profiles = [site?.contact.instagram, site?.contact.facebook, site?.contact.tiktok]
+    .filter((url): url is string => !!url && /^https:\/\/[^\s]+$/.test(url));
+  return [
+    ...seo({
+      origin,
+      pathname: location.pathname,
+      title: translate(lang, "seo.home.title"),
+      description: translate(lang, "seo.home.description"),
+    }),
+    {
+      "script:ld+json": {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": `${origin}/#organization`,
+            name: "LUPIN.",
+            url: `${origin}/`,
+            logo: absoluteUrl(origin, DEFAULT_SHARE_IMAGE),
+            ...(profiles.length ? { sameAs: profiles } : {}),
+          },
+          {
+            "@type": "WebSite",
+            "@id": `${origin}/#website`,
+            name: "LUPIN.",
+            url: `${origin}/`,
+            inLanguage: ["en", "ar"],
+            publisher: { "@id": `${origin}/#organization` },
+          },
+        ],
+      },
+    },
+  ];
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
