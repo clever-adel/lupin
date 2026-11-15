@@ -304,3 +304,63 @@ export interface Me {
   emailVerified: boolean;
   preferredLang: Lang;
 }
+
+// Mirrors store.lupinwear.look.LookDtos (public read models).
+
+export interface LookCard {
+  slug: string;
+  titleEn: string;
+  titleAr: string;
+  imageUrl: string;
+  aiGenerated: boolean;
+  itemCount: number;
+  total: number;
+}
+
+export interface LookColor {
+  id: number;
+  nameEn: string;
+  nameAr: string;
+  hex: string;
+  imageUrl?: string;
+  variants: Variant[];
+}
+
+export type LookRole = "TOP" | "BOTTOM" | "ONE_PIECE" | "OUTER" | "ACCESSORY";
+
+export interface LookItem {
+  productSlug: string;
+  nameEn: string;
+  nameAr: string;
+  categoryEn: string;
+  categoryAr: string;
+  role: LookRole;
+  price: number;
+  salePrice?: number;
+  discountPercent?: number;
+  descriptionEn: string;
+  descriptionAr: string;
+  fabricEn: string;
+  fabricAr: string;
+  fitEn: string;
+  fitAr: string;
+  /** The colour worn in the photo. */
+  colorId: number;
+  inStock: boolean;
+  colors: LookColor[];
+}
+
+export interface LookDetail {
+  slug: string;
+  titleEn: string;
+  titleAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  imageUrl: string;
+  aiGenerated: boolean;
+  items: LookItem[];
+  total: number;
+  fullPrice: number;
+  pairsWith: ProductCard[];
+  otherLooks: LookCard[];
+}

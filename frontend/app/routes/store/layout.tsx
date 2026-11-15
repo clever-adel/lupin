@@ -144,6 +144,11 @@ function Footer({ departments, site }: { departments: Department[]; site: SiteCo
         <nav aria-label={t("footer.shop")}>
           <h2 className="text-sm font-semibold">{t("footer.shop")}</h2>
           <ul className="mt-3 space-y-2 text-sm text-bone/70">
+            <li>
+              <Link to={href("/looks")} className="hover:text-bone">
+                {t("look.indexTitle")}
+              </Link>
+            </li>
             {departments
               .filter((d) => d.status === "ACTIVE")
               .map((d) => (

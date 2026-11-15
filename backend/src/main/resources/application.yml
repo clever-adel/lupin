@@ -77,6 +77,13 @@ lupin:
     integration-fawry: ${PAYMOB_INTEGRATION_ID_FAWRY:}
     intention-url: ${PAYMOB_INTENTION_URL:https://accept.paymob.com/v1/intention/}
     checkout-url: ${PAYMOB_CHECKOUT_URL:https://accept.paymob.com/unifiedcheckout/}
+  # AI model photos for "shop the look" (FASHN virtual try-on). Off until the key is present; the key
+  # stays on the server. candidates = how many alternative photos one run makes (1 to 4, billed each).
+  tryon:
+    fashn-api-key: ${FASHN_API_KEY:}
+    fashn-base-url: ${FASHN_BASE_URL:https://api.fashn.ai/v1}
+    candidates: ${FASHN_CANDIDATES:2}
+    local-preview: false
   # Bosta courier. Switched off until the API key and a webhook secret (24+ characters) are both present.
   bosta:
     api-key: ${BOSTA_API_KEY:}
@@ -97,6 +104,9 @@ lupin:
     cookie-secure: false
     allowed-origins: http://localhost:5173
   public-base-url: http://localhost:5173
+  # Without a FASHN key, local runs make clearly labelled test boards instead of AI photos.
+  tryon:
+    local-preview: true
 springdoc:
   swagger-ui:
     enabled: true

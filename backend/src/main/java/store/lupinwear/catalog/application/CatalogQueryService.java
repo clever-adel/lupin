@@ -180,6 +180,39 @@ public class CatalogQueryService {
                         rs.getString("badge_en"), rs.getString("badge_ar"), rs.getBoolean("in_stock")))
                 .list();
 
+        Map<Long, List<ColorDot>> dots = colorDots(rows.stream().map(Row::id).toList());
+
+        List<ProductCard> cards = rows.stream().map(r -> new ProductCard(r.slug(), r.nameEn(), r.nameAr(), r.catEn(),
+                r.catAr(), r.price(), r.salePrice(), discountPercent(r.price(), r.salePrice()), r.badge(),
+                r.badgeEn(), r.badgeAr(), r.inStock(), dots.getOrDefault(r.id(), List.of()))).toList();
+        return PageResponse.of(cards, page, size, total);
+    }
+
+    /**
+     * Cards for the given products, in the given order. Products shoppers cannot see are left out, so
+     * callers may pass any ids.
+     */
+    public List<ProductCard> cards(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        List<Long> wanted = ids.stream().distinct().limit(48).toList();
+        Map<Long, ProductCard> byId = new HashMap<>();
+        Map<Long, List<ColorDot>> dots = colorDots(wanted);
+        jdbc.sql("select p.id, p.slug, p.name_en, p.name_ar, c.name_en as cat_en, c.name_ar as cat_ar,"
+                + " p.price, p.sale_price, p.badge, p.badge_en, p.badge_ar, " + IN_STOCK + " as in_stock " + VISIBLE + " and p.id in (:ids)")
+                .param("ids", wanted)
+                .query((rs, n) -> byId.put(rs.getLong("id"), new ProductCard(rs.getString("slug"),
+                        rs.getString("name_en"), rs.getString("name_ar"), rs.getString("cat_en"),
+                        rs.getString("cat_ar"), rs.getBigDecimal("price"), rs.getBigDecimal("sale_price"),
+                        discountPercent(rs.getBigDecimal("price"), rs.getBigDecimal("sale_price")),
+                        rs.getString("badge"), rs.getString("badge_en"), rs.getString("badge_ar"),
+                        rs.getBoolean("in_stock"), dots.getOrDefault(rs.getLong("id"), List.of()))))
+                .list();
+        return wanted.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
+    }
+
+    private Map<Long, List<ColorDot>> colorDots(List<Long> productIds) {
         Map<Long, List<ColorDot>> dots = new HashMap<>();
         jdbc.sql("""
                 select pc.product_id, pc.name_en, pc.name_ar, pc.hex,
@@ -187,18 +220,14 @@ public class CatalogQueryService {
                        (select pi.url from product_images pi where pi.color_id = pc.id order by pi.position offset 1 limit 1) as hover_url
                 from product_colors pc where pc.product_id in (:ids)
                 order by pc.product_id, pc.is_main desc, pc.sort_order, pc.id
-                """).param("ids", rows.stream().map(Row::id).toList())
+                """).param("ids", productIds)
                 .query((rs, n) -> {
                     dots.computeIfAbsent(rs.getLong("product_id"), k -> new ArrayList<>())
                             .add(new ColorDot(rs.getString("name_en"), rs.getString("name_ar"), rs.getString("hex"),
                                     rs.getString("image_url"), rs.getString("hover_url")));
                     return null;
                 }).list();
-
-        List<ProductCard> cards = rows.stream().map(r -> new ProductCard(r.slug(), r.nameEn(), r.nameAr(), r.catEn(),
-                r.catAr(), r.price(), r.salePrice(), discountPercent(r.price(), r.salePrice()), r.badge(),
-                r.badgeEn(), r.badgeAr(), r.inStock(), dots.getOrDefault(r.id(), List.of()))).toList();
-        return PageResponse.of(cards, page, size, total);
+        return dots;
     }
 
     public Facets facets(String department) {

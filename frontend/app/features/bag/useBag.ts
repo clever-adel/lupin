@@ -96,6 +96,29 @@ export function useBag() {
       if (signedIn) change.mutate({ type: "remove", variantId });
       else bagActions.remove(variantId);
     },
+    /**
+     * Adds several pieces in one go (a complete look). Stock is checked on the server first; pieces
+     * that sold out in the meantime are skipped and reported back, never added.
+     */
+    async addMany(lines: { variantId: number; quantity: number }[]): Promise<{ added: number[]; skipped: number[] }> {
+      const ids = [...new Set(lines.map((l) => l.variantId))];
+      if (ids.length === 0) return { added: [], skipped: [] };
+      const live = await api<VariantLine[]>("GET", `/api/v1/catalog/variants?ids=${ids.join(",")}`);
+      const available = new Map(live.filter((v) => v.available && v.maxQuantity > 0).map((v) => [v.variantId, v]));
+      const ok = lines
+        .filter((l) => available.has(l.variantId))
+        .map((l) => ({ variantId: l.variantId, quantity: Math.min(l.quantity, available.get(l.variantId)!.maxQuantity) }));
+      const skipped = lines.filter((l) => !available.has(l.variantId)).map((l) => l.variantId);
+      if (ok.length === 0) return { added: [], skipped };
+      if (signedIn) {
+        const cart = await api<Cart>("POST", "/api/v1/cart/merge", { items: ok });
+        await client.cancelQueries({ queryKey: CART_KEY });
+        client.setQueryData(CART_KEY, cart);
+      } else {
+        for (const line of ok) bagActions.add(line.variantId, line.quantity);
+      }
+      return { added: ok.map((l) => l.variantId), skipped };
+    },
   };
 }
 
