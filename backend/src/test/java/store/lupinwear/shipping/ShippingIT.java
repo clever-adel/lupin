@@ -186,6 +186,16 @@ class ShippingIT extends IntegrationTest {
     }
 
     @Test
+    void firstBostaMessageAppliesEvenIfBostasClockIsBehindOurs() throws Exception {
+        String reference = processingCashOrder(1);
+        JsonNode view = body(send(reference, "d-maadi-FceDyHXwpSYYF9zGW").andExpect(status().isOk()).andReturn());
+        String tracking = view.at("/shipment/trackingReference").asText();
+        long behind = Instant.now().minusSeconds(60).toEpochMilli();
+        webhook(SECRET, event("bosta-id-" + tracking, tracking, 41, behind)).andExpect(status().isOk());
+        assertThat(state(reference)).isEqualTo("Out for delivery");
+    }
+
+    @Test
     void onlyPreparedOrdersInDeliverableAreasCanBeSent() throws Exception {
         String reference = placeOrder("COD", 1);
         // Still PENDING.

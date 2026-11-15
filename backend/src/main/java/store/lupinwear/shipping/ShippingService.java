@@ -257,9 +257,12 @@ public class ShippingService {
                     String note = "Sent with Bosta (" + district.name() + ")";
                     orders.changeStatus(actor, reference, new StatusChange("SHIPPED", note, CARRIER,
                             created.trackingNumber()));
+                    // provider_state_at is the time of Bosta's last status message, on Bosta's clock. It
+                    // stays empty here: our own clock must not be compared with Bosta's, or Bosta's first
+                    // message could look older than this and be dropped.
                     jdbc.sql("""
                             update shipments set provider_delivery_id = :d, provider_state = 10,
-                                   provider_state_label = :label, provider_state_at = now(), cod_amount = :cod,
+                                   provider_state_label = :label, provider_state_at = null, cod_amount = :cod,
                                    updated_at = now()
                             where id = (select max(id) from shipments where order_id = :o)
                             """).param("d", created.deliveryId()).param("label", STATE_LABELS.get(10))
