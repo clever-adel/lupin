@@ -122,6 +122,19 @@ class LookIT extends IntegrationTest {
     }
 
     @Test
+    void aiRunsPerStaffMemberAreLimited() throws Exception {
+        JsonNode shirt = product("Limit Shirt", tops, "1000.00", null, 1);
+        long id = body(mvc.perform(jsonPost("/api/v1/admin/looks", lookRequest("Limited", List.of(item(shirt, 0, "TOP"))))
+                .cookie(owner)).andExpect(status().isCreated()).andReturn()).get("id").asLong();
+        for (int i = 0; i < AdminLookController.AI_RUNS_PER_10_MINUTES; i++) {
+            mvc.perform(jsonPost("/api/v1/admin/looks/" + id + "/generations", Map.of()).cookie(owner))
+                    .andExpect(jsonPath("$.code").value("AI_NOT_CONFIGURED"));
+        }
+        mvc.perform(jsonPost("/api/v1/admin/looks/" + id + "/generations", Map.of()).cookie(owner))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
     void staffInputIsChecked() throws Exception {
         JsonNode shirt = product("Check Shirt", tops, "1000.00", null, 1);
         JsonNode other = product("Check Other", bottoms, "1000.00", null, 1);
