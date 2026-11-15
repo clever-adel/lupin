@@ -143,7 +143,7 @@ public class CatalogAdminService {
                 .param("descEn", orEmpty(req.descriptionEn())).param("descAr", orEmpty(req.descriptionAr()))
                 .param("fabricEn", orEmpty(req.fabricEn())).param("fabricAr", orEmpty(req.fabricAr()))
                 .param("fitEn", orEmpty(req.fitEn())).param("fitAr", orEmpty(req.fitAr()))
-                .param("brand", req.brand()).param("badge", req.badge())
+                .param("brand", blankToNull(req.brand())).param("badge", req.badge())
                 .param("badgeEn", badgeText[0]).param("badgeAr", badgeText[1])
                 .param("price", req.price()).param("salePrice", req.salePrice())
                 .query(Long.class).single();
@@ -265,14 +265,14 @@ public class CatalogAdminService {
         AdminProductDetail product = jdbc.sql("""
                 select p.id, p.slug, p.status, d.slug, c.slug, p.name_en, p.name_ar, p.description_en,
                        p.description_ar, p.fabric_en, p.fabric_ar, p.fit_en, p.fit_ar, p.badge, p.price, p.sale_price,
-                       p.featured, p.badge_en, p.badge_ar
+                       p.featured, p.badge_en, p.badge_ar, p.brand
                 from products p join departments d on d.id = p.department_id join categories c on c.id = p.category_id
                 where p.id = :id and p.deleted_at is null
                 """).param("id", id)
                 .query((rs, n) -> new AdminProductDetail(rs.getLong(1), rs.getString(2), rs.getString(3),
                         rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8),
                         rs.getString(9), rs.getString(10), rs.getString(11), rs.getString(12), rs.getString(13),
-                        rs.getString(14), rs.getString(18), rs.getString(19), rs.getBigDecimal(15),
+                        rs.getString(20), rs.getString(14), rs.getString(18), rs.getString(19), rs.getBigDecimal(15),
                         rs.getBigDecimal(16), rs.getBoolean(17), List.of()))
                 .optional().orElseThrow(() -> ApiException.notFound("Product"));
         record ColorHead(long id, String nameEn, String nameAr, String hex) {
@@ -297,7 +297,7 @@ public class CatalogAdminService {
         return new AdminProductDetail(product.id(), product.slug(), product.status(), product.departmentSlug(),
                 product.categorySlug(), product.nameEn(), product.nameAr(), product.descriptionEn(),
                 product.descriptionAr(), product.fabricEn(), product.fabricAr(), product.fitEn(), product.fitAr(),
-                product.badge(), product.badgeEn(), product.badgeAr(), product.price(), product.salePrice(),
+                product.brand(), product.badge(), product.badgeEn(), product.badgeAr(), product.price(), product.salePrice(),
                 product.featured(), colors);
     }
 
@@ -335,7 +335,8 @@ public class CatalogAdminService {
         jdbc.sql("""
                 update products set name_en = :nameEn, name_ar = :nameAr, category_id = :cat,
                        description_en = :descEn, description_ar = :descAr, fabric_en = :fabricEn, fabric_ar = :fabricAr,
-                       fit_en = :fitEn, fit_ar = :fitAr, badge = :badge, badge_en = :badgeEn, badge_ar = :badgeAr,
+                       fit_en = :fitEn, fit_ar = :fitAr, brand = :brand,
+                       badge = :badge, badge_en = :badgeEn, badge_ar = :badgeAr,
                        price = :price, sale_price = :salePrice,
                        featured = :featured, updated_at = now(), version = version + 1
                 where id = :id
@@ -344,6 +345,7 @@ public class CatalogAdminService {
                 .param("descEn", orEmpty(req.descriptionEn())).param("descAr", orEmpty(req.descriptionAr()))
                 .param("fabricEn", orEmpty(req.fabricEn())).param("fabricAr", orEmpty(req.fabricAr()))
                 .param("fitEn", orEmpty(req.fitEn())).param("fitAr", orEmpty(req.fitAr()))
+                .param("brand", blankToNull(req.brand()))
                 .param("badge", req.badge()).param("badgeEn", badgeText[0]).param("badgeAr", badgeText[1])
                 .param("price", req.price()).param("salePrice", req.salePrice())
                 .param("featured", req.featured()).param("id", id).update();
@@ -481,6 +483,11 @@ public class CatalogAdminService {
 
     private static String orEmpty(String s) {
         return s == null ? "" : s.trim();
+    }
+
+    /** Optional single-language text such as the brand: trimmed, and empty means "not given". */
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 
     /** The owner's own label text, English then Arabic: required for CUSTOM, dropped for every other label. */

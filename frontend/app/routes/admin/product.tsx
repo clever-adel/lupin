@@ -19,6 +19,8 @@ interface Detail {
   fabricAr: string;
   fitEn: string;
   fitAr: string;
+  /** Who made the piece, e.g. Bershka. Empty when unknown. */
+  brand?: string | null;
   badge?: string;
   badgeEn?: string;
   badgeAr?: string;
@@ -48,7 +50,7 @@ const KIDS_SIZES = ["2-3Y", "4-5Y", "6-7Y", "8-9Y", "10-11Y", "12-13Y"];
 const stockKey = (colourIndex: number, size: string) => `${colourIndex}:${size}`;
 const EMPTY: Omit<Detail, "id" | "slug" | "status" | "colors"> = {
   departmentSlug: "", categorySlug: "", nameEn: "", nameAr: "", descriptionEn: "", descriptionAr: "",
-  fabricEn: "", fabricAr: "", fitEn: "", fitAr: "", badge: "", badgeEn: "", badgeAr: "", price: 0,
+  fabricEn: "", fabricAr: "", fitEn: "", fitAr: "", brand: "", badge: "", badgeEn: "", badgeAr: "", price: 0,
   featured: false,
 };
 
@@ -213,7 +215,7 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
       const common = {
         nameEn: f.nameEn, nameAr: f.nameAr, categorySlug: f.categorySlug,
         descriptionEn: f.descriptionEn, descriptionAr: f.descriptionAr, fabricEn: f.fabricEn, fabricAr: f.fabricAr,
-        fitEn: f.fitEn, fitAr: f.fitAr, badge: f.badge || null,
+        fitEn: f.fitEn, fitAr: f.fitAr, brand: (f.brand ?? "").trim() || null, badge: f.badge || null,
         badgeEn: f.badge === "CUSTOM" ? (f.badgeEn ?? "").trim() : null,
         badgeAr: f.badge === "CUSTOM" ? (f.badgeAr ?? "").trim() : null,
         price: Number(price), salePrice: salePrice.trim() === "" ? null : Number(salePrice),
@@ -382,6 +384,12 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
           <Text id="fabricAr" label="Fabric (Arabic)" value={f.fabricAr} onChange={set("fabricAr")} rtl />
           <Text id="fitEn" label="Fit (English)" value={f.fitEn} onChange={set("fitEn")} />
           <Text id="fitAr" label="Fit (Arabic)" value={f.fitAr} onChange={set("fitAr")} rtl />
+          <div>
+            <Text id="brand" label="Brand (who made it)" value={f.brand ?? ""} onChange={set("brand")} />
+            <p className="mt-1 text-xs text-stone">
+              For example Bershka. Leave empty for our own pieces or when unknown. Google shows it in search results.
+            </p>
+          </div>
         </div>
       </section>
 

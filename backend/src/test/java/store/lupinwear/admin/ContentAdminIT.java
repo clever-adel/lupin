@@ -94,6 +94,22 @@ class ContentAdminIT extends IntegrationTest {
     }
 
     @Test
+    void staffCanSetAndClearTheBrand() throws Exception {
+        Map<String, Object> body = productUpdate("1000.00", "900.00");
+        body.put("brand", "  Bershka ");
+        putJson("/api/v1/admin/products/" + productId, body, admin).andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/admin/products/" + productId).cookie(admin)).andExpect(jsonPath("$.brand").value("Bershka"));
+        mvc.perform(get("/api/v1/catalog/products/" + productSlug)).andExpect(jsonPath("$.brand").value("Bershka"));
+
+        body.put("brand", " ");
+        putJson("/api/v1/admin/products/" + productId, body, admin).andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/catalog/products/" + productSlug)).andExpect(jsonPath("$.brand").doesNotExist());
+
+        body.put("brand", "x".repeat(81));
+        putJson("/api/v1/admin/products/" + productId, body, admin).andExpect(status().isBadRequest());
+    }
+
+    @Test
     void offersCreatedByStaffApplyAtCheckout() throws Exception {
         mvc.perform(get("/api/v1/admin/promotions/targets").cookie(admin))
                 .andExpect(status().isOk())
