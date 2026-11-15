@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import store.lupinwear.cart.CartService;
 import store.lupinwear.catalog.api.CatalogDtos.DepartmentView;
 import store.lupinwear.catalog.api.CatalogDtos.Facets;
 import store.lupinwear.catalog.api.CatalogDtos.ProductCard;
@@ -15,6 +16,7 @@ import store.lupinwear.catalog.api.CatalogDtos.VariantLine;
 import store.lupinwear.catalog.application.CatalogQueryService;
 import store.lupinwear.catalog.application.CatalogQueryService.ProductFilter;
 import store.lupinwear.catalog.application.CatalogQueryService.Sort;
+import store.lupinwear.shared.ApiException;
 import store.lupinwear.shared.PageResponse;
 
 @RestController
@@ -58,6 +60,11 @@ public class CatalogController {
 
     @GetMapping("/variants")
     List<VariantLine> variants(@RequestParam List<Long> ids) {
+        // A bag holds at most MAX_LINES lines, so a longer list is not a real bag: refuse it rather than
+        // run one large query for anyone who asks.
+        if (ids.size() > CartService.MAX_LINES) {
+            throw ApiException.badRequest("TOO_MANY_IDS", "At most " + CartService.MAX_LINES + " ids per request.");
+        }
         return catalog.variants(ids);
     }
 

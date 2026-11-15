@@ -182,6 +182,16 @@ class CatalogIT extends IntegrationTest {
     }
 
     @Test
+    void variantLookupRefusesMoreIdsThanABagCanHold() throws Exception {
+        String fifty = java.util.stream.LongStream.rangeClosed(1, 50).mapToObj(Long::toString)
+                .collect(java.util.stream.Collectors.joining(","));
+        mvc.perform(get("/api/v1/catalog/variants").param("ids", fifty)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/catalog/variants").param("ids", fifty + ",51"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TOO_MANY_IDS"));
+    }
+
+    @Test
     void stockCannotGoBelowReservedOrBelowZero() throws Exception {
         JsonNode created = create(request("Reserved Stock", "900.00", null, 5));
         long variant = created.get("variantIds").get(0).asLong();
