@@ -1,13 +1,15 @@
+import { useQuery } from "@tanstack/react-query";
 import { useState, type CSSProperties } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/product";
 import { ShareIcon } from "~/components/icons";
 import { FavouriteButton, Price, ProductPhoto } from "~/components/product";
 import { useBag } from "~/features/bag/useBag";
+import { api } from "~/lib/http";
 import { apiGet } from "~/lib/api.server";
 import { localePath, pick, toLang, translate, useT } from "~/lib/i18n";
 import { absoluteUrl, layoutOrigin, seo } from "~/lib/seo";
-import type { ProductDetail } from "~/lib/types";
+import type { LookCard, ProductDetail } from "~/lib/types";
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const product = await apiGet<ProductDetail>(context, `/api/v1/catalog/products/${encodeURIComponent(params.slug)}`);
@@ -81,6 +83,12 @@ function ProductView({ product }: { product: ProductDetail }) {
   const [quantity, setQuantity] = useState(1);
   const [notice, setNotice] = useState<"added" | "size" | "copied" | null>(null);
   const bag = useBag();
+  const looks = useQuery({
+    queryKey: ["looks-with", product.slug],
+    queryFn: () => api<LookCard[]>("GET", `/api/v1/catalog/looks?product=${encodeURIComponent(product.slug)}`),
+    staleTime: 60_000,
+  });
+  const seenIn = looks.data?.[0];
 
   const color = product.colors.find((c) => c.id === colorId) ?? product.colors[0];
   if (!color) return null;
@@ -300,6 +308,24 @@ function ProductView({ product }: { product: ProductDetail }) {
             {notice === "copied" && t("product.linkCopied")}
             {notice === null && <span className="text-stone">{t(anyAvailable ? "product.inStock" : "product.allTaken")}</span>}
           </p>
+
+          {seenIn && (
+            <Link to={href(`/looks/${seenIn.slug}`)} className="group mt-6 flex items-center gap-4 border border-line bg-card p-3">
+              <span className="block w-16 shrink-0 overflow-hidden bg-studio">
+                <ProductPhoto url={seenIn.imageUrl} alt="" sizes="64px" className="aspect-[2/3] w-full" />
+              </span>
+              <span className="min-w-0">
+                <span className="label flex items-center gap-2 text-stone">
+                  <span aria-hidden="true" className="h-px w-5 bg-gold" />
+                  {t("look.label")}
+                </span>
+                <span className="mt-1 block text-sm font-medium">{p(seenIn, "title")}</span>
+                <span className="mt-0.5 block text-xs text-stone group-hover:text-ink group-hover:underline">
+                  {t("look.view")} · {t("look.pieces", { count: seenIn.itemCount })}
+                </span>
+              </span>
+            </Link>
+          )}
 
           <div className="mt-6 border-t border-line">
             {p(product, "description") && (

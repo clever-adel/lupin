@@ -1,6 +1,6 @@
 import type { Route } from "./+types/sitemap";
 import { apiGet, siteOrigin } from "~/lib/api.server";
-import type { Department, Page, ProductCard, SiteContent } from "~/lib/types";
+import type { Department, LookCard, Page, ProductCard, SiteContent } from "~/lib/types";
 
 const MAX_PRODUCT_PAGES = 40; // 48 per page: up to 1,920 products in one sitemap file
 
@@ -11,12 +11,15 @@ function escapeXml(value: string): string {
 /** Public, indexable pages only, each listed in English and Arabic with hreflang alternates. */
 export async function loader({ context }: Route.LoaderArgs) {
   const origin = siteOrigin(context);
-  const [departments, site] = await Promise.all([
+  const [departments, site, looks] = await Promise.all([
     apiGet<Department[]>(context, "/api/v1/catalog/departments"),
     apiGet<SiteContent>(context, "/api/v1/content/site"),
+    apiGet<LookCard[]>(context, "/api/v1/catalog/looks"),
   ]);
 
   const paths = ["/", "/shop", "/faq"];
+  if (looks.length > 0) paths.push("/looks");
+  looks.forEach((l) => paths.push(`/looks/${l.slug}`));
   departments.filter((d) => d.status === "ACTIVE").forEach((d) => paths.push(`/shop/${d.slug}`));
   site.policies.forEach((p) => paths.push(`/policies/${p.slug}`));
   for (let page = 0; page < MAX_PRODUCT_PAGES; page++) {

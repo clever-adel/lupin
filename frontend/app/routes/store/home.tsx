@@ -2,15 +2,31 @@ import { Fragment, type CSSProperties } from "react";
 import { Link, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/home";
 import type { loader as layoutLoader } from "./layout";
+import { LookLineup } from "~/components/look";
 import { ProductGrid, ProductPhoto } from "~/components/product";
 import { apiGet } from "~/lib/api.server";
 import { toLang, translate, useT } from "~/lib/i18n";
 import { absoluteUrl, DEFAULT_SHARE_IMAGE, layoutOrigin, seo } from "~/lib/seo";
-import type { Page, ProductCard, SiteContent } from "~/lib/types";
+import type { LookCard, LookDetail, Page, ProductCard, SiteContent } from "~/lib/types";
 
 export async function loader({ context }: Route.LoaderArgs) {
-  const collection = await apiGet<Page<ProductCard>>(context, "/api/v1/catalog/products?pageSize=8&sort=featured");
-  return { collection };
+  const [collection, look] = await Promise.all([
+    apiGet<Page<ProductCard>>(context, "/api/v1/catalog/products?pageSize=8&sort=featured"),
+    firstLook(context),
+  ]);
+  return { collection, look };
+}
+
+/** The first published look with the others for switching; the home page still renders without it. */
+async function firstLook(context: Route.LoaderArgs["context"]) {
+  try {
+    const looks = await apiGet<LookCard[]>(context, "/api/v1/catalog/looks");
+    if (looks.length === 0) return null;
+    const detail = await apiGet<LookDetail>(context, `/api/v1/catalog/looks/${encodeURIComponent(looks[0]!.slug)}`);
+    return { detail, looks };
+  } catch {
+    return null;
+  }
 }
 
 export function meta({ params, matches, location }: Route.MetaArgs) {
@@ -165,6 +181,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </ul>
       </section>
 
+      {loaderData.look && <HomeLook first={loaderData.look.detail} looks={loaderData.look.looks} />}
+
       <section className="shell pt-16" aria-labelledby="collection-title">
         <div data-reveal className="mb-8 flex items-end justify-between gap-4">
           <div>
@@ -182,5 +200,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         {products.length > 0 ? <ProductGrid products={products} /> : <p className="text-stone">{t("home.empty")}</p>}
       </section>
     </>
+  );
+}
+
+/** Try the look on the home page: the models side by side; choosing one opens its pieces here. */
+function HomeLook({ first, looks }: { first: LookDetail; looks: LookCard[] }) {
+  const { t } = useT();
+  return (
+    <section className="shell mt-20" aria-label={t("look.tryTitle")}>
+      <LookLineup looks={looks} initial={first} />
+    </section>
   );
 }

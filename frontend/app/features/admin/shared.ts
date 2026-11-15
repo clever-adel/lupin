@@ -164,3 +164,70 @@ export function errorText(error: unknown): string {
   }
   return "Something went wrong. Please try again.";
 }
+
+// Mirrors store.lupinwear.look.LookDtos (staff models).
+
+export type LookRole = "TOP" | "BOTTOM" | "ONE_PIECE" | "OUTER" | "ACCESSORY";
+
+export const ROLE_LABEL: Record<LookRole, string> = {
+  TOP: "Top (shirt, tee, knit)",
+  BOTTOM: "Bottom (trousers, jeans, shorts)",
+  ONE_PIECE: "One-piece (jumpsuit, set)",
+  OUTER: "Outer layer (jacket, coat)",
+  ACCESSORY: "Accessory (not dressed by AI)",
+};
+
+export interface AdminLookRow {
+  id: number;
+  slug: string;
+  titleEn: string;
+  titleAr: string;
+  status: "DRAFT" | "PUBLISHED";
+  imageUrl?: string;
+  imageSource?: "AI" | "PHOTO";
+  itemCount: number;
+  sortOrder: number;
+}
+
+export interface AdminLookItem {
+  productId: number;
+  productNameEn: string;
+  productStatus: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  colorId: number;
+  colorNameEn: string;
+  colorHex: string;
+  imageUrl?: string;
+  role: LookRole;
+  categoryEn: string;
+}
+
+export interface AdminLook {
+  id: number;
+  slug: string;
+  titleEn: string;
+  titleAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  status: "DRAFT" | "PUBLISHED";
+  imageUrl?: string;
+  imagePublicId?: string;
+  imageSource?: "AI" | "PHOTO";
+  sortOrder: number;
+  items: AdminLookItem[];
+}
+
+export interface AiStatus {
+  available: boolean;
+  provider?: "FASHN" | "LOCAL_PREVIEW";
+  candidates: number;
+}
+
+export interface LookGeneration {
+  id: string;
+  status: "RUNNING" | "DONE" | "FAILED";
+  provider: string;
+  error?: string;
+  candidateCount: number;
+  createdAt: string;
+  finishedAt?: string;
+}

@@ -21,6 +21,10 @@
   --color-studio: #efefef;
   /* Functional only: destructive actions and errors, as in the prototype's cancel controls. */
   --color-danger: #b3261e;
+  /* "Shop the look" only, used as a hairline and a dot, never as a fill. */
+  --color-gold: #b08d57;
+  /* Text-safe gold (4.5:1 on paper) for the savings line. */
+  --color-gold-deep: #7a5c2e;
 
   --font-display: "Michroma", "Archivo Variable", sans-serif;
   --font-sans: "Archivo Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -292,6 +296,94 @@
   .group:hover .card-rule {
     transform: scaleX(1);
   }
+}
+
+/* Shop the look: a new look's photo settles in while its pieces rise one after another. While the
+   next look loads, the current one dims instead of disappearing. */
+.look-photo > * {
+  animation: look-photo 1100ms var(--ease-out) both;
+}
+@keyframes look-photo {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+.look-piece {
+  animation: look-piece 800ms var(--ease-out) both;
+  animation-delay: calc(120ms + var(--i, 0) * 90ms);
+}
+@keyframes look-piece {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+}
+.look-switching {
+  opacity: 0.45;
+  transition: opacity 300ms ease;
+  pointer-events: none;
+}
+.look-needs-size {
+  animation: look-nudge 420ms ease;
+}
+@keyframes look-nudge {
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+
+/* Try the look: the models share the page as one backdrop. Multiply drops the photos' light studio
+   background into the page colour and a soft mask hides the photo's edges, so no frame shows. */
+.look-figure img {
+  mix-blend-mode: multiply;
+  background: transparent;
+  -webkit-mask-image: radial-gradient(ellipse 72% 62% at 50% 52%, #000 62%, transparent 100%);
+  mask-image: radial-gradient(ellipse 72% 62% at 50% 52%, #000 62%, transparent 100%);
+}
+/* Neighbours overlap a little, like people standing in a row. */
+.look-lineup-item {
+  width: min(46vw, 15rem);
+  margin-inline-end: -1.5rem;
+  transition:
+    opacity 600ms var(--ease-out),
+    filter 600ms var(--ease-out),
+    transform 900ms var(--ease-out);
+  animation: look-piece 1000ms var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 110ms);
+}
+.look-lineup-item:last-child {
+  margin-inline-end: 0;
+}
+@media (min-width: 1024px) {
+  .look-lineup-item {
+    width: 17rem;
+    margin-inline-end: -2.5rem;
+  }
+}
+.look-lineup-item.is-dimmed {
+  opacity: 0.38;
+  filter: blur(1.5px) grayscale(0.4);
+}
+.look-lineup-item:hover,
+.look-lineup-item:focus-within {
+  transform: translateY(-0.5rem) scale(1.03);
+  position: relative;
+  z-index: 1;
+}
+.look-lineup-caption {
+  opacity: 0.75;
+  transition: opacity 400ms ease;
+}
+.look-lineup-item:hover .look-lineup-caption,
+.look-lineup-item:focus-within .look-lineup-caption {
+  opacity: 1;
+}
+.look-focus {
+  animation: look-photo 900ms var(--ease-out) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
