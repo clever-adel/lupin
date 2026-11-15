@@ -161,6 +161,8 @@ public final class CatalogDtos {
             @Size(max = 300) String fabricAr,
             @Size(max = 300) String fitEn,
             @Size(max = 300) String fitAr,
+            /** Who made the piece (e.g. Bershka). Empty means unknown; it is then left out of search markup. */
+            @Size(max = 80) String brand,
             @Pattern(regexp = BADGES) String badge,
             @Size(max = 30) String badgeEn,
             @Size(max = 30) String badgeAr,
@@ -181,7 +183,7 @@ public final class CatalogDtos {
 
     public record AdminProductDetail(long id, String slug, String status, String departmentSlug,
             String categorySlug, String nameEn, String nameAr, String descriptionEn, String descriptionAr,
-            String fabricEn, String fabricAr, String fitEn, String fitAr, String badge, String badgeEn,
+            String fabricEn, String fabricAr, String fitEn, String fitAr, String brand, String badge, String badgeEn,
             String badgeAr, BigDecimal price, BigDecimal salePrice, boolean featured, List<AdminColor> colors) {
     }
 
