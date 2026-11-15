@@ -13,7 +13,16 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 export function meta({ params, matches, location, data }: Route.MetaArgs) {
   const lang = toLang(params.lang);
   const title = data ? pick(lang, data.policy, "title") : "LUPIN.";
-  return seo({ origin: layoutOrigin(matches), pathname: location.pathname, title, description: title });
+  return seo({ origin: layoutOrigin(matches), pathname: location.pathname, title, description: summary(data && pick(lang, data.policy, "body"), title) });
+}
+
+/** The policy's own opening words as its description, cut at a word boundary near 155 characters. */
+function summary(body: string | undefined, fallback: string): string {
+  const text = (body ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return fallback;
+  if (text.length <= 160) return text;
+  const cut = text.slice(0, 155);
+  return cut.slice(0, cut.lastIndexOf(" ")).replace(/[,.;:]$/, "") + "…";
 }
 
 /** Plain text split into paragraphs. The text is never treated as HTML. */

@@ -62,8 +62,8 @@ export function meta({ params, matches, location, data }: Route.MetaArgs) {
   return seo({
     origin: layoutOrigin(matches),
     pathname: location.pathname,
-    title: name,
-    description: `${name} — LUPIN. ${translate(lang, "brand.slogan")}`,
+    title: translate(lang, "seo.shop.title", { name }),
+    description: translate(lang, "seo.shop.description", { name }),
     // Filtered and paginated views are not separate pages for search engines.
     noindex: location.search.length > 1,
   });

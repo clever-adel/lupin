@@ -48,6 +48,10 @@ export function ProductPhoto({ url, alt, sizes, eager, className = "" }: PhotoPr
       srcSet={WIDTHS.map((w) => `${cloudinary(url, w)} ${w}w`).join(", ")}
       sizes={sizes}
       alt={alt}
+      // Every product photo is shown in a 4:5 frame. The attributes give browsers and crawlers that
+      // shape before the file arrives; CSS still sets the real size.
+      width={960}
+      height={1200}
       loading={eager ? "eager" : "lazy"}
       decoding="async"
       fetchPriority={eager ? "high" : undefined}

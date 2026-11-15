@@ -12,7 +12,12 @@ export async function loader({ context }: Route.LoaderArgs) {
 export function meta({ params, matches, location, data }: Route.MetaArgs) {
   const lang = toLang(params.lang);
   const title = translate(lang, "faq.title");
-  const tags = seo({ origin: layoutOrigin(matches), pathname: location.pathname, title, description: title });
+  const tags = seo({
+    origin: layoutOrigin(matches),
+    pathname: location.pathname,
+    title,
+    description: translate(lang, "seo.faq.description"),
+  });
   const items = data?.items ?? [];
   if (items.length === 0) return tags;
   const suffix = lang === "ar" ? "Ar" : "En";
