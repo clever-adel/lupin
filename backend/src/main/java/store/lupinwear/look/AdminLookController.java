@@ -31,6 +31,7 @@ import store.lupinwear.look.LookDtos.LookStatusRequest;
 import store.lupinwear.look.tryon.LookGenerationService;
 import store.lupinwear.look.tryon.TryOnGenerator.Image;
 import store.lupinwear.security.CurrentUser;
+import store.lupinwear.security.RateLimiter;
 
 /** Staff only. Guarded twice: the /api/v1/admin/** URL rule and the class-level role check. */
 @RestController
@@ -38,12 +39,17 @@ import store.lupinwear.security.CurrentUser;
 @PreAuthorize("hasAnyRole('ADMIN','OWNER')")
 public class AdminLookController {
 
+    /** AI photo runs one staff member may start in 10 minutes; each run is billed by FASHN. */
+    static final int AI_RUNS_PER_10_MINUTES = 10;
+
     private final LookAdminService looks;
     private final LookGenerationService ai;
+    private final RateLimiter rateLimiter;
 
-    public AdminLookController(LookAdminService looks, LookGenerationService ai) {
+    public AdminLookController(LookAdminService looks, LookGenerationService ai, RateLimiter rateLimiter) {
         this.looks = looks;
         this.ai = ai;
+        this.rateLimiter = rateLimiter;
     }
 
     @GetMapping
@@ -97,6 +103,8 @@ public class AdminLookController {
     @PostMapping("/{id}/generations")
     @ResponseStatus(HttpStatus.ACCEPTED)
     GenerationView generate(@AuthenticationPrincipal CurrentUser user, @PathVariable long id) {
+        // Every run is billed by FASHN, so one staff account cannot start runs without end.
+        rateLimiter.check("ai-look:" + user.id(), AI_RUNS_PER_10_MINUTES);
         return ai.start(user.id(), id);
     }
 
