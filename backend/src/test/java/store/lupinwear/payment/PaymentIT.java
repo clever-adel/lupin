@@ -117,6 +117,28 @@ class PaymentIT extends IntegrationTest {
     }
 
     @Test
+    void theInstapayLinkMustBeInstapaysOwnAndIsShownToCustomers() throws Exception {
+        mvc.perform(put("/api/v1/admin/settings/payment_methods").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"instapayLink\":\"https://elsewhere.example/pay\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/v1/admin/settings/payment_methods").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"instapayLink\":\"https://ipn.eg/S/lupin.test/instapay/Ab12Cd\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/content/site"))
+                .andExpect(jsonPath("$.instapay.link").value("https://ipn.eg/S/lupin.test/instapay/Ab12Cd"));
+        mvc.perform(put("/api/v1/admin/settings/payment_methods").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"instapayQrUrl\":\"https://elsewhere.example/qr.png\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/v1/admin/settings/payment_methods").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"instapayQrUrl\":\"/media/qr-1.png\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/content/site")).andExpect(jsonPath("$.instapay.qrUrl").value("/media/qr-1.png"));
+        setting("payment_methods", "instapayQrUrl", "\"\"");
+        setting("payment_methods", "instapayLink", "\"\"");
+    }
+
+    @Test
     void vodafoneCashWorksLikeAManualTransferToTheStoreNumber() throws Exception {
         // Off until a number is set, even with the switch on.
         setting("payment_methods", "VODAFONE_CASH_MANUAL", "true");

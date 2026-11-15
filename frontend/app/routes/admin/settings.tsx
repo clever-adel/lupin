@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import { useOutletContext } from "react-router";
 import type { AdminContext } from "./layout";
 import { errorText, PAYMENT_LABEL, type AdminDeliveryOption, type GovernorateFee } from "~/features/admin/shared";
-import { api } from "~/lib/http";
+import { api, deleteUploadedImage, uploadImages } from "~/lib/http";
 import type { Governorate, PaymentMethod, SiteContent } from "~/lib/types";
 
 type Settings = Record<string, Record<string, unknown>>;
@@ -162,12 +162,75 @@ function DeliveryOptionForm({ option, governorates }: { option: AdminDeliveryOpt
   );
 }
 
+/** The QR image InstaPay gives you. Saved as soon as it is chosen; the replaced file is removed from storage. */
+function InstapayQr({ value }: { value: Record<string, unknown> }) {
+  const client = useQueryClient();
+  const current = typeof value.instapayQrUrl === "string" ? value.instapayQrUrl : "";
+  const currentId = typeof value.instapayQrPublicId === "string" ? value.instapayQrPublicId : "";
+  const [error, setError] = useState("");
+  const replace = useMutation({
+    mutationFn: async (file: File | null) => {
+      let next = { instapayQrUrl: "", instapayQrPublicId: "" };
+      if (file) {
+        const [uploaded] = await uploadImages([file]);
+        if (!uploaded) throw new Error("Could not upload the QR image.");
+        next = { instapayQrUrl: uploaded.url, instapayQrPublicId: uploaded.publicId };
+      }
+      try {
+        await api("PUT", "/api/v1/admin/settings/payment_methods", next);
+      } catch (e) {
+        if (next.instapayQrPublicId) await deleteUploadedImage(next.instapayQrPublicId).catch(() => undefined);
+        throw e;
+      }
+      if (currentId) await deleteUploadedImage(currentId).catch(() => undefined);
+    },
+    onMutate: () => setError(""),
+    onError: (e) => setError(e instanceof Error ? e.message : errorText(e)),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["admin", "settings"] });
+      client.invalidateQueries({ queryKey: ["site"] });
+    },
+  });
+  return (
+    <div>
+      <span className="mb-1 block text-xs font-medium">InstaPay QR image (optional)</span>
+      <div className="flex items-center gap-3">
+        {current ? (
+          <img src={current} alt="Current InstaPay QR" className="h-16 w-16 border border-line bg-white object-contain" />
+        ) : (
+          <span className="grid h-16 w-16 place-items-center border border-dashed border-line text-[10px] text-stone">No QR</span>
+        )}
+        <label className={`cursor-pointer text-sm underline ${replace.isPending ? "pointer-events-none opacity-50" : ""}`}>
+          {replace.isPending ? "Saving…" : current ? "Change" : "Upload"}
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) replace.mutate(file);
+            }}
+          />
+        </label>
+        {current && (
+          <button type="button" className="cursor-pointer text-sm underline" disabled={replace.isPending} onClick={() => replace.mutate(null)}>
+            Remove
+          </button>
+        )}
+      </div>
+      {error && <p role="alert" className="mt-1 text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
 function PaymentForm({ value, isOwner }: { value: Record<string, unknown>; isOwner: boolean }) {
   const save = useSaveSetting("payment_methods");
   const [on, setOn] = useState<Record<string, boolean>>(Object.fromEntries(METHODS.map((m) => [m, value[m] === true])));
   const [handle, setHandle] = useState(String(value.instapayHandle ?? ""));
   const [noteEn, setNoteEn] = useState(String(value.instapayInstructionsEn ?? ""));
   const [noteAr, setNoteAr] = useState(String(value.instapayInstructionsAr ?? ""));
+  const [link, setLink] = useState(String(value.instapayLink ?? ""));
   const [vfNumber, setVfNumber] = useState(String(value.vodafoneCashNumber ?? ""));
   const [vfEn, setVfEn] = useState(String(value.vodafoneCashInstructionsEn ?? ""));
   const [vfAr, setVfAr] = useState(String(value.vodafoneCashInstructionsAr ?? ""));
@@ -183,6 +246,7 @@ function PaymentForm({ value, isOwner }: { value: Record<string, unknown>; isOwn
           instapayHandle: handle.trim(),
           instapayInstructionsEn: noteEn,
           instapayInstructionsAr: noteAr,
+          instapayLink: link.trim(),
           vodafoneCashNumber: vfNumber.replace(/[\s-]/g, ""),
           vodafoneCashInstructionsEn: vfEn,
           vodafoneCashInstructionsAr: vfAr,
@@ -219,6 +283,15 @@ function PaymentForm({ value, isOwner }: { value: Record<string, unknown>; isOwn
             <label htmlFor="ip-ar" className="mb-1 block text-xs font-medium">Transfer instructions (Arabic)</label>
             <input id="ip-ar" className="field" dir="rtl" maxLength={500} value={noteAr} onChange={(e) => setNoteAr(e.target.value)} />
           </div>
+        </div>
+        <div className="grid gap-3 pt-3 sm:grid-cols-3">
+          <div className="sm:col-span-2">
+            <label htmlFor="ip-link" className="mb-1 block text-xs font-medium">
+              InstaPay payment link (optional, from InstaPay’s “Share” — starts with https://ipn.eg/S/)
+            </label>
+            <input id="ip-link" className="field" dir="ltr" maxLength={200} placeholder="https://ipn.eg/S/…" value={link} onChange={(e) => setLink(e.target.value)} />
+          </div>
+          <InstapayQr value={value} />
         </div>
         <div className="grid gap-3 pt-3 sm:grid-cols-3">
           <div>

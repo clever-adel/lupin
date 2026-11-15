@@ -240,6 +240,16 @@ public class AdminSettingsController {
                 throw ApiException.badRequest("INVALID_SETTING",
                         "The Vodafone Cash number is an Egyptian mobile number of 11 digits, like 01012345678.");
             }
+            // Only InstaPay's own payment links: customers are sent there to pay, so no other address.
+            String link = value.path("instapayLink").asText("").trim();
+            if (!link.isEmpty() && !link.matches("https://ipn\\.eg/S/[A-Za-z0-9._~/-]{1,150}")) {
+                throw ApiException.badRequest("INVALID_SETTING",
+                        "The InstaPay link is the one InstaPay gives you, starting with https://ipn.eg/S/");
+            }
+            String qr = value.path("instapayQrUrl").asText("");
+            if (!qr.isEmpty() && !qr.matches("/media/[A-Za-z0-9._-]{1,200}")) {
+                throw ApiException.badRequest("INVALID_SETTING", "The InstaPay QR must be uploaded from the dashboard.");
+            }
             if (value.path("VODAFONE_CASH_MANUAL").asBoolean() && number.isEmpty()) {
                 throw ApiException.badRequest("INVALID_SETTING", "Enter the Vodafone Cash number before switching it on.");
             }

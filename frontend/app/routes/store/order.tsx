@@ -93,6 +93,22 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
         {destination && pick(destination, "instructions") && (
           <p className="mt-1 text-xs text-stone">{pick(destination, "instructions")}</p>
         )}
+        {/* InstaPay's own link opens the app with the address filled in; the QR is for people on a computer. */}
+        {!wallet && (site.data?.instapay?.link || site.data?.instapay?.qrUrl) && (
+          <div className="mt-3 flex flex-wrap items-center gap-4">
+            {site.data.instapay.link && (
+              <a href={site.data.instapay.link} target="_blank" rel="noopener noreferrer" className="btn btn-outline">
+                {t("pay.openInstapay")}
+              </a>
+            )}
+            {site.data.instapay.qrUrl && (
+              <figure className="hidden items-center gap-3 md:flex">
+                <img src={site.data.instapay.qrUrl} alt="InstaPay QR" width={112} height={112} className="h-28 w-28 bg-white object-contain p-1" />
+                <figcaption className="max-w-[10rem] text-xs text-stone">{t("pay.scanQr")}</figcaption>
+              </figure>
+            )}
+          </div>
+        )}
         <label htmlFor="transfer-ref" className="mb-1.5 mt-4 block font-medium">{t("pay.transferRef")}</label>
         <div className="flex flex-wrap gap-2">
           <input

@@ -22,7 +22,8 @@ public class PaymentMethods {
     /** Paid by the customer sending money themselves; staff confirm each transfer in the dashboard. */
     public static final List<String> MANUAL = List.of("INSTAPAY_MANUAL", "VODAFONE_CASH_MANUAL");
 
-    public record Instapay(String handle, String instructionsEn, String instructionsAr) {
+    /** {@code link}: optional InstaPay payment link (https://ipn.eg/...); {@code qrUrl}: optional uploaded QR image. */
+    public record Instapay(String handle, String instructionsEn, String instructionsAr, String link, String qrUrl) {
     }
 
     public record VodafoneCash(String number, String instructionsEn, String instructionsAr) {
@@ -54,7 +55,8 @@ public class PaymentMethods {
             return Optional.empty();
         }
         return Optional.of(new Instapay(config.path("instapayHandle").asText().trim(),
-                config.path("instapayInstructionsEn").asText(""), config.path("instapayInstructionsAr").asText("")));
+                config.path("instapayInstructionsEn").asText(""), config.path("instapayInstructionsAr").asText(""),
+                config.path("instapayLink").asText("").trim(), config.path("instapayQrUrl").asText("").trim()));
     }
 
     /** Present only while manual Vodafone Cash is usable; shown to customers so they know where to send money. */

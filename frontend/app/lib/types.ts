@@ -228,7 +228,13 @@ export interface SiteContent {
   freeDeliveryThreshold?: number;
   paymentMethods: Record<PaymentMethod, boolean>;
   /** Present only while manual InstaPay is usable. */
-  instapay?: { handle: string; instructionsEn: string; instructionsAr: string };
+  instapay?: {
+    handle: string; instructionsEn: string; instructionsAr: string;
+    /** InstaPay payment link (https://ipn.eg/S/...); empty when not set. */
+    link?: string;
+    /** The InstaPay QR image uploaded in the dashboard; empty when not set. */
+    qrUrl?: string;
+  };
   /** Present only while manual Vodafone Cash is usable. */
   vodafoneCash?: { number: string; instructionsEn: string; instructionsAr: string };
 }
