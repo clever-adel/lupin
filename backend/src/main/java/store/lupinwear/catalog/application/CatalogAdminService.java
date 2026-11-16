@@ -149,6 +149,55 @@ public class CatalogAdminService {
                 Map.of("colorId", colorId, "nameEn", req.nameEn().trim(), "hex", req.hex(), "main", req.main()));
     }
 
+    /**
+     * Deletes a colour for good: its photos, sizes, stock and stock history, and any shopping bag lines for it.
+     * Orders already placed keep their lines (they hold their own copy of name, colour, size and price).
+     * Refused for the main colour, the only colour, or while stock of it is held for orders not yet shipped.
+     * Returns the photo ids that were attached, so uploaded files can be removed from storage.
+     */
+    public List<String> deleteColor(UUID actor, long productId, long colorId) {
+        jdbc.sql("select id from products where id = :id and deleted_at is null for update").param("id", productId)
+                .query(Long.class).optional().orElseThrow(() -> ApiException.notFound("Product"));
+        record Head(String nameEn, boolean main) {
+        }
+        Head color = jdbc.sql("select name_en, is_main from product_colors where id = :c and product_id = :p for update")
+                .param("c", colorId).param("p", productId).query((rs, n) -> new Head(rs.getString(1), rs.getBoolean(2)))
+                .optional().orElseThrow(() -> ApiException.notFound("Colour"));
+        long colours = jdbc.sql("select count(*) from product_colors where product_id = :p").param("p", productId)
+                .query(Long.class).single();
+        if (colours <= 1) {
+            throw ApiException.conflict("LAST_COLOR", "A product needs at least one colour. Delete the product instead.");
+        }
+        if (color.main()) {
+            throw ApiException.conflict("MAIN_COLOR", "Make another colour the main one first, then delete this one.");
+        }
+        long reserved = jdbc.sql("""
+                select coalesce(sum(i.reserved), 0) from inventory i join product_variants v on v.id = i.variant_id
+                where v.color_id = :c
+                """).param("c", colorId).query(Long.class).single();
+        if (reserved > 0) {
+            throw ApiException.conflict("COLOR_RESERVED", reserved == 1
+                    ? "1 piece of this colour is held for an order that has not shipped yet. Ship or cancel it first."
+                    : reserved + " pieces of this colour are held for orders that have not shipped yet. Ship or cancel them first.");
+        }
+        long onHand = jdbc.sql("""
+                select coalesce(sum(i.on_hand), 0) from inventory i join product_variants v on v.id = i.variant_id
+                where v.color_id = :c
+                """).param("c", colorId).query(Long.class).single();
+        List<String> photos = jdbc.sql("select public_id from product_images where color_id = :c").param("c", colorId)
+                .query(String.class).list();
+        // Stock history rows do not cascade; everything else (photos, sizes, stock, bag lines, look items) does,
+        // and order lines keep their own copy with the variant link cleared.
+        jdbc.sql("delete from inventory_movements where variant_id in (select id from product_variants where color_id = :c)")
+                .param("c", colorId).update();
+        jdbc.sql("delete from product_colors where id = :c").param("c", colorId).update();
+        jdbc.sql("update products set updated_at = now(), version = version + 1 where id = :id").param("id", productId)
+                .update();
+        audit.record(actor, "COLOR_DELETE", "product", productId,
+                Map.of("colorId", colorId, "nameEn", color.nameEn(), "stockOnHand", onHand));
+        return photos;
+    }
+
     /** Creates a draft product with its colours, photos, one variant per colour × size, and stock rows. */
     public ProductCreated createProduct(UUID actor, ProductRequest req) {
         validate(req);

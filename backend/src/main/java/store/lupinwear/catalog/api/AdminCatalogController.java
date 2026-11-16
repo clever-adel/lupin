@@ -109,6 +109,13 @@ public class AdminCatalogController {
         catalog.updateColor(user.id(), id, colorId, body);
     }
 
+    /** Returns the deleted colour's photo ids, so the dashboard can remove uploaded files from storage. */
+    @org.springframework.web.bind.annotation.DeleteMapping("/products/{id}/colors/{colorId}")
+    Map<String, List<String>> deleteColor(@AuthenticationPrincipal CurrentUser user, @PathVariable long id,
+            @PathVariable long colorId) {
+        return Map.of("photos", catalog.deleteColor(user.id(), id, colorId));
+    }
+
     @PostMapping("/products/{id}/colors")
     @ResponseStatus(HttpStatus.CREATED)
     CatalogDtos.ColorAdded addColor(@AuthenticationPrincipal CurrentUser user, @PathVariable long id,

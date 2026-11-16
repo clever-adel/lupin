@@ -94,6 +94,38 @@ class CatalogIT extends IntegrationTest {
     }
 
     @Test
+    void aColourCanBeDeletedButNeverTheMainOneOneHeldForOrdersOrTheLast() throws Exception {
+        JsonNode created = create(request("Colour Delete Jacket", "1500.00", null, 3));
+        long id = created.get("id").asLong();
+        String slug = created.get("slug").asText();
+        publish(id);
+        JsonNode colors = body(mvc.perform(get("/api/v1/admin/products/" + id).cookie(owner)).andReturn()).get("colors");
+        long main = colors.get(0).get("id").asLong();
+        long second = colors.get(1).get("id").asLong();
+        String base = "/api/v1/admin/products/" + id + "/colors/";
+
+        mvc.perform(delete(base + main).with(csrf()).cookie(owner))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("MAIN_COLOR"));
+
+        // Stock held for an order that has not shipped blocks the delete.
+        long variant = jdbc.sql("select id from product_variants where color_id = :c limit 1").param("c", second)
+                .query(Long.class).single();
+        jdbc.sql("update inventory set reserved = 1 where variant_id = :v").param("v", variant).update();
+        mvc.perform(delete(base + second).with(csrf()).cookie(owner))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("COLOR_RESERVED"));
+        jdbc.sql("update inventory set reserved = 0 where variant_id = :v").param("v", variant).update();
+
+        mvc.perform(delete(base + second).with(csrf()).cookie(owner))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.photos").isArray());
+        mvc.perform(get("/api/v1/catalog/products/" + slug)).andExpect(jsonPath("$.colors.length()").value(1));
+        assertThat(jdbc.sql("select count(*) from product_variants where color_id = :c").param("c", second)
+                .query(Long.class).single()).isZero();
+
+        mvc.perform(delete(base + main).with(csrf()).cookie(owner))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("LAST_COLOR"));
+    }
+
+    @Test
     void aColourCanBeRenamedReshadedAndMadeTheMainOne() throws Exception {
         JsonNode created = create(request("Colour Edit Jacket", "1500.00", null, 2));
         long id = created.get("id").asLong();

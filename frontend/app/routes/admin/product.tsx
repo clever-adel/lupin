@@ -164,13 +164,27 @@ function ColourPhotos({ colour, onChange }: { colour: Colour; onChange: (images:
 }
 
 /** A saved colour's name, shade and "main colour" mark. Saved on its own with its own button. */
-function ColourDetails({ productId, colour, otherNames, onSaved }: {
+function ColourDetails({ productId, colour, otherNames, onSaved, onDeleted }: {
   productId: number;
   colour: Colour;
   otherNames: string[];
   onSaved: (next: Colour) => void;
+  onDeleted: (id: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const remove = useMutation({
+    mutationFn: async () => {
+      await api<{ photos: string[] }>("DELETE", `/api/v1/admin/products/${productId}/colors/${colour.id}`);
+      // Photo files uploaded from the dashboard are not used anywhere any more.
+      await Promise.allSettled(
+        colour.images.filter((i) => i.url.startsWith("/media/")).map((i) => deleteUploadedImage(i.publicId)),
+      );
+    },
+    onSuccess: () => onDeleted(colour.id as number),
+  });
+  // The main colour and a product's only colour cannot be deleted (the server refuses too).
+  const deletable = !colour.main && otherNames.length > 0;
   const [nameEn, setNameEn] = useState(colour.nameEn);
   const [nameAr, setNameAr] = useState(colour.nameAr);
   const [hex, setHex] = useState(colour.hex);
@@ -199,9 +213,35 @@ function ColourDetails({ productId, colour, otherNames, onSaved }: {
         <span className="text-stone" dir="rtl">{colour.nameAr}</span>
         <span className="text-xs text-stone" dir="ltr">{colour.hex}</span>
         {colour.main && <span className="label border border-ink px-2 py-0.5 text-[11px]">Main colour</span>}
-        <button type="button" className="ms-auto cursor-pointer text-sm underline" onClick={() => setEditing(true)}>
-          Edit colour <span className="sr-only">{colour.nameEn}</span>
-        </button>
+        <span className="ms-auto flex flex-wrap items-center gap-3">
+          {confirmDelete ? (
+            <span role="group" aria-label={`Delete colour ${colour.nameEn}?`} className="flex flex-wrap items-center gap-2 text-sm">
+              <span>Delete “{colour.nameEn}” with its photos, sizes and stock?</span>
+              <button type="button" className="btn h-9 border-danger bg-danger text-bone" disabled={remove.isPending} onClick={() => remove.mutate()}>
+                {remove.isPending ? "Deleting…" : "Yes, delete"}
+              </button>
+              <button type="button" className="cursor-pointer underline" disabled={remove.isPending} onClick={() => setConfirmDelete(false)}>
+                Keep it
+              </button>
+            </span>
+          ) : (
+            <>
+              <button type="button" className="cursor-pointer text-sm underline" onClick={() => setEditing(true)}>
+                Edit colour <span className="sr-only">{colour.nameEn}</span>
+              </button>
+              {deletable ? (
+                <button type="button" className="cursor-pointer text-sm text-danger underline" onClick={() => setConfirmDelete(true)}>
+                  Delete colour <span className="sr-only">{colour.nameEn}</span>
+                </button>
+              ) : (
+                <span className="text-xs text-stone">
+                  {colour.main && otherNames.length > 0 ? "To delete it, make another colour main first" : ""}
+                </span>
+              )}
+            </>
+          )}
+        </span>
+        {remove.isError && <p role="alert" className="basis-full text-sm text-danger">{errorText(remove.error)}</p>}
       </div>
     );
   }
@@ -732,6 +772,10 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
                       ),
                     )
                   }
+                  onDeleted={(id) => {
+                    setColours((list) => list.filter((item) => item.id !== id));
+                    client.invalidateQueries({ queryKey: ["admin", "products"] });
+                  }}
                 />
                 <ColourPhotos
                   colour={colour}
