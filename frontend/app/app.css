@@ -289,7 +289,8 @@
   transform-origin: right;
 }
 @media (hover: hover) {
-  .group:hover .card-hover-photo {
+  /* Only over the photo itself: pointing at a colour swatch must show that colour's main photo. */
+  .card-media:hover .card-hover-photo {
     opacity: 1;
     transform: scale(1.03);
   }

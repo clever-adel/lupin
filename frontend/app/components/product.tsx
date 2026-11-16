@@ -110,7 +110,7 @@ export function ProductCard({ product, eager, heading: Heading = "h3" }: { produ
   return (
     <article className="group relative">
       <Link to={link} className="block">
-        <div className="relative aspect-[4/5] overflow-hidden bg-studio">
+        <div className="card-media relative aspect-[4/5] overflow-hidden bg-studio">
           <ProductPhoto
             key={colour?.imageUrl}
             url={colour?.imageUrl}
