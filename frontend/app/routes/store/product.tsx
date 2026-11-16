@@ -313,6 +313,13 @@ function ProductView({ product }: { product: ProductDetail }) {
             {notice === "copied" && t("product.linkCopied")}
             {notice === null && <span className="text-stone">{t(anyAvailable ? "product.inStock" : "product.allTaken")}</span>}
           </p>
+          {/* The store's return window, stated where the buying decision is made, with the full policy one tap away. */}
+          <p className="mt-1 text-sm text-stone">
+            {t("product.returnsWindow")}{" "}
+            <Link to={href("/policies/exchange-returns")} className="underline hover:text-ink">
+              {t("product.returnsPolicy")}
+            </Link>
+          </p>
 
           {seenIn && (
             <Link to={href(`/looks/${seenIn.slug}`)} className="group mt-6 flex items-center gap-4 border border-line bg-card p-3">
