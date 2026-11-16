@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, type CSSProperties } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/product";
 import { ShareIcon } from "~/components/icons";
 import { FavouriteButton, Price, ProductPhoto } from "~/components/product";
@@ -77,7 +77,12 @@ export default function Product({ loaderData }: Route.ComponentProps) {
 
 function ProductView({ product }: { product: ProductDetail }) {
   const { t, href, pick: p, money } = useT();
-  const [colorId, setColorId] = useState(product.colors[0]?.id);
+  // A card's colour swatch links here with ?color=<name>, so the page opens on the colour the shopper chose.
+  const [search] = useSearchParams();
+  const wanted = search.get("color")?.toLowerCase();
+  const [colorId, setColorId] = useState(
+    (wanted && product.colors.find((c) => c.nameEn.toLowerCase() === wanted)?.id) || product.colors[0]?.id,
+  );
   const [photo, setPhoto] = useState(0);
   const [variantId, setVariantId] = useState<number | null>(null);
   const [quantity, setQuantity] = useState(1);

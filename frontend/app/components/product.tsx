@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { Link } from "react-router";
 import { bagActions, useBagState } from "~/features/bag/store";
 import { useT } from "~/lib/i18n";
@@ -101,20 +101,28 @@ export function ProductCard({ product, eager, heading: Heading = "h3" }: { produ
         ? t(`badge.${product.badge}`)
         : null;
   const discount = product.discountPercent != null ? `−${product.discountPercent}%` : null;
+  // The colour being looked at: pointing at, focusing or tapping a swatch shows that colour's photos,
+  // and opening the card then lands on that colour.
+  const [active, setActive] = useState(0);
+  const colour = product.colors[active] ?? product.colors[0];
+  const link = href(`/product/${product.slug}`) + (active > 0 && colour ? `?color=${encodeURIComponent(colour.nameEn)}` : "");
+  const MAX_SWATCHES = 6;
   return (
     <article className="group relative">
-      <Link to={href(`/product/${product.slug}`)} className="block">
+      <Link to={link} className="block">
         <div className="relative aspect-[4/5] overflow-hidden bg-studio">
           <ProductPhoto
-            url={product.colors[0]?.imageUrl}
-            alt={name}
+            key={colour?.imageUrl}
+            url={colour?.imageUrl}
+            alt={product.colors.length > 1 && colour ? `${name} — ${pick(colour, "name")}` : name}
             sizes="(min-width: 1024px) 25vw, 50vw"
             eager={eager}
             className="h-full w-full transition-transform duration-[1200ms] ease-[var(--ease-out)] group-hover:scale-[1.03]"
           />
-          {product.colors[0]?.hoverImageUrl && (
+          {colour?.hoverImageUrl && (
             <ProductPhoto
-              url={product.colors[0].hoverImageUrl}
+              key={colour.hoverImageUrl}
+              url={colour.hoverImageUrl}
               alt=""
               sizes="(min-width: 1024px) 25vw, 50vw"
               className="card-hover-photo absolute inset-0 h-full w-full"
@@ -140,23 +148,33 @@ export function ProductCard({ product, eager, heading: Heading = "h3" }: { produ
         <p className="label mt-3 text-stone">{pick(product, "category")}</p>
         <Heading className="mt-1 text-sm font-medium">{name}</Heading>
       </Link>
-      <div className="mt-1 flex items-center justify-between gap-2">
+      <div className="mt-1">
         <Price price={product.price} salePrice={product.salePrice} />
-        {product.colors.length > 1 && (
-          <span className="flex items-center gap-1.5 text-xs text-stone">
-            <span className="flex gap-1" aria-hidden="true">
-              {product.colors.slice(0, 4).map((c) => (
-                <span
-                  key={c.nameEn}
-                  className="h-2.5 w-2.5 rounded-full border border-line"
-                  style={{ backgroundColor: c.hex }}
-                />
-              ))}
-            </span>
-            {t("card.colours", { count: product.colors.length })}
-          </span>
-        )}
       </div>
+      {product.colors.length > 1 && (
+        <div className="mt-2.5 flex flex-wrap items-center gap-2" role="group" aria-label={t("card.colours", { count: product.colors.length })}>
+          {product.colors.slice(0, MAX_SWATCHES).map((c, i) => (
+            <button
+              key={c.nameEn}
+              type="button"
+              title={pick(c, "name")}
+              aria-label={t("card.showColour", { name: pick(c, "name") })}
+              aria-pressed={i === active}
+              onMouseEnter={() => setActive(i)}
+              onFocus={() => setActive(i)}
+              onClick={() => setActive(i)}
+              className={`h-6 w-6 cursor-pointer rounded-full border border-line ring-offset-2 ring-offset-paper transition-shadow ${
+                i === active ? "ring-1 ring-ink" : "hover:ring-1 hover:ring-stone"
+              }`}
+              style={{ backgroundColor: c.hex }}
+            />
+          ))}
+          {product.colors.length > MAX_SWATCHES && (
+            <span className="text-xs text-stone">+{product.colors.length - MAX_SWATCHES}</span>
+          )}
+          <span className="ms-auto text-xs text-stone">{colour ? pick(colour, "name") : ""}</span>
+        </div>
+      )}
       <FavouriteButton slug={product.slug} className="absolute end-0 top-0" />
     </article>
   );
