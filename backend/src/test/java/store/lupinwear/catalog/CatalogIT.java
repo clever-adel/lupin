@@ -25,6 +25,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -90,6 +91,42 @@ class CatalogIT extends IntegrationTest {
         mvc.perform(get("/api/v1/catalog/departments"))
                 .andExpect(jsonPath("$[?(@.slug=='men')].status").value("COMING_SOON"))
                 .andExpect(jsonPath("$[?(@.slug=='men')].productCount").value(0));
+    }
+
+    @Test
+    void aColourCanBeAddedToAProductAlreadyOnSale() throws Exception {
+        JsonNode created = create(request("Colour Later Jacket", "1500.00", null, 2));
+        long id = created.get("id").asLong();
+        String slug = created.get("slug").asText();
+        publish(id);
+        mvc.perform(get("/api/v1/admin/products/" + id).cookie(owner))
+                .andExpect(jsonPath("$.sizes[0]").value("S"))
+                .andExpect(jsonPath("$.sizes.length()").value(3));
+
+        String body = "{\"nameEn\":\"Olive\",\"nameAr\":\"زيتي\",\"hex\":\"#556B2F\","
+                + "\"images\":[{\"publicId\":\"lupin/test/olive\",\"url\":\"https://res.cloudinary.com/demo/olive.jpg\",\"altEn\":\"\",\"altAr\":\"\"}],"
+                + "\"stockBySize\":{\"M\":4}}";
+        mvc.perform(post("/api/v1/admin/products/" + id + "/colors").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.variantIds.length()").value(3));
+
+        // Shoppers see the new colour straight away, with only the size that has stock available.
+        mvc.perform(get("/api/v1/catalog/products/" + slug))
+                .andExpect(jsonPath("$.colors.length()").value(3))
+                .andExpect(jsonPath("$.colors[2].nameEn").value("Olive"))
+                .andExpect(jsonPath("$.colors[2].main").value(false))
+                .andExpect(jsonPath("$.colors[2].images.length()").value(1))
+                .andExpect(jsonPath("$.colors[2].variants[?(@.sizeCode=='M')].maxQuantity").value(4))
+                .andExpect(jsonPath("$.colors[2].variants[?(@.sizeCode=='S')].available").value(false));
+
+        mvc.perform(post("/api/v1/admin/products/" + id + "/colors").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON).content(body.replace("Olive", "olive")))
+                .andExpect(status().isConflict());
+        mvc.perform(post("/api/v1/admin/products/" + id + "/colors").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nameEn\":\"Sand\",\"nameAr\":\"رملي\",\"hex\":\"#C2B280\",\"stockBySize\":{\"XXL\":1}}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

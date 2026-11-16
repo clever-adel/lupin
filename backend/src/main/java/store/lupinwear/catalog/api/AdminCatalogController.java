@@ -102,6 +102,13 @@ public class AdminCatalogController {
         return catalog.products(q == null ? null : q.substring(0, Math.min(q.length(), 80)), status, page, pageSize);
     }
 
+    @PostMapping("/products/{id}/colors")
+    @ResponseStatus(HttpStatus.CREATED)
+    CatalogDtos.ColorAdded addColor(@AuthenticationPrincipal CurrentUser user, @PathVariable long id,
+            @Valid @RequestBody CatalogDtos.AddColorRequest body) {
+        return catalog.addColor(user.id(), id, body);
+    }
+
     @GetMapping("/products/{id}")
     CatalogDtos.AdminProductDetail product(@PathVariable long id) {
         return catalog.productForEdit(id);

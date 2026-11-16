@@ -28,6 +28,8 @@ interface Detail {
   salePrice?: number;
   featured: boolean;
   colors: Colour[];
+  /** The sizes the product is sold in; a colour added later gets the same ones. */
+  sizes?: string[];
 }
 
 interface ImageInput {
@@ -155,6 +157,121 @@ function ColourPhotos({ colour, onChange }: { colour: Colour; onChange: (images:
           ))}
         </ol>
       )}
+    </div>
+  );
+}
+
+/**
+ * Adds a colour to a product that is already saved (even one on sale). It gets the product's sizes, the stock
+ * typed here and its own photos. Saved on its own, straight away, separately from "Save changes".
+ */
+function AddColour({ productId, sizes, existingNames, onAdded }: {
+  productId: number;
+  sizes: string[];
+  existingNames: string[];
+  onAdded: (colour: Colour) => void;
+}) {
+  const client = useQueryClient();
+  const blank: Colour = { nameEn: "", nameAr: "", hex: "#0B0B0C", images: [] };
+  const [open, setOpen] = useState(false);
+  const [colour, setColour] = useState<Colour>(blank);
+  const [stock, setStock] = useState<Record<string, string>>({});
+  const duplicate = existingNames.some((n) => n.trim().toLowerCase() === colour.nameEn.trim().toLowerCase());
+  const ready = colour.nameEn.trim() && colour.nameAr.trim() && /^#[0-9A-Fa-f]{6}$/.test(colour.hex) && !duplicate;
+
+  const add = useMutation({
+    mutationFn: () =>
+      api<{ colorId: number }>("POST", `/api/v1/admin/products/${productId}/colors`, {
+        nameEn: colour.nameEn.trim(),
+        nameAr: colour.nameAr.trim(),
+        hex: colour.hex,
+        images: colour.images.map(({ publicId, url, altEn, altAr }) => ({ publicId, url, altEn, altAr })),
+        stockBySize: Object.fromEntries(sizes.map((s) => [s, Math.max(0, Number(stock[s] ?? 0) || 0)])),
+      }),
+    onSuccess: ({ colorId }) => {
+      onAdded({ ...colour, id: colorId });
+      setColour(blank);
+      setStock({});
+      setOpen(false);
+      client.invalidateQueries({ queryKey: ["admin", "products"] });
+    },
+  });
+
+  const cancel = () => {
+    // Photos uploaded for a colour that is not added are not used anywhere: remove them from storage.
+    void Promise.allSettled(colour.images.filter((i) => i.url.startsWith("/media/")).map((i) => deleteUploadedImage(i.publicId)));
+    setColour(blank);
+    setStock({});
+    setOpen(false);
+  };
+
+  if (!open) {
+    return (
+      <button type="button" className="btn btn-outline mt-4" onClick={() => setOpen(true)}>
+        + Add a colour
+      </button>
+    );
+  }
+  return (
+    <div className="mt-4 border border-ink p-4" role="group" aria-label="New colour">
+      <h3 className="text-sm font-semibold">New colour</h3>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <Text id="new-colour-en" label="Colour name (English)" value={colour.nameEn} onChange={(v) => setColour({ ...colour, nameEn: v })} />
+        <Text id="new-colour-ar" label="Colour name (Arabic)" rtl value={colour.nameAr} onChange={(v) => setColour({ ...colour, nameAr: v })} />
+        <div>
+          <label htmlFor="new-colour-hex" className="mb-1 block text-xs font-medium">Colour</label>
+          <div className="flex items-center gap-2">
+            <input
+              id="new-colour-hex"
+              type="color"
+              className="h-11 w-14 cursor-pointer border border-line bg-card"
+              value={/^#[0-9A-Fa-f]{6}$/.test(colour.hex) ? colour.hex : "#000000"}
+              onChange={(e) => setColour({ ...colour, hex: e.target.value.toUpperCase() })}
+            />
+            <input
+              aria-label="Colour code"
+              className="field"
+              dir="ltr"
+              maxLength={7}
+              value={colour.hex}
+              onChange={(e) => setColour({ ...colour, hex: e.target.value })}
+            />
+          </div>
+        </div>
+      </div>
+      {duplicate && <p className="mt-2 text-sm text-danger">This product already has a colour called “{colour.nameEn}”.</p>}
+
+      <fieldset className="mt-4">
+        <legend className="text-xs font-medium">Starting stock by size</legend>
+        <div className="mt-2 flex flex-wrap gap-3">
+          {sizes.map((s) => (
+            <label key={s} className="text-xs">
+              <span className="mb-1 block font-medium" dir="ltr">{s}</span>
+              <input
+                className="field h-10 w-20"
+                inputMode="numeric"
+                value={stock[s] ?? "0"}
+                onChange={(e) => setStock({ ...stock, [s]: e.target.value.replace(/[^0-9]/g, "") })}
+              />
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <ColourPhotos colour={colour} onChange={(images) => setColour({ ...colour, images })} />
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button type="button" className="btn btn-primary" disabled={!ready || add.isPending} onClick={() => add.mutate()}>
+          {add.isPending ? "Adding…" : "Add colour"}
+        </button>
+        <button type="button" className="cursor-pointer text-sm underline" disabled={add.isPending} onClick={cancel}>
+          Cancel
+        </button>
+        {add.isError && <span role="alert" className="text-sm text-danger">{errorText(add.error)}</span>}
+      </div>
+      <p className="mt-2 text-xs text-stone">
+        Customers see the new colour as soon as it is added, if the product is on sale. Sizes with 0 stock show as sold out.
+      </p>
     </div>
   );
 }
@@ -510,7 +627,7 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
 
       {existing && (
         <section className={box}>
-          <h2 className="font-semibold">Photos by colour</h2>
+          <h2 className="font-semibold">Colours and photos</h2>
           <p className="mt-1 text-sm text-stone">Upload up to 10 photos per colour from your device. These appear in the product gallery when shoppers select that colour.</p>
           <div className="mt-4 divide-y divide-line">
             {colours.map((colour, index) => (
@@ -522,6 +639,12 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
               </div>
             ))}
           </div>
+          <AddColour
+            productId={existing.id}
+            sizes={existing.sizes ?? []}
+            existingNames={colours.map((c) => c.nameEn)}
+            onAdded={(colour) => setColours((list) => [...list, colour])}
+          />
         </section>
       )}
 

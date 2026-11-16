@@ -184,7 +184,22 @@ public final class CatalogDtos {
     public record AdminProductDetail(long id, String slug, String status, String departmentSlug,
             String categorySlug, String nameEn, String nameAr, String descriptionEn, String descriptionAr,
             String fabricEn, String fabricAr, String fitEn, String fitAr, String brand, String badge, String badgeEn,
-            String badgeAr, BigDecimal price, BigDecimal salePrice, boolean featured, List<AdminColor> colors) {
+            String badgeAr, BigDecimal price, BigDecimal salePrice, boolean featured, List<AdminColor> colors,
+            /** The product's sizes, in size order: a colour added later gets one variant for each. */
+            List<String> sizes) {
+    }
+
+    /** A colour added to a product that already exists: same sizes as the others, its own stock and photos. */
+    public record AddColorRequest(
+            @NotBlank @Size(max = 60) String nameEn,
+            @NotBlank @Size(max = 60) String nameAr,
+            @NotBlank @Pattern(regexp = "^#[0-9A-Fa-f]{6}$") String hex,
+            @Size(max = 10, message = "A colour can have at most 10 photos") List<@Valid ImageRequest> images,
+            /** Starting stock per size code; a size left out starts at 0. */
+            java.util.Map<@NotBlank String, @NotNull @Min(0) @Max(100000) Integer> stockBySize) {
+    }
+
+    public record ColorAdded(long colorId, List<Long> variantIds) {
     }
 
     public record AdminVariantRow(long variantId, String color, String sizeCode, String sku, int onHand,

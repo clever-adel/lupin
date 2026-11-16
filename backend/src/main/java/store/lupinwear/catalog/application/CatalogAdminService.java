@@ -26,6 +26,8 @@ import store.lupinwear.catalog.api.CatalogDtos.AdminImage;
 import store.lupinwear.catalog.api.CatalogDtos.AdminProductRow;
 import store.lupinwear.catalog.api.CatalogDtos.ProductUpdateRequest;
 import store.lupinwear.catalog.api.CatalogDtos.AdminVariantRow;
+import store.lupinwear.catalog.api.CatalogDtos.AddColorRequest;
+import store.lupinwear.catalog.api.CatalogDtos.ColorAdded;
 import store.lupinwear.shared.ApiException;
 import store.lupinwear.shared.PageResponse;
 
@@ -273,7 +275,7 @@ public class CatalogAdminService {
                         rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8),
                         rs.getString(9), rs.getString(10), rs.getString(11), rs.getString(12), rs.getString(13),
                         rs.getString(20), rs.getString(14), rs.getString(18), rs.getString(19), rs.getBigDecimal(15),
-                        rs.getBigDecimal(16), rs.getBoolean(17), List.of()))
+                        rs.getBigDecimal(16), rs.getBoolean(17), List.of(), List.of()))
                 .optional().orElseThrow(() -> ApiException.notFound("Product"));
         record ColorHead(long id, String nameEn, String nameAr, String hex) {
         }
@@ -298,7 +300,83 @@ public class CatalogAdminService {
                 product.categorySlug(), product.nameEn(), product.nameAr(), product.descriptionEn(),
                 product.descriptionAr(), product.fabricEn(), product.fabricAr(), product.fitEn(), product.fitAr(),
                 product.brand(), product.badge(), product.badgeEn(), product.badgeAr(), product.price(), product.salePrice(),
-                product.featured(), colors);
+                product.featured(), colors, productSizes(id).stream().map(ProductSize::code).toList());
+    }
+
+    private record ProductSize(int id, String code) {
+    }
+
+    /** The sizes a product is sold in (from its active variants), in the size chart's order. */
+    private List<ProductSize> productSizes(long productId) {
+        return jdbc.sql("""
+                select distinct s.id, s.code, s.size_group, s.sort_order from product_variants v
+                join sizes s on s.id = v.size_id
+                where v.product_id = :p and v.active order by s.size_group, s.sort_order
+                """).param("p", productId).query((rs, n) -> new ProductSize(rs.getInt(1), rs.getString(2))).list();
+    }
+
+    /**
+     * Adds a colour to a product that already exists, even one already on sale: the colour, its photos, and
+     * one variant per size the product is sold in, each with its starting stock. The new colour is never the
+     * main one, so what shoppers see first does not change.
+     */
+    public ColorAdded addColor(UUID actor, long productId, AddColorRequest req) {
+        jdbc.sql("select id from products where id = :id and deleted_at is null for update").param("id", productId)
+                .query(Long.class).optional().orElseThrow(() -> ApiException.notFound("Product"));
+        boolean taken = jdbc.sql("select count(*) from product_colors where product_id = :p and lower(name_en) = lower(:n)")
+                .param("p", productId).param("n", req.nameEn().trim()).query(Long.class).single() > 0;
+        if (taken) {
+            throw ApiException.conflict("COLOR_EXISTS", "This product already has a colour with that name.");
+        }
+        List<ProductSize> sizes = productSizes(productId);
+        if (sizes.isEmpty()) {
+            throw ApiException.badRequest("PRODUCT_INCOMPLETE", "This product has no sizes to add a colour to.");
+        }
+        Map<String, Integer> stockBySize = new HashMap<>();
+        if (req.stockBySize() != null) {
+            req.stockBySize().forEach((code, qty) -> stockBySize.put(code.trim().toUpperCase(Locale.ROOT), qty));
+        }
+        for (String code : stockBySize.keySet()) {
+            if (sizes.stream().noneMatch(s -> s.code().equals(code))) {
+                throw ApiException.badRequest("UNKNOWN_SIZE", "This product is not sold in size " + code + ".");
+            }
+        }
+        int order = jdbc.sql("select coalesce(max(sort_order), -1) + 1 from product_colors where product_id = :p")
+                .param("p", productId).query(Integer.class).single();
+        long colorId = jdbc.sql("""
+                insert into product_colors (product_id, name_en, name_ar, hex, is_main, sort_order)
+                values (:p, :en, :ar, :hex, false, :ord) returning id
+                """).param("p", productId).param("en", req.nameEn().trim()).param("ar", req.nameAr().trim())
+                .param("hex", req.hex().toUpperCase(Locale.ROOT)).param("ord", order).query(Long.class).single();
+        List<ImageRequest> images = req.images() == null ? List.of() : req.images();
+        for (int i = 0; i < images.size(); i++) {
+            ImageRequest img = images.get(i);
+            jdbc.sql("""
+                    insert into product_images (color_id, public_id, url, alt_en, alt_ar, position)
+                    values (:c, :pid, :url, :altEn, :altAr, :pos)
+                    """).param("c", colorId).param("pid", img.publicId()).param("url", img.url())
+                    .param("altEn", orEmpty(img.altEn())).param("altAr", orEmpty(img.altAr()))
+                    .param("pos", (short) i).update();
+        }
+        List<Long> variantIds = new ArrayList<>();
+        for (ProductSize size : sizes) {
+            int qty = stockBySize.getOrDefault(size.code(), 0);
+            long variantId = jdbc.sql("""
+                    insert into product_variants (product_id, color_id, size_id, sku)
+                    values (:p, :c, :s, :sku) returning id
+                    """).param("p", productId).param("c", colorId).param("s", size.id())
+                    .param("sku", "LP-" + productId + "-" + colorId + "-" + size.id()).query(Long.class).single();
+            jdbc.sql("insert into inventory (variant_id, on_hand) values (:v, :q)").param("v", variantId)
+                    .param("q", qty).update();
+            if (qty > 0) {
+                movement(variantId, "RECEIVE", qty, "Initial stock", actor);
+            }
+            variantIds.add(variantId);
+        }
+        jdbc.sql("update products set updated_at = now(), version = version + 1 where id = :id").param("id", productId)
+                .update();
+        audit.record(actor, "COLOR_ADD", "product", productId, Map.of("color", req.nameEn().trim()));
+        return new ColorAdded(colorId, variantIds);
     }
 
     public void replaceColorImages(UUID actor, long productId, long colorId, List<ImageRequest> images) {
