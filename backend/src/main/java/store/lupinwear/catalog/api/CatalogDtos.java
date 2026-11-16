@@ -178,7 +178,7 @@ public final class CatalogDtos {
     public record AdminImage(long id, String publicId, String url, String altEn, String altAr) {
     }
 
-    public record AdminColor(long id, String nameEn, String nameAr, String hex, List<AdminImage> images) {
+    public record AdminColor(long id, String nameEn, String nameAr, String hex, List<AdminImage> images, boolean main) {
     }
 
     public record AdminProductDetail(long id, String slug, String status, String departmentSlug,
@@ -200,6 +200,14 @@ public final class CatalogDtos {
     }
 
     public record ColorAdded(long colorId, List<Long> variantIds) {
+    }
+
+    /** Edits a colour's names and shade; {@code main: true} makes it the colour shoppers see first. */
+    public record ColorUpdateRequest(
+            @NotBlank @Size(max = 60) String nameEn,
+            @NotBlank @Size(max = 60) String nameAr,
+            @NotBlank @Pattern(regexp = "^#[0-9A-Fa-f]{6}$") String hex,
+            boolean main) {
     }
 
     public record AdminVariantRow(long variantId, String color, String sizeCode, String sku, int onHand,

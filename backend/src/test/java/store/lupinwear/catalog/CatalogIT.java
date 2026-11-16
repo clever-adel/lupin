@@ -94,6 +94,39 @@ class CatalogIT extends IntegrationTest {
     }
 
     @Test
+    void aColourCanBeRenamedReshadedAndMadeTheMainOne() throws Exception {
+        JsonNode created = create(request("Colour Edit Jacket", "1500.00", null, 2));
+        long id = created.get("id").asLong();
+        String slug = created.get("slug").asText();
+        publish(id);
+        JsonNode colors = body(mvc.perform(get("/api/v1/admin/products/" + id).cookie(owner)).andReturn()).get("colors");
+        assertThat(colors.get(0).get("main").asBoolean()).isTrue();
+        long second = colors.get(1).get("id").asLong();
+        String firstName = colors.get(0).get("nameEn").asText();
+
+        mvc.perform(put("/api/v1/admin/products/" + id + "/colors/" + second).with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nameEn\":\"Midnight\",\"nameAr\":\"كحلي غامق\",\"hex\":\"#191970\",\"main\":true}"))
+                .andExpect(status().isNoContent());
+        // The main colour is listed first for shoppers; exactly one colour is main.
+        mvc.perform(get("/api/v1/catalog/products/" + slug))
+                .andExpect(jsonPath("$.colors[0].nameEn").value("Midnight"))
+                .andExpect(jsonPath("$.colors[0].hex").value("#191970"))
+                .andExpect(jsonPath("$.colors[0].main").value(true))
+                .andExpect(jsonPath("$.colors[1].main").value(false));
+
+        mvc.perform(put("/api/v1/admin/products/" + id + "/colors/" + second).with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nameEn\":\"" + firstName.toUpperCase() + "\",\"nameAr\":\"س\",\"hex\":\"#000000\",\"main\":false}"))
+                .andExpect(status().isConflict());
+        long other = create(request("Other Colour Jacket", "1000.00", null, 1)).get("id").asLong();
+        mvc.perform(put("/api/v1/admin/products/" + other + "/colors/" + second).with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nameEn\":\"Stolen\",\"nameAr\":\"س\",\"hex\":\"#000000\",\"main\":false}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void aColourCanBeAddedToAProductAlreadyOnSale() throws Exception {
         JsonNode created = create(request("Colour Later Jacket", "1500.00", null, 2));
         long id = created.get("id").asLong();

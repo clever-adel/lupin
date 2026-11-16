@@ -28,6 +28,7 @@ import store.lupinwear.catalog.api.CatalogDtos.ProductUpdateRequest;
 import store.lupinwear.catalog.api.CatalogDtos.AdminVariantRow;
 import store.lupinwear.catalog.api.CatalogDtos.AddColorRequest;
 import store.lupinwear.catalog.api.CatalogDtos.ColorAdded;
+import store.lupinwear.catalog.api.CatalogDtos.ColorUpdateRequest;
 import store.lupinwear.shared.ApiException;
 import store.lupinwear.shared.PageResponse;
 
@@ -112,6 +113,40 @@ public class CatalogAdminService {
                 .param("freed", ("x" + id + "-" + slug).substring(0, Math.min(60, ("x" + id + "-" + slug).length())))
                 .param("c", id).update();
         audit.record(actor, "CATEGORY_DELETE", "category", slug, Map.of());
+    }
+
+    /**
+     * Renames a colour or changes its shade. Orders keep the colour name they were placed with, so past orders
+     * are not affected. {@code main} moves the "main colour" mark to this colour (there is always exactly one).
+     */
+    public void updateColor(UUID actor, long productId, long colorId, ColorUpdateRequest req) {
+        jdbc.sql("select id from products where id = :id and deleted_at is null for update").param("id", productId)
+                .query(Long.class).optional().orElseThrow(() -> ApiException.notFound("Product"));
+        boolean taken = jdbc.sql("""
+                select count(*) from product_colors where product_id = :p and id <> :c and lower(name_en) = lower(:n)
+                """).param("p", productId).param("c", colorId).param("n", req.nameEn().trim())
+                .query(Long.class).single() > 0;
+        if (taken) {
+            throw ApiException.conflict("COLOR_EXISTS", "This product already has a colour with that name.");
+        }
+        int rows = jdbc.sql("""
+                update product_colors set name_en = :en, name_ar = :ar, hex = :hex
+                where id = :c and product_id = :p
+                """).param("en", req.nameEn().trim()).param("ar", req.nameAr().trim())
+                .param("hex", req.hex().toUpperCase(Locale.ROOT)).param("c", colorId).param("p", productId).update();
+        if (rows == 0) {
+            throw ApiException.notFound("Colour");
+        }
+        if (req.main()) {
+            // One statement each: the "one main colour per product" index allows no moment with two.
+            jdbc.sql("update product_colors set is_main = false where product_id = :p and id <> :c and is_main")
+                    .param("p", productId).param("c", colorId).update();
+            jdbc.sql("update product_colors set is_main = true where id = :c").param("c", colorId).update();
+        }
+        jdbc.sql("update products set updated_at = now(), version = version + 1 where id = :id").param("id", productId)
+                .update();
+        audit.record(actor, "COLOR_UPDATE", "product", productId,
+                Map.of("colorId", colorId, "nameEn", req.nameEn().trim(), "hex", req.hex(), "main", req.main()));
     }
 
     /** Creates a draft product with its colours, photos, one variant per colour × size, and stock rows. */
@@ -277,12 +312,12 @@ public class CatalogAdminService {
                         rs.getString(20), rs.getString(14), rs.getString(18), rs.getString(19), rs.getBigDecimal(15),
                         rs.getBigDecimal(16), rs.getBoolean(17), List.of(), List.of()))
                 .optional().orElseThrow(() -> ApiException.notFound("Product"));
-        record ColorHead(long id, String nameEn, String nameAr, String hex) {
+        record ColorHead(long id, String nameEn, String nameAr, String hex, boolean main) {
         }
         List<ColorHead> colorHeads = jdbc.sql("""
-                select id, name_en, name_ar, hex from product_colors where product_id = :p order by sort_order, id
+                select id, name_en, name_ar, hex, is_main from product_colors where product_id = :p order by sort_order, id
                 """).param("p", id).query((rs, n) -> new ColorHead(rs.getLong(1), rs.getString(2), rs.getString(3),
-                        rs.getString(4))).list();
+                        rs.getString(4), rs.getBoolean(5))).list();
         Map<Long, List<AdminImage>> imagesByColor = new HashMap<>();
         if (!colorHeads.isEmpty()) {
             jdbc.sql("""
@@ -295,7 +330,7 @@ public class CatalogAdminService {
                             rs.getString(6)))).list();
         }
         List<AdminColor> colors = colorHeads.stream().map(color -> new AdminColor(color.id(), color.nameEn(),
-                color.nameAr(), color.hex(), imagesByColor.getOrDefault(color.id(), List.of()))).toList();
+                color.nameAr(), color.hex(), imagesByColor.getOrDefault(color.id(), List.of()), color.main())).toList();
         return new AdminProductDetail(product.id(), product.slug(), product.status(), product.departmentSlug(),
                 product.categorySlug(), product.nameEn(), product.nameAr(), product.descriptionEn(),
                 product.descriptionAr(), product.fabricEn(), product.fabricAr(), product.fitEn(), product.fitAr(),

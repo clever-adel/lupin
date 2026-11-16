@@ -45,6 +45,8 @@ interface Colour {
   nameAr: string;
   hex: string;
   images: ImageInput[];
+  /** The colour shoppers see first (exactly one per product). */
+  main?: boolean;
 }
 
 const ADULT_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "ONE"];
@@ -157,6 +159,93 @@ function ColourPhotos({ colour, onChange }: { colour: Colour; onChange: (images:
           ))}
         </ol>
       )}
+    </div>
+  );
+}
+
+/** A saved colour's name, shade and "main colour" mark. Saved on its own with its own button. */
+function ColourDetails({ productId, colour, otherNames, onSaved }: {
+  productId: number;
+  colour: Colour;
+  otherNames: string[];
+  onSaved: (next: Colour) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [nameEn, setNameEn] = useState(colour.nameEn);
+  const [nameAr, setNameAr] = useState(colour.nameAr);
+  const [hex, setHex] = useState(colour.hex);
+  const [main, setMain] = useState(Boolean(colour.main));
+  const validHex = /^#[0-9A-Fa-f]{6}$/.test(hex);
+  const duplicate = otherNames.some((n) => n.trim().toLowerCase() === nameEn.trim().toLowerCase());
+  const save = useMutation({
+    mutationFn: () =>
+      api<void>("PUT", `/api/v1/admin/products/${productId}/colors/${colour.id}`, {
+        nameEn: nameEn.trim(), nameAr: nameAr.trim(), hex: hex.toUpperCase(), main,
+      }),
+    onSuccess: () => {
+      onSaved({ ...colour, nameEn: nameEn.trim(), nameAr: nameAr.trim(), hex: hex.toUpperCase(), main: main || colour.main });
+      setEditing(false);
+    },
+  });
+  const reset = () => {
+    setNameEn(colour.nameEn); setNameAr(colour.nameAr); setHex(colour.hex); setMain(Boolean(colour.main)); setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="h-7 w-7 rounded-full border border-line" style={{ backgroundColor: colour.hex }} aria-hidden="true" />
+        <span className="font-semibold">{colour.nameEn}</span>
+        <span className="text-stone" dir="rtl">{colour.nameAr}</span>
+        <span className="text-xs text-stone" dir="ltr">{colour.hex}</span>
+        {colour.main && <span className="label border border-ink px-2 py-0.5 text-[11px]">Main colour</span>}
+        <button type="button" className="ms-auto cursor-pointer text-sm underline" onClick={() => setEditing(true)}>
+          Edit colour <span className="sr-only">{colour.nameEn}</span>
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="border border-ink p-3" role="group" aria-label={`Edit colour ${colour.nameEn}`}>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Text id={`c-en-${colour.id}`} label="Colour name (English)" value={nameEn} onChange={setNameEn} />
+        <Text id={`c-ar-${colour.id}`} label="Colour name (Arabic)" rtl value={nameAr} onChange={setNameAr} />
+        <div>
+          <label htmlFor={`c-hex-${colour.id}`} className="mb-1 block text-xs font-medium">Colour</label>
+          <div className="flex items-center gap-2">
+            <input
+              id={`c-hex-${colour.id}`}
+              type="color"
+              className="h-11 w-14 cursor-pointer border border-line bg-card"
+              value={validHex ? hex : "#000000"}
+              onChange={(e) => setHex(e.target.value.toUpperCase())}
+            />
+            <input aria-label="Colour code" className="field" dir="ltr" maxLength={7} value={hex} onChange={(e) => setHex(e.target.value)} />
+          </div>
+        </div>
+      </div>
+      {!colour.main && (
+        <label className="mt-3 flex items-center gap-2 text-sm">
+          <input type="checkbox" className="accent-ink" checked={main} onChange={(e) => setMain(e.target.checked)} />
+          Make this the main colour (shown first in the shop and on the product page)
+        </label>
+      )}
+      {duplicate && <p className="mt-2 text-sm text-danger">Another colour of this product is already called “{nameEn}”.</p>}
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={save.isPending || !nameEn.trim() || !nameAr.trim() || !validHex || duplicate}
+          onClick={() => save.mutate()}
+        >
+          {save.isPending ? "Saving…" : "Save colour"}
+        </button>
+        <button type="button" className="cursor-pointer text-sm underline" disabled={save.isPending} onClick={reset}>
+          Cancel
+        </button>
+        {save.isError && <span role="alert" className="text-sm text-danger">{errorText(save.error)}</span>}
+      </div>
+      <p className="mt-2 text-xs text-stone">Past orders keep the colour name they were placed with.</p>
     </div>
   );
 }
@@ -632,6 +721,18 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
           <div className="mt-4 divide-y divide-line">
             {colours.map((colour, index) => (
               <div key={colour.id} className={index === 0 ? "" : "pt-4"}>
+                <ColourDetails
+                  productId={existing.id}
+                  colour={colour}
+                  otherNames={colours.filter((c) => c.id !== colour.id).map((c) => c.nameEn)}
+                  onSaved={(next) =>
+                    setColours((list) =>
+                      list.map((item) =>
+                        item.id === next.id ? next : next.main ? { ...item, main: false } : item,
+                      ),
+                    )
+                  }
+                />
                 <ColourPhotos
                   colour={colour}
                   onChange={(images) => setColours((list) => list.map((item) => item.id === colour.id ? { ...item, images } : item))}

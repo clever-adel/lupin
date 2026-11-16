@@ -102,6 +102,13 @@ public class AdminCatalogController {
         return catalog.products(q == null ? null : q.substring(0, Math.min(q.length(), 80)), status, page, pageSize);
     }
 
+    @org.springframework.web.bind.annotation.PutMapping("/products/{id}/colors/{colorId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void updateColor(@AuthenticationPrincipal CurrentUser user, @PathVariable long id, @PathVariable long colorId,
+            @Valid @RequestBody CatalogDtos.ColorUpdateRequest body) {
+        catalog.updateColor(user.id(), id, colorId, body);
+    }
+
     @PostMapping("/products/{id}/colors")
     @ResponseStatus(HttpStatus.CREATED)
     CatalogDtos.ColorAdded addColor(@AuthenticationPrincipal CurrentUser user, @PathVariable long id,
