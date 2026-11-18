@@ -15,6 +15,36 @@ export function meta({ params, matches, location }: Route.MetaArgs) {
 }
 
 /** Whatever the customer still has to do, or know, about paying. The server decides; this only shows it. */
+/** Copies the InstaPay address or wallet number, so it can be pasted into the payment app. */
+function CopyButton({ value }: { value: string }) {
+  const { t } = useT();
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="inline-flex h-8 cursor-pointer items-center gap-1.5 border border-line bg-card px-2.5 text-xs font-semibold hover:border-ink"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 2000);
+        } catch {
+          // Clipboard not allowed: the value stays on screen to copy by hand.
+        }
+      }}
+    >
+      <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+        {copied ? (
+          <path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        ) : (
+          <path d="M5.5 5.5V3.2c0-.4.3-.7.7-.7h6.6c.4 0 .7.3.7.7v6.6c0 .4-.3.7-.7.7h-2.3M3.2 5.5h6.6c.4 0 .7.3.7.7v6.6c0 .4-.3.7-.7.7H3.2c-.4 0-.7-.3-.7-.7V6.2c0-.4.3-.7.7-.7z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        )}
+      </svg>
+      <span role="status">{copied ? t("pay.copied") : t("pay.copy")}</span>
+    </button>
+  );
+}
+
 function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boolean; returned: boolean }) {
   const { t, money, pick, code } = useT();
   const client = useQueryClient();
@@ -76,6 +106,7 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
     // Where the money goes depends on the method chosen at checkout.
     const wallet = order.paymentMethod === "VODAFONE_CASH_MANUAL";
     const destination = wallet ? site.data?.vodafoneCash : site.data?.instapay;
+    const destinationValue = wallet ? site.data?.vodafoneCash?.number : site.data?.instapay?.handle;
     return (
       <form
         noValidate
@@ -88,27 +119,31 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
         }}
       >
         {failed && <p role="alert" className="mb-3 text-danger">{t("pay.transferRejected")}</p>}
-        <p>{t(wallet ? "pay.vodafoneTitle" : "pay.transferTitle", { amount: money(order.total) })}</p>
-        <p className="mt-1 text-base font-bold" dir="ltr">{(wallet ? site.data?.vodafoneCash?.number : site.data?.instapay?.handle) ?? "…"}</p>
-        {destination && pick(destination, "instructions") && (
-          <p className="mt-1 text-xs text-stone">{pick(destination, "instructions")}</p>
-        )}
-        {/* InstaPay's own link opens the app with the address filled in; the QR is for people on a computer. */}
-        {!wallet && (site.data?.instapay?.link || site.data?.instapay?.qrUrl) && (
-          <div className="mt-3 flex flex-wrap items-center gap-4">
-            {site.data.instapay.link && (
-              <a href={site.data.instapay.link} target="_blank" rel="noopener noreferrer" className="btn btn-outline">
+        <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+          <div>
+            <p>{t(wallet ? "pay.vodafoneTitle" : "pay.transferTitle", { amount: money(order.total) })}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <p className="text-lg font-bold" dir="ltr">{destinationValue ?? "…"}</p>
+              {destinationValue && <CopyButton value={destinationValue} />}
+            </div>
+            {destination && pick(destination, "instructions") && (
+              <p className="mt-1 text-xs text-stone">{pick(destination, "instructions")}</p>
+            )}
+            {/* InstaPay's own link opens the app with the address filled in. */}
+            {!wallet && site.data?.instapay?.link && (
+              <a href={site.data.instapay.link} target="_blank" rel="noopener noreferrer" className="btn btn-primary mt-4">
                 {t("pay.openInstapay")}
               </a>
             )}
-            {site.data.instapay.qrUrl && (
-              <figure className="hidden items-center gap-3 md:flex">
-                <img src={site.data.instapay.qrUrl} alt="InstaPay QR" width={112} height={112} className="h-28 w-28 bg-white object-contain p-1" />
-                <figcaption className="max-w-[10rem] text-xs text-stone">{t("pay.scanQr")}</figcaption>
-              </figure>
-            )}
           </div>
-        )}
+          {/* Large enough to scan from another phone; on a phone it can be saved and scanned from InstaPay. */}
+          {!wallet && site.data?.instapay?.qrUrl && (
+            <figure className="justify-self-center border border-line bg-white p-3 text-center md:justify-self-end">
+              <img src={site.data.instapay.qrUrl} alt="InstaPay QR" width={220} height={236} className="mx-auto h-auto w-[220px] max-w-full object-contain" />
+              <figcaption className="mt-2 max-w-[220px] text-xs text-stone">{t("pay.scanQr")}</figcaption>
+            </figure>
+          )}
+        </div>
         <label htmlFor="transfer-ref" className="mb-1.5 mt-4 block font-medium">{t("pay.transferRef")}</label>
         <div className="flex flex-wrap gap-2">
           <input
