@@ -12,7 +12,7 @@ const METHODS: PaymentMethod[] = ["COD", "INSTAPAY_MANUAL", "VODAFONE_CASH_MANUA
 /** Why a switched-on method still is not offered to customers. */
 const MISSING: Partial<Record<PaymentMethod, string>> = {
   INSTAPAY_MANUAL: "the InstaPay address is missing",
-  VODAFONE_CASH_MANUAL: "the Vodafone Cash number is missing",
+  VODAFONE_CASH_MANUAL: "the wallet number is missing",
 };
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
@@ -295,15 +295,15 @@ function PaymentForm({ value, isOwner }: { value: Record<string, unknown>; isOwn
         </div>
         <div className="grid gap-3 pt-3 sm:grid-cols-3">
           <div>
-            <label htmlFor="vf-number" className="mb-1 block text-xs font-medium">Vodafone Cash number customers send money to</label>
+            <label htmlFor="vf-number" className="mb-1 block text-xs font-medium">Wallet number customers send money to (any wallet: Vodafone, e&, Orange…)</label>
             <input id="vf-number" className="field" dir="ltr" inputMode="tel" maxLength={20} placeholder="01012345678" value={vfNumber} onChange={(e) => setVfNumber(e.target.value)} />
           </div>
           <div>
-            <label htmlFor="vf-en" className="mb-1 block text-xs font-medium">Vodafone Cash instructions (English)</label>
+            <label htmlFor="vf-en" className="mb-1 block text-xs font-medium">Wallet instructions (English)</label>
             <input id="vf-en" className="field" maxLength={500} value={vfEn} onChange={(e) => setVfEn(e.target.value)} />
           </div>
           <div>
-            <label htmlFor="vf-ar" className="mb-1 block text-xs font-medium">Vodafone Cash instructions (Arabic)</label>
+            <label htmlFor="vf-ar" className="mb-1 block text-xs font-medium">Wallet instructions (Arabic)</label>
             <input id="vf-ar" className="field" dir="rtl" maxLength={500} value={vfAr} onChange={(e) => setVfAr(e.target.value)} />
           </div>
         </div>

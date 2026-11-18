@@ -141,7 +141,7 @@ export const PAYMENT_LABEL: Record<string, string> = {
   WALLET: "Wallet",
   FAWRY: "Fawry",
   INSTAPAY_MANUAL: "InstaPay transfer",
-  VODAFONE_CASH_MANUAL: "Vodafone Cash transfer",
+  VODAFONE_CASH_MANUAL: "Wallet transfer",
 };
 
 export const PAYMENT_STATUS_LABEL: Record<string, string> = {
