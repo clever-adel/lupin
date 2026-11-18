@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { useOutletContext } from "react-router";
 import type { AdminContext } from "./layout";
+import { PushAlertsPanel } from "~/features/admin/push-panel";
 import { errorText, PAYMENT_LABEL, type AdminDeliveryOption, type GovernorateFee } from "~/features/admin/shared";
 import { api, deleteUploadedImage, uploadImages } from "~/lib/http";
 import type { Governorate, PaymentMethod, SiteContent } from "~/lib/types";
@@ -358,24 +359,34 @@ function CheckoutForm({ value, isOwner }: { value: Record<string, unknown>; isOw
 
 function NotificationsForm({ value, isOwner }: { value: Record<string, unknown>; isOwner: boolean }) {
   const save = useSaveSetting("notifications");
+  const [emailStaff, setEmailStaff] = useState(value.emailStaff !== false);
   const [email, setEmail] = useState(String(value.orderEmail ?? ""));
-  const [phone, setPhone] = useState(String(value.whatsappTo ?? ""));
+  // Saved as "01012345678,01112223334"; shown one number per line.
+  const [phones, setPhones] = useState(String(value.whatsappTo ?? "").split(/[,;\n]+/).filter(Boolean).join("\n"));
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        save.mutate({ orderEmail: email.trim(), whatsappTo: phone.replace(/[\s-]/g, "") });
+        const numbers = phones.split(/[,;\n]+/).map((p) => p.replace(/[\s-]/g, "")).filter(Boolean);
+        save.mutate({ emailStaff, orderEmail: email.trim(), whatsappTo: numbers.join(",") });
       }}
     >
-      <fieldset disabled={!isOwner} className="grid gap-3 sm:grid-cols-2">
+      <fieldset disabled={!isOwner} className="grid gap-4 sm:grid-cols-2">
+        <label className="flex items-start gap-2 text-sm sm:col-span-2">
+          <input type="checkbox" className="mt-1" checked={emailStaff} onChange={(e) => setEmailStaff(e.target.checked)} />
+          <span>
+            Email every owner and admin account
+            <span className="block text-xs text-stone">Each staff member gets the order on the email they sign in with (Staff page).</span>
+          </span>
+        </label>
         <div>
-          <label htmlFor="alert-email" className="mb-1 block text-xs font-medium">Email for new orders (empty = none)</label>
+          <label htmlFor="alert-email" className="mb-1 block text-xs font-medium">Extra email for new orders (empty = none)</label>
           <input id="alert-email" className="field" type="email" dir="ltr" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
           <p className="mt-1 text-xs text-stone">Sent through Resend; works once RESEND_API_KEY is set on the server.</p>
         </div>
         <div>
-          <label htmlFor="alert-phone" className="mb-1 block text-xs font-medium">WhatsApp number for new orders (empty = none)</label>
-          <input id="alert-phone" className="field" inputMode="tel" dir="ltr" placeholder="01012345678" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <label htmlFor="alert-phone" className="mb-1 block text-xs font-medium">WhatsApp numbers for new orders, one per line (up to 5)</label>
+          <textarea id="alert-phone" className="field min-h-[5.5rem]" inputMode="tel" dir="ltr" placeholder={"01012345678\n01112223334"} value={phones} onChange={(e) => setPhones(e.target.value)} />
           <p className="mt-1 text-xs text-stone">Works once the WhatsApp Cloud API keys are set on the server.</p>
         </div>
       </fieldset>
@@ -456,9 +467,10 @@ export default function AdminSettings() {
 
       <Section
         title="New order alerts"
-        hint="Each new order is sent here with the customer, address, items and total. While the dashboard is open, “Turn on order alerts” at the top also plays a sound on this computer."
+        hint="Each new order is sent with the customer, address, items and total. Phone notifications work even when the dashboard is closed; “Turn on order alerts” at the top plays a sound while it is open."
       >
         <NotificationsForm value={settings.data.notifications ?? {}} isOwner={isOwner} />
+        <PushAlertsPanel />
       </Section>
 
       <Section title="Checkout rules">

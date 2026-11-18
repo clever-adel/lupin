@@ -347,58 +347,121 @@ class CheckoutIT extends IntegrationTest {
     @Autowired
     FakeWhatsApp whatsapp;
 
+    @Autowired
+    store.lupinwear.support.IntegrationTest.FakePush pushes;
+
+    /** Every email whose subject starts with this text that arrives within a short wait. */
+    private java.util.List<store.lupinwear.mail.Mailer.Message> mailsAbout(String subjectStart) throws InterruptedException {
+        java.util.List<store.lupinwear.mail.Mailer.Message> found = new java.util.ArrayList<>();
+        long until = System.currentTimeMillis() + 3000;
+        while (System.currentTimeMillis() < until) {
+            var mail = mailer.sent.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS);
+            if (mail != null && mail.subject().startsWith(subjectStart)) {
+                found.add(mail);
+            }
+        }
+        return found;
+    }
+
     @Test
-    void theOwnerIsToldAboutEachNewOrderOnceByEmailAndWhatsApp() throws Exception {
+    void theStaffAreToldAboutEachNewOrderOnceByEmailWhatsAppAndPush() throws Exception {
         // Only the owner may say where order details go, and only to real-looking addresses.
         Cookie admin = staffCookie(store.lupinwear.auth.domain.Role.ADMIN);
         mvc.perform(put("/api/v1/admin/settings/notifications").with(csrf()).cookie(admin)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"orderEmail\":\"x@example.test\"}"))
                 .andExpect(status().isForbidden());
         mvc.perform(put("/api/v1/admin/settings/notifications").with(csrf()).cookie(owner)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"whatsappTo\":\"12345\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"whatsappTo\":\"01012345678, 12345\"}"))
                 .andExpect(status().isBadRequest());
         mvc.perform(put("/api/v1/admin/settings/notifications").with(csrf()).cookie(owner)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"orderEmail\":\"owner-alerts@example.test\",\"whatsappTo\":\"01112223334\"}"))
+                        .content("{\"orderEmail\":\"owner-alerts@example.test\",\"whatsappTo\":\"01112223334\\n0102 333 4445\"}"))
                 .andExpect(status().isOk());
+
+        // An admin turns push on for one browser; a customer cannot, and only real push services are accepted.
+        String adminEmail = uniqueEmail();
+        authService.createStaff(adminEmail, "staff-" + PASSWORD_OK, "Alert Admin", store.lupinwear.auth.domain.Role.ADMIN);
+        Cookie alertAdmin = cookie(login(adminEmail, "staff-" + PASSWORD_OK), store.lupinwear.security.AuthCookies.ACCESS);
+        java.security.KeyPair browser = store.lupinwear.notify.WebPush.newKeyPair();
+        byte[] auth = new byte[16];
+        new java.security.SecureRandom().nextBytes(auth);
+        String endpoint = "https://fcm.googleapis.com/fcm/send/test-" + UUID.randomUUID();
+        Map<String, Object> keys = Map.of(
+                "p256dh", store.lupinwear.notify.WebPush.b64(store.lupinwear.notify.WebPush.raw(
+                        (java.security.interfaces.ECPublicKey) browser.getPublic())),
+                "auth", store.lupinwear.notify.WebPush.b64(auth));
+        Map<String, Object> subscription = Map.of("endpoint", endpoint, "keys", keys);
+        mvc.perform(get("/api/v1/admin/push/key").cookie(alertAdmin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.publicKey").isNotEmpty());
+        mvc.perform(jsonPost("/api/v1/admin/push/subscriptions", Map.of("endpoint", "https://evil.example/x",
+                "keys", keys)).cookie(alertAdmin)).andExpect(status().isBadRequest());
+        mvc.perform(jsonPost("/api/v1/admin/push/subscriptions", subscription).cookie(alertAdmin))
+                .andExpect(status().isNoContent());
+        mvc.perform(jsonPost("/api/v1/admin/push/subscriptions/status", Map.of("endpoint", endpoint)).cookie(alertAdmin))
+                .andExpect(jsonPath("$.subscribed").value(true));
+
         mailer.sent.clear();
         whatsapp.sent.clear();
+        pushes.sent.clear();
         try {
             long variant = product("Alert <Jacket>", "1000.00", null, 5);
             Customer customer = customer();
+            mvc.perform(jsonPost("/api/v1/admin/push/subscriptions", subscription).cookie(customer.cookie))
+                    .andExpect(status().isForbidden());
             setQuantity(customer, variant, 1).andExpect(status().isOk());
             PlaceOrderRequest request = request(null, "1060.00", "key-" + UUID.randomUUID());
             String reference = body(place(customer, request).andExpect(status().isCreated()).andReturn())
                     .get("reference").asText();
             place(customer, request).andExpect(status().isCreated()); // a retry is not a new order
 
-            var mail = mailer.sent.poll(5, java.util.concurrent.TimeUnit.SECONDS);
-            assertThat(mail).isNotNull();
-            assertThat(mail.to()).isEqualTo("owner-alerts@example.test");
+            // Email: the extra address and every owner and admin account, once each.
+            var mails = mailsAbout("طلب جديد " + reference);
+            var recipients = mails.stream().map(store.lupinwear.mail.Mailer.Message::to).toList();
+            assertThat(recipients).contains("owner-alerts@example.test", adminEmail).doesNotHaveDuplicates()
+                    .doesNotContain(customer.email());
+            var mail = mails.get(0);
             assertThat(mail.subject()).contains(reference).contains("1,060");
             assertThat(mail.text()).contains("Test Customer").contains("01012345678").contains("كاش عند الاستلام");
             // Customer-typed text is escaped in the HTML version.
             assertThat(mail.html()).contains("/admin/orders/" + reference).doesNotContain("<Jacket>");
 
-            var message = whatsapp.sent.poll(5, java.util.concurrent.TimeUnit.SECONDS);
-            assertThat(message).isNotNull();
-            assertThat(message.to()).isEqualTo("201112223334");
-            assertThat(message.values()).containsExactly(reference, "Test Customer", "1,060", "كاش عند الاستلام");
+            // WhatsApp: each number.
+            var first = whatsapp.sent.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+            var second = whatsapp.sent.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(java.util.List.of(first.to(), second.to())).containsExactlyInAnyOrder("201112223334", "201023334445");
+            assertThat(first.values()).containsExactly(reference, "Test Customer", "1,060", "كاش عند الاستلام");
+            assertThat(whatsapp.sent.poll(300, java.util.concurrent.TimeUnit.MILLISECONDS)).isNull();
 
-            assertThat(mailer.sent.poll(500, java.util.concurrent.TimeUnit.MILLISECONDS)).isNull();
+            // Push: encrypted for that browser, which can read it.
+            store.lupinwear.support.IntegrationTest.FakePush.Sent pushed = null;
+            long until = System.currentTimeMillis() + 5000;
+            while (pushed == null && System.currentTimeMillis() < until) {
+                var p = pushes.sent.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS);
+                if (p != null && p.endpoint().equals(endpoint)) {
+                    pushed = p;
+                }
+            }
+            assertThat(pushed).isNotNull();
+            assertThat(pushed.authorization()).startsWith("vapid t=");
+            String text = store.lupinwear.notify.WebPushUnitTest.decrypt(pushed.body(), browser, auth);
+            assertThat(text).contains("طلب جديد " + reference).contains("/admin/orders/" + reference)
+                    .contains("Test Customer");
 
-            // The customer cancels, then takes it back: one email each, no WhatsApp.
+            // The customer cancels, then takes it back: one email each per person, no WhatsApp.
             mvc.perform(jsonPost("/api/v1/orders/" + reference + "/cancel", Map.of()).cookie(customer.cookie))
                     .andExpect(status().isOk());
-            var cancelled = mailer.sent.poll(5, java.util.concurrent.TimeUnit.SECONDS);
-            assertThat(cancelled).isNotNull();
-            assertThat(cancelled.subject()).startsWith("العميل لغى الطلب " + reference);
+            assertThat(mailsAbout("العميل لغى الطلب " + reference)).extracting(store.lupinwear.mail.Mailer.Message::to)
+                    .contains("owner-alerts@example.test", adminEmail).doesNotHaveDuplicates();
             mvc.perform(jsonPost("/api/v1/orders/" + reference + "/undo-cancel", Map.of()).cookie(customer.cookie))
                     .andExpect(status().isOk());
-            var restored = mailer.sent.poll(5, java.util.concurrent.TimeUnit.SECONDS);
-            assertThat(restored).isNotNull();
-            assertThat(restored.subject()).startsWith("العميل رجّع الطلب بعد ما لغاه " + reference);
-            assertThat(whatsapp.sent.poll(500, java.util.concurrent.TimeUnit.MILLISECONDS)).isNull();
+            assertThat(mailsAbout("العميل رجّع الطلب بعد ما لغاه " + reference)).isNotEmpty();
+            assertThat(whatsapp.sent.poll(300, java.util.concurrent.TimeUnit.MILLISECONDS)).isNull();
+
+            // A browser that was removed (410) is forgotten.
+            pushes.status = 410;
+            mvc.perform(jsonPost("/api/v1/admin/push/test", Map.of()).cookie(alertAdmin)).andExpect(status().isOk());
+            mvc.perform(jsonPost("/api/v1/admin/push/subscriptions/status", Map.of("endpoint", endpoint)).cookie(alertAdmin))
+                    .andExpect(jsonPath("$.subscribed").value(false));
 
             mvc.perform(get("/api/v1/admin/orders").param("q", reference).cookie(owner))
                     .andExpect(jsonPath("$.items[0].reference").value(reference))
@@ -407,6 +470,7 @@ class CheckoutIT extends IntegrationTest {
                     .andExpect(jsonPath("$.latestOrderReference").value(reference))
                     .andExpect(jsonPath("$.latestOrderAt").isNotEmpty());
         } finally {
+            pushes.status = 201;
             setting("notifications", "orderEmail", "\"\"");
             setting("notifications", "whatsappTo", "\"\"");
         }

@@ -155,9 +155,30 @@ public abstract class IntegrationTest {
         FakeWhatsApp fakeWhatsApp() {
             return new FakeWhatsApp();
         }
+
+        @Bean
+        @Primary
+        FakePush fakePush() {
+            return new FakePush();
+        }
     }
 
     /** Stands in for the WhatsApp Cloud API: switched on, keeps every message. */
+    /** Stands in for the browser push services: records each message; answers with {@code status}. */
+    public static class FakePush implements store.lupinwear.notify.PushGateway {
+        public record Sent(String endpoint, String authorization, byte[] body) {
+        }
+
+        public final java.util.concurrent.LinkedBlockingQueue<Sent> sent = new java.util.concurrent.LinkedBlockingQueue<>();
+        public volatile int status = 201;
+
+        @Override
+        public int deliver(String endpoint, String authorization, byte[] body) {
+            sent.add(new Sent(endpoint, authorization, body));
+            return status;
+        }
+    }
+
     public static class FakeWhatsApp implements store.lupinwear.notify.WhatsAppGateway {
         public record Sent(String to, java.util.List<String> values) {
         }

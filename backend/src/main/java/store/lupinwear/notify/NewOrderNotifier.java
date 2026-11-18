@@ -3,8 +3,10 @@ package store.lupinwear.notify;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,9 +21,11 @@ import store.lupinwear.order.OrderService.CustomerChangedOrder;
 import store.lupinwear.order.OrderService.OrderPlaced;
 
 /**
- * Tells the owner about each new order, by email and/or WhatsApp, to the addresses set in the
- * dashboard (Settings → New order alerts). Runs after the order is saved, on its own thread, so a
- * slow or failing message never delays or breaks checkout.
+ * Tells the staff about each new order: by email to every active owner and admin account (unless
+ * switched off) plus any extra address, by WhatsApp to the numbers set in the dashboard (Settings →
+ * New order alerts), and by push notification to every phone or computer a staff member turned it on
+ * for. Runs after the order is saved, on its own thread, so a slow or failing message never delays or
+ * breaks checkout.
  */
 @Component
 public class NewOrderNotifier {
@@ -39,14 +43,16 @@ public class NewOrderNotifier {
     private final SiteSettings settings;
     private final Mailer mailer;
     private final WhatsAppGateway whatsapp;
+    private final StaffPush push;
     private final String publicBaseUrl;
 
     public NewOrderNotifier(JdbcClient jdbc, SiteSettings settings, Mailer mailer, WhatsAppGateway whatsapp,
-            @Value("${lupin.public-base-url}") String publicBaseUrl) {
+            StaffPush push, @Value("${lupin.public-base-url}") String publicBaseUrl) {
         this.jdbc = jdbc;
         this.settings = settings;
         this.mailer = mailer;
         this.whatsapp = whatsapp;
+        this.push = push;
         this.publicBaseUrl = publicBaseUrl.replaceAll("/+$", "");
     }
 
@@ -66,14 +72,16 @@ public class NewOrderNotifier {
     public void onCustomerChangedOrder(CustomerChangedOrder event) {
         Thread.ofVirtual().name("order-change-" + event.reference()).start(() -> {
             try {
-                String email = settings.get("notifications").path("orderEmail").asText("").trim();
-                if (email.isEmpty()) {
+                Set<String> emails = emails(settings.get("notifications"));
+                if (emails.isEmpty()) {
                     return;
                 }
                 Order order = load(event.reference());
                 if (order != null) {
-                    mailer.send(email(email, order, items(event.reference()),
-                            event.cancelled() ? Kind.CANCELLED : Kind.RESTORED));
+                    List<Item> items = items(event.reference());
+                    for (String email : emails) {
+                        mailer.send(email(email, order, items, event.cancelled() ? Kind.CANCELLED : Kind.RESTORED));
+                    }
                 }
             } catch (RuntimeException e) {
                 log.error("Order change alert for {} failed: {}", event.reference(), e.getMessage());
@@ -97,24 +105,60 @@ public class NewOrderNotifier {
 
     void notifyOwner(String reference) {
         var config = settings.get("notifications");
-        String email = config.path("orderEmail").asText("").trim();
-        String phone = config.path("whatsappTo").asText("").trim();
-        if (email.isEmpty() && (phone.isEmpty() || !whatsapp.configured())) {
-            return;
-        }
         Order order = load(reference);
         if (order == null) {
             return;
         }
-        List<Item> items = items(reference);
+        // Each channel on its own: one failing must not stop the others.
+        try {
+            push.send(Kind.NEW.title + " " + order.reference(),
+                    clean(order.customerName()) + " — " + money(order.total()) + " ج.م — " + paymentLabel(order.paymentMethod()),
+                    "/admin/orders/" + order.reference(), "order-" + order.reference());
+        } catch (RuntimeException e) {
+            log.error("Push alert for {} failed: {}", reference, e.getMessage());
+        }
+        Set<String> emails = emails(config);
+        if (!emails.isEmpty()) {
+            List<Item> items = items(reference);
+            for (String email : emails) {
+                mailer.send(email(email, order, items, Kind.NEW));
+            }
+        }
+        if (whatsapp.configured()) {
+            for (String phone : phones(config.path("whatsappTo").asText(""))) {
+                whatsapp.sendTemplate(international(phone), List.of(order.reference(), clean(order.customerName()),
+                        money(order.total()), paymentLabel(order.paymentMethod())));
+            }
+        }
+    }
 
-        if (!email.isEmpty()) {
-            mailer.send(email(email, order, items, Kind.NEW));
+    /** The extra address from Settings, then every active owner and admin (unless "emailStaff" is off). */
+    private Set<String> emails(com.fasterxml.jackson.databind.JsonNode config) {
+        Set<String> emails = new LinkedHashSet<>();
+        String extra = config.path("orderEmail").asText("").trim().toLowerCase(Locale.ROOT);
+        if (!extra.isEmpty()) {
+            emails.add(extra);
         }
-        if (!phone.isEmpty() && whatsapp.configured()) {
-            whatsapp.sendTemplate(international(phone), List.of(order.reference(), clean(order.customerName()),
-                    money(order.total()), paymentLabel(order.paymentMethod())));
+        if (config.path("emailStaff").asBoolean(true)) {
+            emails.addAll(jdbc.sql("""
+                    select distinct u.email from users u
+                    join user_roles ur on ur.user_id = u.id join roles r on r.id = ur.role_id
+                    where r.code in ('OWNER', 'ADMIN') and u.status = 'ACTIVE' and u.email is not null
+                    order by u.email""").query(String.class).list());
         }
+        return emails;
+    }
+
+    /** "01012345678, 0111 222 3334" → each Egyptian mobile number once, at most five. */
+    static List<String> phones(String value) {
+        Set<String> phones = new LinkedHashSet<>();
+        for (String part : (value == null ? "" : value).split("[,;\\r\\n]+")) {
+            String phone = part.replaceAll("[\\s-]", "");
+            if (phone.matches("01[0125]\\d{8}")) {
+                phones.add(phone);
+            }
+        }
+        return phones.stream().limit(5).toList();
     }
 
     private Order load(String reference) {

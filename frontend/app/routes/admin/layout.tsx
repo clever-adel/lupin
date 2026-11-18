@@ -7,7 +7,21 @@ import type { Summary } from "~/features/admin/shared";
 import { api, ApiError } from "~/lib/http";
 
 export function meta() {
-  return [{ title: "LUPIN. — Staff" }, { name: "robots", content: "noindex, nofollow" }];
+  return [
+    { title: "LUPIN. — Staff" },
+    { name: "robots", content: "noindex, nofollow" },
+    // "Add to Home Screen" makes the dashboard an app; on iPhone that is what allows notifications.
+    { name: "apple-mobile-web-app-capable", content: "yes" },
+    { name: "apple-mobile-web-app-title", content: "LUPIN Staff" },
+    { name: "theme-color", content: "#0b0b0c" },
+  ];
+}
+
+export function links() {
+  return [
+    { rel: "manifest", href: "/staff.webmanifest" },
+    { rel: "apple-touch-icon", href: "/brand/apple-touch-icon.png" },
+  ];
 }
 
 /**

@@ -260,10 +260,25 @@ public class AdminSettingsController {
             if (!email.isEmpty() && !email.matches("[^@\\s]{1,64}@[^@\\s]{1,190}\\.[A-Za-z]{2,24}")) {
                 throw ApiException.badRequest("INVALID_SETTING", "Enter a valid email address for order alerts.");
             }
-            String phone = value.path("whatsappTo").asText("").replaceAll("[\\s-]", "");
-            if (!phone.isEmpty() && !phone.matches("01[0125]\\d{8}")) {
-                throw ApiException.badRequest("INVALID_SETTING",
-                        "The WhatsApp number is an Egyptian mobile number of 11 digits, like 01012345678.");
+            // One or more numbers, separated by commas or new lines (up to five).
+            String[] phones = value.path("whatsappTo").asText("").trim().split("[,;\\r\\n]+");
+            int count = 0;
+            for (String part : phones) {
+                String phone = part.replaceAll("[\\s-]", "");
+                if (phone.isEmpty()) {
+                    continue;
+                }
+                if (!phone.matches("01[0125]\\d{8}")) {
+                    throw ApiException.badRequest("INVALID_SETTING",
+                            "Each WhatsApp number is an Egyptian mobile number of 11 digits, like 01012345678.");
+                }
+                count++;
+            }
+            if (count > 5) {
+                throw ApiException.badRequest("INVALID_SETTING", "Up to five WhatsApp numbers.");
+            }
+            if (value.has("emailStaff") && !value.get("emailStaff").isBoolean()) {
+                throw ApiException.badRequest("INVALID_SETTING", "emailStaff is true or false.");
             }
         }
         if ("payment_methods".equals(key) && value.path("INSTAPAY_MANUAL").asBoolean()
