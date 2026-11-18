@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
+import { TransferReceipt } from "~/features/admin/receipt";
 import { errorText, money, when, type Transfer } from "~/features/admin/shared";
 import { api } from "~/lib/http";
 
@@ -27,7 +28,7 @@ export default function AdminTransfers() {
       <h1 className="display text-2xl">Transfers to check</h1>
       <p className="mt-2 text-sm text-stone">
         Open the InstaPay account or the mobile wallet (each transfer says which), find the transfer by its
-        reference and amount, then confirm it. Confirm only
+        reference, screenshot and amount, then confirm it. Confirm only
         when the money is really there: confirming marks the order as paid.
       </p>
       {decide.isError && <p role="alert" className="mt-4 text-sm text-danger">{errorText(decide.error)}</p>}
@@ -43,12 +44,13 @@ export default function AdminTransfers() {
                     {tr.method === "VODAFONE_CASH_MANUAL" ? "Wallet" : "InstaPay"}
                   </span>
                 </p>
-                <p>Reference: <span className="font-semibold">{tr.transferReference}</span></p>
+                {tr.transferReference && <p>Reference: <span className="font-semibold">{tr.transferReference}</span></p>}
                 <p className="text-stone">
                   {tr.customerName} · {tr.customerPhone} · order{" "}
                   <Link to={`/admin/orders/${tr.orderReference}`} className="underline">{tr.orderReference}</Link>
                 </p>
                 <p className="text-xs text-stone">Sent to us {when(tr.submittedAt)}</p>
+                {tr.hasReceipt && <div className="mt-3"><TransferReceipt paymentId={tr.paymentId} /></div>}
               </div>
               {asking?.id === tr.paymentId ? (
                 <div className="text-end">

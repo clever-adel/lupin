@@ -49,7 +49,7 @@ public class OrderAdminService {
     }
 
     public record PaymentRow(UUID id, String provider, String method, String status, BigDecimal amount,
-            String transferReference, String providerTransactionId, Instant createdAt) {
+            String transferReference, String providerTransactionId, Instant createdAt, boolean hasReceipt) {
     }
 
     public record ShipmentRow(String carrier, String trackingReference, String status, Instant shippedAt,
@@ -129,12 +129,13 @@ public class OrderAdminService {
         String email = jdbc.sql("select email from users where id = :u").param("u", ids.user())
                 .query((rs, n) -> rs.getString(1)).single();
         List<PaymentRow> payments = jdbc.sql("""
-                select id, provider, method, status, amount, manual_reference, provider_transaction_id, created_at
+                select id, provider, method, status, amount, manual_reference, provider_transaction_id, created_at,
+                       exists (select 1 from transfer_receipts r where r.payment_id = payments.id)
                 from payments where order_id = :o order by created_at
                 """).param("o", ids.id())
                 .query((rs, n) -> new PaymentRow(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3),
                         rs.getString(4), rs.getBigDecimal(5), rs.getString(6), rs.getString(7),
-                        rs.getObject(8, OffsetDateTime.class).toInstant()))
+                        rs.getObject(8, OffsetDateTime.class).toInstant(), rs.getBoolean(9)))
                 .list();
         ShipmentRow shipment = jdbc.sql("select carrier, tracking_reference, status, shipped_at, delivered_at,"
                 + " provider_state, provider_state_label, last_exception, cod_amount"

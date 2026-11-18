@@ -14,6 +14,34 @@ export function meta({ params, matches, location }: Route.MetaArgs) {
   return seo({ origin: layoutOrigin(matches), pathname: location.pathname, title, description: title, noindex: true });
 }
 
+const RECEIPT_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const RECEIPT_MAX_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Phone screenshots are often several MB: redraw the photo at most 1600 px tall/wide as a JPEG, which keeps
+ * every number readable and makes the upload quick on mobile data. Falls back to the original file.
+ */
+async function prepareReceipt(file: File): Promise<Blob | null> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("no canvas");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    if (blob && blob.size <= RECEIPT_MAX_BYTES) return blob;
+  } catch {
+    // Not decodable here: let the server judge the original.
+  }
+  return RECEIPT_TYPES.includes(file.type) && file.size <= RECEIPT_MAX_BYTES ? file : null;
+}
+
 /** Whatever the customer still has to do, or know, about paying. The server decides; this only shows it. */
 /** Copies the InstaPay address or wallet number, so it can be pasted into the payment app. */
 function CopyButton({ value }: { value: string }) {
@@ -50,6 +78,14 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
   const client = useQueryClient();
   const [reference, setReference] = useState("");
   const [referenceError, setReferenceError] = useState(false);
+  const [receipt, setReceipt] = useState<Blob | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const [receiptError, setReceiptError] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [proofError, setProofError] = useState(false);
+  useEffect(() => () => {
+    if (receiptPreview) URL.revokeObjectURL(receiptPreview);
+  }, [receiptPreview]);
   const started = useRef(false);
   const base = `/api/v1/orders/${encodeURIComponent(order.reference)}/payment`;
 
@@ -65,7 +101,12 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
     onSuccess: ({ redirectUrl }) => window.location.assign(redirectUrl),
   });
   const transfer = useMutation({
-    mutationFn: () => api<Order>("POST", `${base}/transfer`, { reference: reference.trim() }),
+    mutationFn: () => {
+      const form = new FormData();
+      if (reference.trim()) form.set("reference", reference.trim());
+      if (receipt) form.set("receipt", receipt, "transfer.jpg");
+      return api<Order>("POST", `${base}/transfer`, form);
+    },
     onSuccess: (updated) => client.setQueryData(["order", updated.reference], updated),
   });
   const { mutate: startPayment } = pay;
@@ -84,7 +125,13 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
     return <p className={`${box} text-danger`} role="alert">{t("pay.refundPending")}</p>;
   }
   if (order.paymentStatus === "VERIFYING") {
-    return <p className={box} role="status">{t("pay.transferChecking", { reference: order.transferReference ?? "" })}</p>;
+    return (
+      <p className={box} role="status">
+        {order.transferReference
+          ? t("pay.transferChecking", { reference: order.transferReference })
+          : t("pay.transferCheckingReceipt")}
+      </p>
+    );
   }
   if (order.paymentAction === "PAYMOB") {
     const waiting = returned && !failed;
@@ -113,9 +160,12 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
         className={box}
         onSubmit={(e) => {
           e.preventDefault();
-          const ok = /^[A-Za-z0-9 ._/-]{4,100}$/.test(reference.trim());
-          setReferenceError(!ok);
-          if (ok) transfer.mutate();
+          const typed = reference.trim();
+          const badReference = typed !== "" && !/^[A-Za-z0-9 ._/-]{4,100}$/.test(typed);
+          const nothing = typed === "" && !receipt;
+          setReferenceError(badReference);
+          setProofError(nothing);
+          if (!badReference && !nothing && !preparing) transfer.mutate();
         }}
       >
         {failed && <p role="alert" className="mb-3 text-danger">{t("pay.transferRejected")}</p>}
@@ -144,7 +194,47 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
             </figure>
           )}
         </div>
-        <label htmlFor="transfer-ref" className="mb-1.5 mt-4 block font-medium">{t("pay.transferRef")}</label>
+        <p className="mt-5 font-medium">{t("pay.receipt")}</p>
+        <p className="mt-0.5 text-xs text-stone">{t("pay.receiptHint")}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          {receiptPreview && (
+            <img src={receiptPreview} alt={t("pay.receipt")} className="h-24 w-auto max-w-[8rem] border border-line bg-white object-contain" />
+          )}
+          <label className="btn btn-outline cursor-pointer">
+            {preparing ? t("pay.receiptPreparing") : t("pay.receiptChoose")}
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                setPreparing(true);
+                const prepared = await prepareReceipt(file);
+                setPreparing(false);
+                setReceiptError(!prepared);
+                setProofError(false);
+                setReceipt(prepared);
+                setReceiptPreview(prepared ? URL.createObjectURL(prepared) : null);
+              }}
+            />
+          </label>
+          {receipt && (
+            <button
+              type="button"
+              className="text-xs underline"
+              onClick={() => {
+                setReceipt(null);
+                setReceiptPreview(null);
+              }}
+            >
+              {t("pay.receiptRemove")}
+            </button>
+          )}
+        </div>
+        {receiptError && <p className="mt-1 text-xs text-danger" role="alert">{t("pay.err.receiptType")}</p>}
+        <label htmlFor="transfer-ref" className="mb-1.5 mt-4 block font-medium">{t("pay.transferRefOptional")}</label>
         <div className="flex flex-wrap gap-2">
           <input
             id="transfer-ref"
@@ -155,13 +245,17 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
             value={reference}
             aria-invalid={referenceError || undefined}
             aria-describedby={referenceError ? "transfer-ref-error" : undefined}
-            onChange={(e) => setReference(e.target.value)}
+            onChange={(e) => {
+              setReference(e.target.value);
+              setProofError(false);
+            }}
           />
-          <button type="submit" className="btn btn-primary" disabled={transfer.isPending}>{t("pay.transferSubmit")}</button>
+          <button type="submit" className="btn btn-primary" disabled={transfer.isPending || preparing}>{t("pay.transferSubmit")}</button>
         </div>
         {referenceError && (
           <p id="transfer-ref-error" className="mt-1 text-xs text-danger">{t(wallet ? "pay.err.referenceWallet" : "pay.err.reference")}</p>
         )}
+        {proofError && <p role="alert" className="mt-2 text-danger">{t("pay.err.proof")}</p>}
         {transfer.isError && <p role="alert" className="mt-2 text-danger">{error(transfer.error)}</p>}
       </form>
     );

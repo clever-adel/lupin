@@ -33,6 +33,8 @@ export interface AdminOrder {
     transferReference?: string;
     providerTransactionId?: string;
     createdAt: string;
+    /** The customer sent a screenshot of the transfer (see TransferReceipt). */
+    hasReceipt?: boolean;
   }[];
   shipment?: {
     carrier?: string;
@@ -83,9 +85,11 @@ export interface Transfer {
   customerName: string;
   customerPhone: string;
   amount: number;
-  transferReference: string;
+  /** Empty when the customer sent only a screenshot. */
+  transferReference?: string | null;
   submittedAt: string;
   method?: string;
+  hasReceipt?: boolean;
 }
 
 export interface AdminVariant {

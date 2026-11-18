@@ -42,8 +42,14 @@ public class PaymentService {
     }
 
     public record TransferView(UUID paymentId, String orderReference, String customerName, String customerPhone,
-            BigDecimal amount, String transferReference, Instant submittedAt, String method) {
+            BigDecimal amount, String transferReference, Instant submittedAt, String method, boolean hasReceipt) {
     }
+
+    /** A screenshot of the transfer, checked to really be a JPEG, PNG or WebP image. */
+    public record Receipt(String contentType, byte[] bytes) {
+    }
+
+    public static final int RECEIPT_MAX_BYTES = 5 * 1024 * 1024;
 
     private record OrderRow(UUID id, String reference, String status, String paymentStatus, String method,
             BigDecimal total, String customerName, String customerPhone, String city, String addressLine) {
@@ -245,30 +251,72 @@ public class PaymentService {
 
     // ── Manual transfer (InstaPay or Vodafone Cash) ──
 
-    /** The customer tells us the reference of the transfer they made. Staff then check the bank app. */
-    public void submitTransfer(UUID user, String reference, String transferReference) {
+    /**
+     * The customer tells us about the transfer they made: its reference number, a screenshot of it, or
+     * both. Staff then check the bank or wallet app.
+     */
+    public void submitTransfer(UUID user, String reference, String transferReference, Receipt receipt) {
+        String ref = transferReference == null || transferReference.isBlank() ? null : transferReference.trim();
+        if (ref == null && receipt == null) {
+            throw ApiException.badRequest("TRANSFER_PROOF_REQUIRED",
+                    "Send the transfer reference number or a screenshot of the transfer.");
+        }
         tx.executeWithoutResult(status -> {
             OrderRow order = order(user, reference, true);
-            int rows = !"AWAITING_PAYMENT".equals(order.status()) ? 0 : jdbc.sql("""
+            UUID paymentId = !"AWAITING_PAYMENT".equals(order.status()) ? null : jdbc.sql("""
                     update payments set status = 'VERIFYING', manual_reference = :ref, updated_at = now()
                     where order_id = :o and provider = 'MANUAL_TRANSFER' and status in ('PENDING', 'FAILED')
-                    """).param("ref", transferReference.trim()).param("o", order.id()).update();
-            if (rows == 0) {
+                    returning id
+                    """).param("ref", ref).param("o", order.id()).query(UUID.class).optional().orElse(null);
+            if (paymentId == null) {
                 throw ApiException.conflict("PAYMENT_NOT_POSSIBLE", "A transfer cannot be recorded for this order.");
+            }
+            if (receipt != null) {
+                jdbc.sql("""
+                        insert into transfer_receipts (payment_id, content_type, bytes, size_bytes)
+                        values (:p, :t, :b, :n)
+                        on conflict (payment_id) do update set content_type = excluded.content_type,
+                            bytes = excluded.bytes, size_bytes = excluded.size_bytes, created_at = now()
+                        """).param("p", paymentId).param("t", receipt.contentType()).param("b", receipt.bytes())
+                        .param("n", receipt.bytes().length).update();
+            } else {
+                // A fresh attempt without a screenshot must not show the one from a rejected attempt.
+                jdbc.sql("delete from transfer_receipts where payment_id = :p").param("p", paymentId).update();
             }
             orders.setPaymentStatus(order.id(), "VERIFYING");
         });
     }
 
+    /** Staff only (the controller sits under /api/v1/admin). */
+    public Optional<Receipt> receipt(UUID paymentId) {
+        return jdbc.sql("select content_type, bytes from transfer_receipts where payment_id = :p")
+                .param("p", paymentId).query((rs, n) -> new Receipt(rs.getString(1), rs.getBytes(2))).optional();
+    }
+
+    /** JPEG, PNG or WebP, judged by the file's first bytes rather than what the browser claims. */
+    public static String imageType(byte[] bytes) {
+        if (bytes.length > 3 && (bytes[0] & 0xff) == 0xff && (bytes[1] & 0xff) == 0xd8 && (bytes[2] & 0xff) == 0xff) {
+            return "image/jpeg";
+        }
+        if (bytes.length > 8 && (bytes[0] & 0xff) == 0x89 && bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G') {
+            return "image/png";
+        }
+        if (bytes.length > 12 && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
+                && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P') {
+            return "image/webp";
+        }
+        return null;
+    }
+
     public List<TransferView> transfersToVerify() {
         return jdbc.sql("""
                 select p.id, o.reference, o.customer_name, o.customer_phone, p.amount, p.manual_reference, p.updated_at,
-                       p.method
+                       p.method, exists (select 1 from transfer_receipts r where r.payment_id = p.id)
                 from payments p join orders o on o.id = p.order_id
                 where p.provider = 'MANUAL_TRANSFER' and p.status = 'VERIFYING' order by p.updated_at limit 200
                 """).query((rs, n) -> new TransferView(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3),
                         rs.getString(4), rs.getBigDecimal(5), rs.getString(6),
-                        rs.getObject(7, OffsetDateTime.class).toInstant(), rs.getString(8)))
+                        rs.getObject(7, OffsetDateTime.class).toInstant(), rs.getString(8), rs.getBoolean(9)))
                 .list();
     }
 

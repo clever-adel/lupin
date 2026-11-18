@@ -35,13 +35,15 @@ async function csrfToken(): Promise<string> {
 
 async function send(method: string, path: string, body?: unknown): Promise<Response> {
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  // A FormData body (a file upload) sets its own multipart Content-Type with the boundary.
+  const form = body instanceof FormData;
+  if (body !== undefined && !form) headers["Content-Type"] = "application/json";
   if (method !== "GET") headers["X-XSRF-TOKEN"] = await csrfToken();
   return fetch(path, {
     method,
     headers,
     credentials: "same-origin",
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : form ? body : JSON.stringify(body),
   });
 }
 

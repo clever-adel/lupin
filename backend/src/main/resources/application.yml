@@ -1,6 +1,11 @@
 spring:
   application:
     name: lupin-backend
+  servlet:
+    multipart:
+      # Transfer screenshots (PaymentController); the service itself refuses anything over 5 MB.
+      max-file-size: 6MB
+      max-request-size: 7MB
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/lupin}
     username: ${DATABASE_USERNAME:lupin}

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router";
 import type { AdminContext } from "./layout";
 import { BostaPanel } from "~/features/admin/BostaPanel";
+import { TransferReceipt } from "~/features/admin/receipt";
 import {
   COURIER_PROBLEM_STATES, errorText, money, PAYMENT_LABEL, PAYMENT_STATUS_LABEL, STATUS_LABEL, when, type AdminOrder,
 } from "~/features/admin/shared";
@@ -261,6 +262,7 @@ export default function AdminOrder() {
                   {when(p.createdAt)} · {p.provider} · {p.status} · {money(p.amount)}
                   {p.transferReference && <span className="block">Transfer ref: {p.transferReference}</span>}
                   {p.providerTransactionId && <span className="block">Paymob transaction: {p.providerTransactionId}</span>}
+                  {p.hasReceipt && <span className="mt-2 block"><TransferReceipt paymentId={p.id} size="sm" /></span>}
                 </li>
               ))}
               {payments.length === 0 && <li>No payment attempt yet.</li>}

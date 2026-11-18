@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -26,9 +27,12 @@ import store.lupinwear.support.IntegrationTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -225,6 +229,54 @@ class PaymentIT extends IntegrationTest {
         long audits = jdbc.sql("select count(*) from audit_logs where entity_type = 'payment' and entity_id = :id")
                 .param("id", paymentId).query(Long.class).single();
         assertThat(audits).isEqualTo(2);
+    }
+
+    @Test
+    void aTransferScreenshotIsKeptPrivateForStaffToCheck() throws Exception {
+        String reference = reference(place("INSTAPAY_MANUAL").andExpect(status().isCreated()));
+        String url = "/api/v1/orders/" + reference + "/payment/transfer";
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d, 'I', 'H', 'D', 'R'};
+
+        // Nothing at all, or a file that is not an image, is refused.
+        mvc.perform(multipart(url).with(csrf()).cookie(customer)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TRANSFER_PROOF_REQUIRED"));
+        mvc.perform(multipart(url).file(new MockMultipartFile("receipt", "x.png", "image/png", "<html>".getBytes()))
+                .with(csrf()).cookie(customer)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("RECEIPT_NOT_IMAGE"));
+
+        // A screenshot alone is enough; the browser's claimed type is not trusted, the bytes are.
+        mvc.perform(multipart(url).file(new MockMultipartFile("receipt", "shot.jpg", "image/jpeg", png))
+                        .with(csrf()).cookie(customer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentStatus").value("VERIFYING"));
+
+        String paymentId = null;
+        for (JsonNode row : body(mvc.perform(get("/api/v1/admin/payments/transfers").cookie(owner)).andReturn())) {
+            if (row.get("orderReference").asText().equals(reference)) {
+                paymentId = row.get("paymentId").asText();
+                assertThat(row.get("hasReceipt").asBoolean()).isTrue();
+            }
+        }
+        assertThat(paymentId).isNotNull();
+        mvc.perform(get("/api/v1/admin/orders/" + reference).cookie(owner))
+                .andExpect(jsonPath("$.payments[0].hasReceipt").value(true));
+
+        mvc.perform(get("/api/v1/admin/payments/" + paymentId + "/receipt").cookie(owner))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "image/png"))
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(content().bytes(png));
+        // The customer (or anyone else who is not staff) cannot open it through the staff address.
+        mvc.perform(get("/api/v1/admin/payments/" + paymentId + "/receipt").cookie(customer))
+                .andExpect(status().isForbidden());
+
+        // Rejected, then sent again with only a reference: the old screenshot no longer shows.
+        mvc.perform(jsonPost("/api/v1/admin/payments/" + paymentId + "/reject", Map.of()).cookie(owner))
+                .andExpect(status().isNoContent());
+        mvc.perform(multipart(url).param("reference", "IPN 55556666").with(csrf()).cookie(customer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.transferReference").value("IPN 55556666"));
+        mvc.perform(get("/api/v1/admin/payments/" + paymentId + "/receipt").cookie(owner))
+                .andExpect(status().isNotFound());
     }
 
     @Test

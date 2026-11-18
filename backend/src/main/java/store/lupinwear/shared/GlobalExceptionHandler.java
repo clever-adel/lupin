@@ -17,6 +17,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /** One error shape for the whole API. Never leaks stack traces, SQL or internal messages. */
@@ -49,6 +50,12 @@ public class GlobalExceptionHandler {
             MethodArgumentTypeMismatchException.class, MissingServletRequestParameterException.class})
     ResponseEntity<ErrorBody> badRequest(Exception e) {
         return ResponseEntity.badRequest().body(ErrorBody.of("BAD_REQUEST", "The request is not valid."));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<ErrorBody> tooLarge(MaxUploadSizeExceededException e) {
+        return ResponseEntity.badRequest()
+                .body(ErrorBody.of("RECEIPT_TOO_LARGE", "The file must be smaller than 5 MB."));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
