@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, type CSSProperties } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/product";
+import { announceBagAdded } from "~/components/bag-added";
 import { ShareIcon } from "~/components/icons";
 import { FavouriteButton, Price, ProductPhoto } from "~/components/product";
 import { useBag } from "~/features/bag/useBag";
@@ -116,8 +117,28 @@ function ProductView({ product }: { product: ProductDetail }) {
       setNotice("size");
       return;
     }
-    bag.add(variant.id, Math.min(quantity, max));
+    const qty = Math.min(quantity, max);
+    bag.add(variant.id, qty);
     setNotice("added");
+    // Fly the photo the shopper is looking at (the one most on screen) into the bag icon.
+    const onScreen = (el: HTMLImageElement) => {
+      const r = el.getBoundingClientRect();
+      const h = Math.max(0, Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0));
+      const w = Math.max(0, Math.min(r.right, window.innerWidth) - Math.max(r.left, 0));
+      return h * w;
+    };
+    const shown = [...document.querySelectorAll<HTMLImageElement>("[data-gallery] img")].sort(
+      (a, b) => onScreen(b) - onScreen(a),
+    )[0];
+    const rect = shown && onScreen(shown) > 0 ? shown.getBoundingClientRect() : null;
+    announceBagAdded({
+      imageUrl: shown?.currentSrc || color.images[0]?.url,
+      name,
+      colour: p(color, "name"),
+      size: variant.sizeCode,
+      quantity: qty,
+      from: rect ? { x: rect.left, y: rect.top, width: rect.width, height: rect.height } : undefined,
+    });
   };
 
   const share = async () => {
@@ -169,6 +190,7 @@ function ProductView({ product }: { product: ProductDetail }) {
             <>
               <ul
                 key={color.id}
+                data-gallery
                 aria-label={p(color, "name")}
                 onScroll={(e) => {
                   const el = e.currentTarget;

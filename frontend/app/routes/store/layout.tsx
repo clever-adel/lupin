@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
 import type { Route } from "./+types/layout";
 import { HeaderLogo, Intro, LogoLockup, replayIntro } from "~/components/brand";
+import { BagAddedFeedback } from "~/components/bag-added";
 import { BagIcon, HeartIcon, UserIcon } from "~/components/icons";
 import { useScrollReveal } from "~/components/reveal";
 import { useMe } from "~/features/auth/session";
@@ -90,7 +91,7 @@ function Header({ departments }: { departments: Department[] }) {
             <span className="sr-only">{t("nav.favourites")}</span>
             <Count value={favourites.length} />
           </Link>
-          <Link to={href("/bag")} className={iconLink}>
+          <Link to={href("/bag")} className={iconLink} data-bag-icon>
             <BagIcon />
             <span className="sr-only">{t("nav.bag")}</span>
             <Count value={bag.count} />
@@ -219,6 +220,7 @@ export default function StoreLayout({ loaderData }: Route.ComponentProps) {
       <Intro />
       <Announcement site={loaderData.site} />
       <Header departments={loaderData.departments} />
+      <BagAddedFeedback />
       <main id="main" tabIndex={-1} className="outline-none">
         <Outlet />
       </main>
