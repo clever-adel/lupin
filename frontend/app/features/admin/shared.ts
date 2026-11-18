@@ -16,6 +16,8 @@ export interface AdminOrderRow {
   governorate: string;
   placedAt: string;
   itemCount: number;
+  /** Photos saved with the order's first lines (up to four). */
+  images?: string[];
 }
 
 export interface AdminOrder {

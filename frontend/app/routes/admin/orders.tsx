@@ -109,7 +109,23 @@ export default function AdminOrders() {
                   {o.customerName}
                   <span className="block text-xs text-stone">{o.customerPhone} · {o.governorate}</span>
                 </td>
-                <td className="px-3 py-3">{o.itemCount}</td>
+                <td className="px-3 py-2">
+                  <Link to={`/admin/orders/${o.reference}`} className="flex items-center gap-2" aria-label={`${o.itemCount} items in ${o.reference}`}>
+                    <span className="flex -space-x-3">
+                      {(o.images ?? []).slice(0, 3).map((src, i) => (
+                        <img
+                          key={i}
+                          src={src}
+                          alt=""
+                          loading="lazy"
+                          className="h-12 w-10 border-2 border-card bg-studio object-cover"
+                        />
+                      ))}
+                      {!o.images?.length && <span className="h-12 w-10 border-2 border-card bg-studio" aria-hidden="true" />}
+                    </span>
+                    <span className="text-xs text-stone">×{o.itemCount}</span>
+                  </Link>
+                </td>
                 <td className="px-3 py-3 font-semibold">{money(o.total)}</td>
                 <td className="px-3 py-3">
                   {PAYMENT_LABEL[o.paymentMethod ?? ""] ?? "—"}

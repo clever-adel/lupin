@@ -15,6 +15,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.util.HtmlUtils;
 import store.lupinwear.content.SiteSettings;
 import store.lupinwear.mail.Mailer;
+import store.lupinwear.order.OrderService.CustomerChangedOrder;
 import store.lupinwear.order.OrderService.OrderPlaced;
 
 /**
@@ -60,6 +61,40 @@ public class NewOrderNotifier {
         });
     }
 
+    /** A customer cancelled (or took back a cancel) on their own: email only, WhatsApp is for new orders. */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onCustomerChangedOrder(CustomerChangedOrder event) {
+        Thread.ofVirtual().name("order-change-" + event.reference()).start(() -> {
+            try {
+                String email = settings.get("notifications").path("orderEmail").asText("").trim();
+                if (email.isEmpty()) {
+                    return;
+                }
+                Order order = load(event.reference());
+                if (order != null) {
+                    mailer.send(email(email, order, items(event.reference()),
+                            event.cancelled() ? Kind.CANCELLED : Kind.RESTORED));
+                }
+            } catch (RuntimeException e) {
+                log.error("Order change alert for {} failed: {}", event.reference(), e.getMessage());
+            }
+        });
+    }
+
+    enum Kind {
+        NEW("طلب جديد", "#111"),
+        CANCELLED("العميل لغى الطلب", "#9b1c1c"),
+        RESTORED("العميل رجّع الطلب بعد ما لغاه", "#111");
+
+        final String title;
+        final String colour;
+
+        Kind(String title, String colour) {
+            this.title = title;
+            this.colour = colour;
+        }
+    }
+
     void notifyOwner(String reference) {
         var config = settings.get("notifications");
         String email = config.path("orderEmail").asText("").trim();
@@ -67,6 +102,22 @@ public class NewOrderNotifier {
         if (email.isEmpty() && (phone.isEmpty() || !whatsapp.configured())) {
             return;
         }
+        Order order = load(reference);
+        if (order == null) {
+            return;
+        }
+        List<Item> items = items(reference);
+
+        if (!email.isEmpty()) {
+            mailer.send(email(email, order, items, Kind.NEW));
+        }
+        if (!phone.isEmpty() && whatsapp.configured()) {
+            whatsapp.sendTemplate(international(phone), List.of(order.reference(), clean(order.customerName()),
+                    money(order.total()), paymentLabel(order.paymentMethod())));
+        }
+    }
+
+    private Order load(String reference) {
         Order order = jdbc.sql("""
                         select reference, customer_name, customer_phone, governorate_name_ar, city, address_line,
                                total, payment_method
@@ -75,29 +126,22 @@ public class NewOrderNotifier {
                 .query((rs, n) -> new Order(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
                         rs.getString(5), rs.getString(6), rs.getBigDecimal(7), rs.getString(8)))
                 .optional().orElse(null);
-        if (order == null) {
-            return;
-        }
-        List<Item> items = jdbc.sql("""
+        return order;
+    }
+
+    private List<Item> items(String reference) {
+        return jdbc.sql("""
                         select coalesce(nullif(i.product_name_ar, ''), i.product_name),
                                coalesce(nullif(i.color_name_ar, ''), i.color_name), i.size_code, i.quantity
                         from order_items i join orders o on o.id = i.order_id where o.reference = :r order by i.id""")
                 .param("r", reference)
                 .query((rs, n) -> new Item(rs.getString(1), rs.getString(2), rs.getString(3), rs.getInt(4))).list();
-
-        if (!email.isEmpty()) {
-            mailer.send(email(email, order, items));
-        }
-        if (!phone.isEmpty() && whatsapp.configured()) {
-            whatsapp.sendTemplate(international(phone), List.of(order.reference(), clean(order.customerName()),
-                    money(order.total()), paymentLabel(order.paymentMethod())));
-        }
     }
 
-    Mailer.Message email(String to, Order o, List<Item> items) {
+    Mailer.Message email(String to, Order o, List<Item> items, Kind kind) {
         String link = publicBaseUrl + "/admin/orders/" + o.reference();
         StringBuilder text = new StringBuilder()
-                .append("طلب جديد ").append(o.reference()).append('\n')
+                .append(kind.title).append(' ').append(o.reference()).append('\n')
                 .append("العميل: ").append(o.customerName()).append(" — ").append(o.customerPhone()).append('\n')
                 .append("العنوان: ").append(o.governorate()).append("، ").append(o.city()).append("، ").append(o.address()).append('\n')
                 .append("الدفع: ").append(paymentLabel(o.paymentMethod())).append('\n')
@@ -116,7 +160,7 @@ public class NewOrderNotifier {
                 <!doctype html><html dir="rtl"><body style="margin:0;background:#f4f1ea;font-family:Arial,Helvetica,sans-serif;color:#111">
                 <table role="presentation" width="100%%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
                 <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border:1px solid #e3ded3">
-                <tr><td style="background:#111;color:#f4f1ea;padding:16px 24px;font-size:16px;font-weight:bold">طلب جديد %s</td></tr>
+                <tr><td style="background:%s;color:#f4f1ea;padding:16px 24px;font-size:16px;font-weight:bold">%s %s</td></tr>
                 <tr><td style="padding:20px 24px;font-size:14px;line-height:1.7">
                 <p style="margin:0 0 4px;font-size:22px;font-weight:bold">%s ج.م</p>
                 <p style="margin:0 0 16px;color:#6b675f">%s</p>
@@ -125,9 +169,9 @@ public class NewOrderNotifier {
                 <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="font-size:14px">%s</table>
                 <a href="%s" style="display:inline-block;margin-top:20px;background:#111;color:#fff;text-decoration:none;padding:12px 20px;font-size:13px;font-weight:bold">افتح الطلب في الداشبورد</a>
                 </td></tr></table></td></tr></table></body></html>""".formatted(
-                esc(o.reference()), money(o.total()), esc(paymentLabel(o.paymentMethod())), esc(o.customerName()),
+                kind.colour, kind.title, esc(o.reference()), money(o.total()), esc(paymentLabel(o.paymentMethod())), esc(o.customerName()),
                 esc(o.customerPhone()), esc(o.governorate()), esc(o.city()), esc(o.address()), rows, esc(link));
-        return new Mailer.Message(to, "طلب جديد " + o.reference() + " — " + money(o.total()) + " ج.م", text.toString(), html);
+        return new Mailer.Message(to, kind.title + " " + o.reference() + " — " + money(o.total()) + " ج.م", text.toString(), html);
     }
 
     static String paymentLabel(String method) {

@@ -45,7 +45,7 @@ public class OrderAdminService {
 
     public record OrderRow(String reference, String status, String paymentStatus, String paymentMethod,
             BigDecimal total, String customerName, String customerPhone, String governorate, Instant placedAt,
-            int itemCount) {
+            int itemCount, List<String> images) {
     }
 
     public record PaymentRow(UUID id, String provider, String method, String status, BigDecimal amount,
@@ -105,12 +105,16 @@ public class OrderAdminService {
         params.put("offset", (long) index * size);
         List<OrderRow> rows = jdbc.sql("select o.reference, o.status, o.payment_status, o.payment_method, o.total,"
                 + " o.customer_name, o.customer_phone, o.governorate_name, o.placed_at,"
-                + " (select coalesce(sum(oi.quantity), 0) from order_items oi where oi.order_id = o.id) as item_count"
+                + " (select coalesce(sum(oi.quantity), 0) from order_items oi where oi.order_id = o.id) as item_count,"
+                // The photo saved with each line when the order was placed (first four lines).
+                + " array(select oi.image_url from order_items oi where oi.order_id = o.id and oi.image_url is not null"
+                + "       order by oi.id limit 4) as images"
                 + where + " order by o.placed_at desc, o.reference desc limit :limit offset :offset")
                 .params(params)
                 .query((rs, n) -> new OrderRow(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
                         rs.getBigDecimal(5), rs.getString(6), rs.getString(7), rs.getString(8),
-                        rs.getObject(9, OffsetDateTime.class).toInstant(), rs.getInt(10)))
+                        rs.getObject(9, OffsetDateTime.class).toInstant(), rs.getInt(10),
+                        List.of((String[]) rs.getArray(11).getArray())))
                 .list();
         return PageResponse.of(rows, index, size, total);
     }

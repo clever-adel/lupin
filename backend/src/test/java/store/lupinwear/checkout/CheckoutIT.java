@@ -386,6 +386,23 @@ class CheckoutIT extends IntegrationTest {
             assertThat(message.values()).containsExactly(reference, "Test Customer", "1,060", "كاش عند الاستلام");
 
             assertThat(mailer.sent.poll(500, java.util.concurrent.TimeUnit.MILLISECONDS)).isNull();
+
+            // The customer cancels, then takes it back: one email each, no WhatsApp.
+            mvc.perform(jsonPost("/api/v1/orders/" + reference + "/cancel", Map.of()).cookie(customer.cookie))
+                    .andExpect(status().isOk());
+            var cancelled = mailer.sent.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(cancelled).isNotNull();
+            assertThat(cancelled.subject()).startsWith("العميل لغى الطلب " + reference);
+            mvc.perform(jsonPost("/api/v1/orders/" + reference + "/undo-cancel", Map.of()).cookie(customer.cookie))
+                    .andExpect(status().isOk());
+            var restored = mailer.sent.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(restored).isNotNull();
+            assertThat(restored.subject()).startsWith("العميل رجّع الطلب بعد ما لغاه " + reference);
+            assertThat(whatsapp.sent.poll(500, java.util.concurrent.TimeUnit.MILLISECONDS)).isNull();
+
+            mvc.perform(get("/api/v1/admin/orders").param("q", reference).cookie(owner))
+                    .andExpect(jsonPath("$.items[0].reference").value(reference))
+                    .andExpect(jsonPath("$.items[0].images").isArray());
             mvc.perform(get("/api/v1/admin/summary").cookie(owner))
                     .andExpect(jsonPath("$.latestOrderReference").value(reference))
                     .andExpect(jsonPath("$.latestOrderAt").isNotEmpty());

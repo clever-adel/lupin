@@ -97,6 +97,10 @@ public class OrderService {
     public record OrderPlaced(String reference) {
     }
 
+    /** The customer cancelled their order themselves ({@code cancelled}), or took that cancel back. */
+    public record CustomerChangedOrder(String reference, boolean cancelled) {
+    }
+
     private final org.springframework.context.ApplicationEventPublisher events;
 
     public OrderService(JdbcClient jdbc, PricingService pricing, CartService cart, SiteSettings settings,
@@ -225,6 +229,7 @@ public class OrderService {
                     "This order can no longer be cancelled here. Please contact us.");
         }
         cancelLocked(order, reference, user, true);
+        events.publishEvent(new CustomerChangedOrder(reference, true));
         return get(user, reference);
     }
 
@@ -337,6 +342,7 @@ public class OrderService {
                 where id = :id
                 """).param("status", order.statusBeforeCancel()).param("now", now).param("id", order.id()).update();
         history(order.id(), "CANCELLED", order.statusBeforeCancel(), user, now);
+        events.publishEvent(new CustomerChangedOrder(reference, false));
         return get(user, reference);
     }
 
