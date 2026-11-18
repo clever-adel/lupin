@@ -19,6 +19,7 @@ import store.lupinwear.auth.api.AuthDtos.RegisterRequest;
 import store.lupinwear.auth.application.AuthService;
 import store.lupinwear.auth.application.AuthService.ClientInfo;
 import store.lupinwear.auth.application.AuthService.Tokens;
+import store.lupinwear.auth.application.PasswordResetService;
 import store.lupinwear.security.AuthCookies;
 import store.lupinwear.security.CurrentUser;
 import store.lupinwear.shared.ApiException;
@@ -29,10 +30,12 @@ public class AuthController {
 
     private final AuthService auth;
     private final AuthCookies cookies;
+    private final PasswordResetService resets;
 
-    public AuthController(AuthService auth, AuthCookies cookies) {
+    public AuthController(AuthService auth, AuthCookies cookies, PasswordResetService resets) {
         this.auth = auth;
         this.cookies = cookies;
+        this.resets = resets;
     }
 
     /** Reading the token makes Spring Security set the XSRF-TOKEN cookie the SPA echoes back. */
@@ -86,6 +89,22 @@ public class AuthController {
     void changePassword(@AuthenticationPrincipal CurrentUser user, @Valid @RequestBody AuthDtos.PasswordChangeRequest body,
             HttpServletResponse res) {
         auth.changeOwnPassword(user.id(), body.currentPassword(), body.newPassword());
+        cookies.clear(res);
+    }
+
+    /** Always the same answer, whether or not the email has an account. */
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    void forgotPassword(@Valid @RequestBody AuthDtos.ForgotPasswordRequest body, HttpServletRequest req) {
+        resets.requestLink(body.email(), body.lang(), req.getRemoteAddr());
+    }
+
+    /** Ends every session of that person; this browser is signed out too and signs in with the new password. */
+    @PostMapping("/reset-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void resetPassword(@Valid @RequestBody AuthDtos.ResetPasswordRequest body, HttpServletRequest req,
+            HttpServletResponse res) {
+        resets.reset(body.token(), body.newPassword(), req.getRemoteAddr());
         cookies.clear(res);
     }
 

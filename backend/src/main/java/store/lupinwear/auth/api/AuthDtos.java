@@ -32,6 +32,16 @@ public final class AuthDtos {
             @NotBlank @Size(min = 10, max = 128, message = "Use at least 10 characters") String newPassword) {
     }
 
+    public record ForgotPasswordRequest(
+            @NotBlank @Email @Size(max = 254) String email,
+            @Pattern(regexp = "en|ar") String lang) {
+    }
+
+    public record ResetPasswordRequest(
+            @NotBlank @Size(max = 100) String token,
+            @NotBlank @Size(min = 10, max = 128, message = "Use at least 10 characters") String newPassword) {
+    }
+
     public record MeResponse(UUID id, String email, String phone, String fullName, Set<String> roles,
             boolean emailVerified, String preferredLang) {
 

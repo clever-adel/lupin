@@ -135,6 +135,22 @@ public abstract class IntegrationTest {
         FakeBosta fakeBosta() {
             return new FakeBosta();
         }
+
+        @Bean
+        @Primary
+        FakeMailer fakeMailer() {
+            return new FakeMailer();
+        }
+    }
+
+    /** No network in tests: keeps every message, so a test can open the link it carries. */
+    public static class FakeMailer implements store.lupinwear.mail.Mailer {
+        public final java.util.concurrent.LinkedBlockingQueue<Message> sent = new java.util.concurrent.LinkedBlockingQueue<>();
+
+        @Override
+        public void send(Message message) {
+            sent.add(message);
+        }
     }
 
     /** Stands in for Bosta's API: two districts per city, and remembers the last delivery it was asked for. */

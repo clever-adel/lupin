@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/sign-in";
 import { LogoLockup } from "~/components/brand";
 import { Field } from "~/components/form";
@@ -100,7 +100,12 @@ export default function SignIn() {
           {mode === "signin" ? (
             <form noValidate className="mt-6 space-y-4" onSubmit={signInForm.handleSubmit((values) => signIn.mutate(values))}>
               <Field label={t("auth.email")} type="email" autoComplete="email" error={signInForm.formState.errors.email} registration={signInForm.register("email")} />
-              <Field label={t("auth.password")} type="password" autoComplete="current-password" error={signInForm.formState.errors.password} registration={signInForm.register("password")} />
+              <div>
+                <Field label={t("auth.password")} type="password" autoComplete="current-password" error={signInForm.formState.errors.password} registration={signInForm.register("password")} />
+                <Link to={href("/reset-password")} className="mt-2 inline-block text-xs text-stone underline underline-offset-4 hover:text-ink">
+                  {t("auth.forgot")}
+                </Link>
+              </div>
               <button type="submit" className="btn btn-primary w-full" disabled={signIn.isPending}>
                 {signIn.isPending ? t("auth.working") : t("auth.submitSignIn")}
               </button>

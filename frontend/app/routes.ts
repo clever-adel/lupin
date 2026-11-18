@@ -26,6 +26,7 @@ export default [
     route("looks/:slug", "routes/store/look.tsx"),
     route("bag", "routes/store/bag.tsx"),
     route("sign-in", "routes/store/sign-in.tsx"),
+    route("reset-password", "routes/store/reset-password.tsx"),
     route("account", "routes/store/account.tsx"),
     route("faq", "routes/store/faq.tsx"),
     route("policies/:slug", "routes/store/policy.tsx"),
