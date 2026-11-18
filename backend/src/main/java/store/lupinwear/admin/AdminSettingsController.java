@@ -72,8 +72,9 @@ public class AdminSettingsController {
     /** Settings a staff member may edit, and extra fields allowed beyond those already stored. */
     private static final Map<String, Set<String>> EDITABLE = Map.of(
             "hero", Set.of("imageUrl", "imagePublicId"), "announcement", Set.of(), "contact", Set.of(), "home_sections", Set.of(),
-            "checkout", Set.of("unpaidOrderMinutes"), "payment_methods", Set.of());
-    private static final Set<String> OWNER_ONLY = Set.of("payment_methods", "checkout");
+            "checkout", Set.of("unpaidOrderMinutes"), "payment_methods", Set.of(), "notifications", Set.of());
+    /** "notifications" decides where customers' order details are sent, so it is the owner's too. */
+    private static final Set<String> OWNER_ONLY = Set.of("payment_methods", "checkout", "notifications");
 
     private final JdbcClient jdbc;
     private final SiteSettings settings;
@@ -252,6 +253,17 @@ public class AdminSettingsController {
             }
             if (value.path("VODAFONE_CASH_MANUAL").asBoolean() && number.isEmpty()) {
                 throw ApiException.badRequest("INVALID_SETTING", "Enter the wallet number before switching it on.");
+            }
+        }
+        if ("notifications".equals(key)) {
+            String email = value.path("orderEmail").asText("").trim();
+            if (!email.isEmpty() && !email.matches("[^@\\s]{1,64}@[^@\\s]{1,190}\\.[A-Za-z]{2,24}")) {
+                throw ApiException.badRequest("INVALID_SETTING", "Enter a valid email address for order alerts.");
+            }
+            String phone = value.path("whatsappTo").asText("").replaceAll("[\\s-]", "");
+            if (!phone.isEmpty() && !phone.matches("01[0125]\\d{8}")) {
+                throw ApiException.badRequest("INVALID_SETTING",
+                        "The WhatsApp number is an Egyptian mobile number of 11 digits, like 01012345678.");
             }
         }
         if ("payment_methods".equals(key) && value.path("INSTAPAY_MANUAL").asBoolean()

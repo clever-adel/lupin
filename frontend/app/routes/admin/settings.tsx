@@ -356,6 +356,38 @@ function CheckoutForm({ value, isOwner }: { value: Record<string, unknown>; isOw
   );
 }
 
+function NotificationsForm({ value, isOwner }: { value: Record<string, unknown>; isOwner: boolean }) {
+  const save = useSaveSetting("notifications");
+  const [email, setEmail] = useState(String(value.orderEmail ?? ""));
+  const [phone, setPhone] = useState(String(value.whatsappTo ?? ""));
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate({ orderEmail: email.trim(), whatsappTo: phone.replace(/[\s-]/g, "") });
+      }}
+    >
+      <fieldset disabled={!isOwner} className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor="alert-email" className="mb-1 block text-xs font-medium">Email for new orders (empty = none)</label>
+          <input id="alert-email" className="field" type="email" dir="ltr" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <p className="mt-1 text-xs text-stone">Sent through Resend; works once RESEND_API_KEY is set on the server.</p>
+        </div>
+        <div>
+          <label htmlFor="alert-phone" className="mb-1 block text-xs font-medium">WhatsApp number for new orders (empty = none)</label>
+          <input id="alert-phone" className="field" inputMode="tel" dir="ltr" placeholder="01012345678" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <p className="mt-1 text-xs text-stone">Works once the WhatsApp Cloud API keys are set on the server.</p>
+        </div>
+      </fieldset>
+      {isOwner ? (
+        <SaveRow pending={save.isPending} error={save.error} saved={save.isSuccess} />
+      ) : (
+        <p className="mt-4 text-sm text-stone">Only the owner can change these.</p>
+      )}
+    </form>
+  );
+}
+
 function AnnouncementForm({ value }: { value: Record<string, unknown> }) {
   const save = useSaveSetting("announcement");
   const lines = (v: unknown) => (Array.isArray(v) ? v.join("\n") : "");
@@ -420,6 +452,13 @@ export default function AdminSettings() {
 
       <Section title="Payment methods" hint="Decides how customers can pay and where transfers are sent.">
         <PaymentForm value={settings.data.payment_methods ?? {}} isOwner={isOwner} />
+      </Section>
+
+      <Section
+        title="New order alerts"
+        hint="Each new order is sent here with the customer, address, items and total. While the dashboard is open, “Turn on order alerts” at the top also plays a sound on this computer."
+      >
+        <NotificationsForm value={settings.data.notifications ?? {}} isOwner={isOwner} />
       </Section>
 
       <Section title="Checkout rules">

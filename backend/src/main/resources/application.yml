@@ -72,6 +72,13 @@ lupin:
   google:
     client-id: ${GOOGLE_CLIENT_ID:531304085676-69ir1l2mgopbq283vdacct77re4ofb64.apps.googleusercontent.com}
     client-secret: ${GOOGLE_CLIENT_SECRET:}
+  # New-order alerts on WhatsApp (Meta WhatsApp Cloud API). Off until the token and the sender's
+  # phone number ID are present. The template must be approved by Meta (see NewOrderNotifier).
+  whatsapp:
+    token: ${WHATSAPP_TOKEN:}
+    phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+    template: ${WHATSAPP_TEMPLATE:new_order}
+    template-lang: ${WHATSAPP_TEMPLATE_LANG:ar}
   # Outgoing email ("forgot password" links) through Resend. Nothing is sent until the key is present.
   # The sender's domain must be verified in Resend (DNS records on lupinwear.store).
   mail:

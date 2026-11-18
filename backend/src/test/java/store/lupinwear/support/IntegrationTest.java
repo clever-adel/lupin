@@ -149,6 +149,30 @@ public abstract class IntegrationTest {
         FakeGoogle fakeGoogle() {
             return new FakeGoogle();
         }
+
+        @Bean
+        @Primary
+        FakeWhatsApp fakeWhatsApp() {
+            return new FakeWhatsApp();
+        }
+    }
+
+    /** Stands in for the WhatsApp Cloud API: switched on, keeps every message. */
+    public static class FakeWhatsApp implements store.lupinwear.notify.WhatsAppGateway {
+        public record Sent(String to, java.util.List<String> values) {
+        }
+
+        public final java.util.concurrent.LinkedBlockingQueue<Sent> sent = new java.util.concurrent.LinkedBlockingQueue<>();
+
+        @Override
+        public boolean configured() {
+            return true;
+        }
+
+        @Override
+        public void sendTemplate(String to, java.util.List<String> bodyValues) {
+            sent.add(new Sent(to, bodyValues));
+        }
     }
 
     /** Stands in for Google's token endpoint: answers each code with the profile a test registered for it. */

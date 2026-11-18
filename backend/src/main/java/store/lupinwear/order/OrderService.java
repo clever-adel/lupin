@@ -93,8 +93,15 @@ public class OrderService {
     private final Clock clock;
     private final PaymentMethods paymentMethods;
 
+    /** A new order was placed (not a retry of one already placed). */
+    public record OrderPlaced(String reference) {
+    }
+
+    private final org.springframework.context.ApplicationEventPublisher events;
+
     public OrderService(JdbcClient jdbc, PricingService pricing, CartService cart, SiteSettings settings,
-            Clock clock, PaymentMethods paymentMethods) {
+            Clock clock, PaymentMethods paymentMethods, org.springframework.context.ApplicationEventPublisher events) {
+        this.events = events;
         this.paymentMethods = paymentMethods;
         this.jdbc = jdbc;
         this.pricing = pricing;
@@ -206,6 +213,8 @@ public class OrderService {
         }
         history(orderId, null, cash ? "PENDING" : "AWAITING_PAYMENT", user, now);
         cart.clear(user);
+        // Heard only once the order is committed (NewOrderNotifier tells the owner).
+        events.publishEvent(new OrderPlaced(reference));
         return get(user, reference);
     }
 

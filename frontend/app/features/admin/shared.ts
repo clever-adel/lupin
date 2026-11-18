@@ -53,6 +53,9 @@ export interface Summary {
   refundsPending: number;
   lowStockVariants: number;
   shipmentsNeedingAttention: number;
+  /** The newest order, so the dashboard can ring when it changes. */
+  latestOrderReference?: string | null;
+  latestOrderAt?: string | null;
 }
 
 /** Mirrors ShippingService.BostaInfo. */

@@ -342,6 +342,59 @@ class CheckoutIT extends IntegrationTest {
         mvc.perform(get("/api/v1/content/faq")).andExpect(status().isOk());
     }
 
+    @Autowired
+    FakeMailer mailer;
+    @Autowired
+    FakeWhatsApp whatsapp;
+
+    @Test
+    void theOwnerIsToldAboutEachNewOrderOnceByEmailAndWhatsApp() throws Exception {
+        // Only the owner may say where order details go, and only to real-looking addresses.
+        Cookie admin = staffCookie(store.lupinwear.auth.domain.Role.ADMIN);
+        mvc.perform(put("/api/v1/admin/settings/notifications").with(csrf()).cookie(admin)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"orderEmail\":\"x@example.test\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(put("/api/v1/admin/settings/notifications").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"whatsappTo\":\"12345\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/v1/admin/settings/notifications").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderEmail\":\"owner-alerts@example.test\",\"whatsappTo\":\"01112223334\"}"))
+                .andExpect(status().isOk());
+        mailer.sent.clear();
+        whatsapp.sent.clear();
+        try {
+            long variant = product("Alert <Jacket>", "1000.00", null, 5);
+            Customer customer = customer();
+            setQuantity(customer, variant, 1).andExpect(status().isOk());
+            PlaceOrderRequest request = request(null, "1060.00", "key-" + UUID.randomUUID());
+            String reference = body(place(customer, request).andExpect(status().isCreated()).andReturn())
+                    .get("reference").asText();
+            place(customer, request).andExpect(status().isCreated()); // a retry is not a new order
+
+            var mail = mailer.sent.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(mail).isNotNull();
+            assertThat(mail.to()).isEqualTo("owner-alerts@example.test");
+            assertThat(mail.subject()).contains(reference).contains("1,060");
+            assertThat(mail.text()).contains("Test Customer").contains("01012345678").contains("كاش عند الاستلام");
+            // Customer-typed text is escaped in the HTML version.
+            assertThat(mail.html()).contains("/admin/orders/" + reference).doesNotContain("<Jacket>");
+
+            var message = whatsapp.sent.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(message).isNotNull();
+            assertThat(message.to()).isEqualTo("201112223334");
+            assertThat(message.values()).containsExactly(reference, "Test Customer", "1,060", "كاش عند الاستلام");
+
+            assertThat(mailer.sent.poll(500, java.util.concurrent.TimeUnit.MILLISECONDS)).isNull();
+            mvc.perform(get("/api/v1/admin/summary").cookie(owner))
+                    .andExpect(jsonPath("$.latestOrderReference").value(reference))
+                    .andExpect(jsonPath("$.latestOrderAt").isNotEmpty());
+        } finally {
+            setting("notifications", "orderEmail", "\"\"");
+            setting("notifications", "whatsappTo", "\"\"");
+        }
+    }
+
     // ── helpers ──
 
     record Customer(UUID id, String email, Cookie cookie) {

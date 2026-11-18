@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { Link, NavLink, Outlet } from "react-router";
 import { useRequireSignIn, useSignOut } from "~/features/auth/session";
+import { NewOrderBanner, OrderAlertToggle, useNewOrderAlerts } from "~/features/admin/order-alerts";
 import type { Summary } from "~/features/admin/shared";
 import { api, ApiError } from "~/lib/http";
 
@@ -22,9 +23,12 @@ export default function AdminLayout() {
     queryKey: ["admin", "summary"],
     queryFn: () => api<Summary>("GET", "/api/v1/admin/summary"),
     enabled: isStaff,
-    refetchInterval: 60_000,
+    // Often enough that a new order rings within half a minute, also in a background tab.
+    refetchInterval: 20_000,
+    refetchIntervalInBackground: true,
     retry: false,
   });
+  const alerts = useNewOrderAlerts(summary.data);
 
   // The server ended this session (password reset, switched off, signed out elsewhere): the failed
   // refresh has already cleared the cookies, so asking "who am I" again sends the visitor to sign in.
@@ -67,6 +71,7 @@ export default function AdminLayout() {
           </Link>
           <div className="flex items-center gap-4 text-xs text-bone/70">
             <span>{me.data.fullName} · {me.data.roles.includes("OWNER") ? "Owner" : "Admin"}</span>
+            <OrderAlertToggle on={alerts.on} enable={alerts.enable} disable={alerts.disable} />
             <Link to="/account" className="underline">My password</Link>
             <Link to="/" className="underline">Store</Link>
             <button type="button" className="cursor-pointer underline" onClick={() => signOut.mutate()}>Sign out</button>
@@ -83,6 +88,7 @@ export default function AdminLayout() {
           {me.data.roles.includes("OWNER") && <NavLink to="/admin/staff" className={link}>Staff</NavLink>}
         </nav>
       </header>
+      {alerts.fresh && <NewOrderBanner reference={alerts.fresh} onClose={alerts.dismiss} />}
       <main className="shell py-8">
         <Outlet context={{ summary: summary.data, isOwner: me.data.roles.includes("OWNER") }} />
       </main>

@@ -65,7 +65,7 @@ public class OrderAdminService {
     }
 
     public record Summary(Map<String, Long> ordersByStatus, long transfersToCheck, long refundsPending,
-            long lowStockVariants, long shipmentsNeedingAttention) {
+            long lowStockVariants, long shipmentsNeedingAttention, String latestOrderReference, String latestOrderAt) {
     }
 
     /** Courier states that need a person: returned, exception, cancelled, terminated, lost, damaged, awaiting action. */
@@ -290,7 +290,11 @@ public class OrderAdminService {
                 select count(*) from shipments s join orders o on o.id = s.order_id
                 where o.status = 'SHIPPED' and s.provider_state in (:states)
                 """).param("states", COURIER_PROBLEM_STATES).query(Long.class).single();
-        return new Summary(byStatus, transfers, refunds, lowStock, shipmentProblems);
+        // The dashboard compares this with what it saw last time to ring for a new order.
+        var latest = jdbc.sql("select reference, placed_at from orders order by placed_at desc limit 1")
+                .query((rs, n) -> new String[] {rs.getString(1), rs.getTimestamp(2).toInstant().toString()})
+                .optional().orElse(new String[] {null, null});
+        return new Summary(byStatus, transfers, refunds, lowStock, shipmentProblems, latest[0], latest[1]);
     }
 
     private static String blankToNull(String s) {
