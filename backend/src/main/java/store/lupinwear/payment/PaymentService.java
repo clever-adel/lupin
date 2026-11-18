@@ -249,6 +249,60 @@ public class PaymentService {
         return node.path(field).asText("");
     }
 
+    // ── Changing how to pay ──
+
+    /**
+     * While an online order is still unpaid, the customer may pay another way: switch between InstaPay,
+     * a wallet transfer and the Paymob methods that are switched on. Not to or from cash on delivery (that
+     * is a different kind of order), and never once a transfer is being checked or the order is paid.
+     * A Paymob attempt already open stays valid: if its money still arrives, the webhook records it.
+     */
+    public void changeMethod(UUID user, String reference, String method) {
+        if (!(PaymentMethods.MANUAL.contains(method) || PaymentMethods.PAYMOB.contains(method))
+                || !methods.available(method)) {
+            throw ApiException.badRequest("PAYMENT_METHOD_UNAVAILABLE", "This payment method is not available.");
+        }
+        tx.executeWithoutResult(status -> {
+            OrderRow order = order(user, reference, true);
+            if (!"AWAITING_PAYMENT".equals(order.status())
+                    || !List.of("PENDING", "FAILED").contains(order.paymentStatus())) {
+                throw ApiException.conflict("PAYMENT_METHOD_LOCKED", "The payment method can no longer be changed.");
+            }
+            if (method.equals(order.method())) {
+                return;
+            }
+            jdbc.sql("update orders set payment_method = :m, updated_at = now() where id = :o")
+                    .param("m", method).param("o", order.id()).update();
+            // The order's single manual-transfer row follows the method; it is re-opened clean.
+            UUID manual = jdbc.sql("select id from payments where order_id = :o and provider = 'MANUAL_TRANSFER'"
+                    + " and status in ('PENDING', 'FAILED', 'CANCELLED') order by created_at desc limit 1")
+                    .param("o", order.id()).query(UUID.class).optional().orElse(null);
+            if (PaymentMethods.MANUAL.contains(method)) {
+                if (manual != null) {
+                    jdbc.sql("""
+                            update payments set method = :m, status = 'PENDING', manual_reference = null,
+                                amount = :amount, updated_at = now() where id = :id
+                            """).param("m", method).param("amount", order.total()).param("id", manual).update();
+                    jdbc.sql("delete from transfer_receipts where payment_id = :p").param("p", manual).update();
+                } else {
+                    jdbc.sql("""
+                            insert into payments (order_id, provider, method, amount, idempotency_key)
+                            values (:o, 'MANUAL_TRANSFER', :m, :amount, :key)
+                            """).param("o", order.id()).param("m", method).param("amount", order.total())
+                            .param("key", "order:" + order.id() + ":" + UUID.randomUUID()).update();
+                }
+            } else if (manual != null) {
+                jdbc.sql("update payments set status = 'CANCELLED', updated_at = now() where id = :id")
+                        .param("id", manual).update();
+            }
+            if ("FAILED".equals(order.paymentStatus())) {
+                orders.setPaymentStatus(order.id(), "PENDING");
+            }
+            audit.record(user, "PAYMENT_METHOD_CHANGED", "order", order.reference(),
+                    Map.of("from", order.method() == null ? "" : order.method(), "to", method));
+        });
+    }
+
     // ── Manual transfer (InstaPay or Vodafone Cash) ──
 
     /**

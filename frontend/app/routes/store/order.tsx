@@ -7,7 +7,7 @@ import { useRequireSignIn } from "~/features/auth/session";
 import { api, ApiError } from "~/lib/http";
 import { toLang, translate, useT, type MessageKey } from "~/lib/i18n";
 import { layoutOrigin, seo } from "~/lib/seo";
-import type { Order, SiteContent } from "~/lib/types";
+import type { Order, PaymentMethod, SiteContent } from "~/lib/types";
 
 export function meta({ params, matches, location }: Route.MetaArgs) {
   const title = translate(toLang(params.lang), "order.title", { reference: params.reference ?? "" });
@@ -40,6 +40,59 @@ async function prepareReceipt(file: File): Promise<Blob | null> {
     // Not decodable here: let the server judge the original.
   }
   return RECEIPT_TYPES.includes(file.type) && file.size <= RECEIPT_MAX_BYTES ? file : null;
+}
+
+const SWITCHABLE: PaymentMethod[] = ["CARD", "WALLET", "FAWRY", "INSTAPAY_MANUAL", "VODAFONE_CASH_MANUAL"];
+
+/** Until the order is paid (or a transfer is sent for checking), the customer may choose another way to pay. */
+function ChangeMethod({ order, site }: { order: Order; site?: SiteContent }) {
+  const { t, code } = useT();
+  const client = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const options = SWITCHABLE.filter((m) => site?.paymentMethods[m] === true);
+  const change = useMutation({
+    mutationFn: (method: PaymentMethod) =>
+      api<Order>("POST", `/api/v1/orders/${encodeURIComponent(order.reference)}/payment/method`, { method }),
+    onSuccess: (updated) => {
+      client.setQueryData(["order", updated.reference], updated);
+      setOpen(false);
+    },
+  });
+  if (options.filter((m) => m !== order.paymentMethod).length === 0) return null;
+  return (
+    <div className="mt-4 border-t border-line pt-3">
+      {!open ? (
+        <button type="button" className="text-sm underline" onClick={() => setOpen(true)}>{t("pay.change")}</button>
+      ) : (
+        <fieldset disabled={change.isPending}>
+          <legend className="mb-2 font-medium">{t("pay.changeTitle")}</legend>
+          <div className="flex flex-wrap gap-2">
+            {options.map((m) => {
+              const current = m === order.paymentMethod;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  aria-pressed={current}
+                  className={current ? "btn btn-primary" : "btn btn-outline"}
+                  onClick={() => (current ? setOpen(false) : change.mutate(m))}
+                >
+                  {t(`pay.${m}` as MessageKey)}
+                  {current && <span className="ms-1 text-xs opacity-75">({t("pay.changeCurrent")})</span>}
+                </button>
+              );
+            })}
+          </div>
+          {change.isPending && <p className="mt-2 text-xs text-stone" role="status">{t("pay.changing")}</p>}
+          {change.isError && (
+            <p role="alert" className="mt-2 text-danger">
+              {code("err", change.error instanceof ApiError ? change.error.code : undefined)}
+            </p>
+          )}
+        </fieldset>
+      )}
+    </div>
+  );
 }
 
 /** Whatever the customer still has to do, or know, about paying. The server decides; this only shows it. */
@@ -93,7 +146,7 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
     queryKey: ["site"],
     queryFn: () => api<SiteContent>("GET", "/api/v1/content/site"),
     staleTime: 300_000,
-    enabled: order.paymentAction === "TRANSFER",
+    enabled: order.paymentAction === "TRANSFER" || order.paymentAction === "PAYMOB",
   });
   // Card, wallet and Fawry details are entered on Paymob's own page, never here.
   const pay = useMutation({
@@ -146,6 +199,7 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
             {pay.isPending || pay.isSuccess ? t("pay.opening") : `${t("pay.now")} · ${money(order.total)}`}
           </button>
         </div>
+        <ChangeMethod order={order} site={site.data} />
       </div>
     );
   }
@@ -257,6 +311,7 @@ function PaymentPanel({ order, autoPay, returned }: { order: Order; autoPay: boo
         )}
         {proofError && <p role="alert" className="mt-2 text-danger">{t("pay.err.proof")}</p>}
         {transfer.isError && <p role="alert" className="mt-2 text-danger">{error(transfer.error)}</p>}
+        <ChangeMethod order={order} site={site.data} />
       </form>
     );
   }

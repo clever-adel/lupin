@@ -232,6 +232,50 @@ class PaymentIT extends IntegrationTest {
     }
 
     @Test
+    void aCustomerMaySwitchHowToPayUntilTheTransferIsSent() throws Exception {
+        setting("payment_methods", "VODAFONE_CASH_MANUAL", "true");
+        setting("payment_methods", "vodafoneCashNumber", "\"01012345678\"");
+        String reference = reference(place("INSTAPAY_MANUAL").andExpect(status().isCreated()));
+        String url = "/api/v1/orders/" + reference + "/payment/method";
+
+        mvc.perform(jsonPost(url, Map.of("method", "VODAFONE_CASH_MANUAL")).cookie(customer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentMethod").value("VODAFONE_CASH_MANUAL"))
+                .andExpect(jsonPath("$.paymentAction").value("TRANSFER"));
+        assertThat(paymentRows(reference)).containsExactly("MANUAL_TRANSFER:VODAFONE_CASH_MANUAL:PENDING");
+
+        // To an online method: the transfer row is closed, the order now waits for Paymob.
+        mvc.perform(jsonPost(url, Map.of("method", "CARD")).cookie(customer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.paymentAction").value("PAYMOB"));
+        assertThat(paymentRows(reference)).containsExactly("MANUAL_TRANSFER:VODAFONE_CASH_MANUAL:CANCELLED");
+
+        // And back: still one transfer row, opened again for InstaPay.
+        mvc.perform(jsonPost(url, Map.of("method", "INSTAPAY_MANUAL")).cookie(customer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.paymentAction").value("TRANSFER"));
+        assertThat(paymentRows(reference)).containsExactly("MANUAL_TRANSFER:INSTAPAY_MANUAL:PENDING");
+
+        // Cash on delivery is a different kind of order; and another customer's order is not found.
+        mvc.perform(jsonPost(url, Map.of("method", "COD")).cookie(customer)).andExpect(status().isBadRequest());
+        Cookie stranger = cookie(register(uniqueEmail()), AuthCookies.ACCESS);
+        mvc.perform(jsonPost(url, Map.of("method", "VODAFONE_CASH_MANUAL")).cookie(stranger))
+                .andExpect(status().isNotFound());
+
+        // Once the transfer is sent for checking, the method is fixed.
+        mvc.perform(jsonPost("/api/v1/orders/" + reference + "/payment/transfer", Map.of("reference", "IPN 11223344"))
+                .cookie(customer)).andExpect(status().isOk());
+        mvc.perform(jsonPost(url, Map.of("method", "VODAFONE_CASH_MANUAL")).cookie(customer))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PAYMENT_METHOD_LOCKED"));
+    }
+
+    private List<String> paymentRows(String reference) {
+        return jdbc.sql("""
+                select p.provider || ':' || p.method || ':' || p.status from payments p
+                join orders o on o.id = p.order_id where o.reference = :r order by p.created_at""")
+                .param("r", reference).query(String.class).list();
+    }
+
+    @Test
     void aTransferScreenshotIsKeptPrivateForStaffToCheck() throws Exception {
         String reference = reference(place("INSTAPAY_MANUAL").andExpect(status().isCreated()));
         String url = "/api/v1/orders/" + reference + "/payment/transfer";

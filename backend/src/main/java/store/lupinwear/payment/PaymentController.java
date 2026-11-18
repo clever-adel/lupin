@@ -40,6 +40,10 @@ public class PaymentController {
                     message = "Use the reference number shown in your banking app") String reference) {
     }
 
+    public record MethodRequest(
+            @NotBlank @Pattern(regexp = "CARD|WALLET|FAWRY|INSTAPAY_MANUAL|VODAFONE_CASH_MANUAL") String method) {
+    }
+
     public record DecisionRequest(@Size(max = 300) String note) {
     }
 
@@ -59,6 +63,14 @@ public class PaymentController {
     PayRedirect payOnline(@AuthenticationPrincipal CurrentUser user, @PathVariable String reference) {
         rateLimiter.check("pay:" + user.id(), 20);
         return payments.startPaymob(user.id(), reference);
+    }
+
+    @PostMapping("/api/v1/orders/{reference}/payment/method")
+    OrderView changeMethod(@AuthenticationPrincipal CurrentUser user, @PathVariable String reference,
+            @Valid @RequestBody MethodRequest body) {
+        rateLimiter.check("pay:" + user.id(), 20);
+        payments.changeMethod(user.id(), reference, body.method());
+        return orders.get(user.id(), reference);
     }
 
     @PostMapping(path = "/api/v1/orders/{reference}/payment/transfer", consumes = MediaType.APPLICATION_JSON_VALUE)
