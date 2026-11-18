@@ -103,6 +103,13 @@ public class User {
         lockedUntil = null;
     }
 
+    /** Google (or a later email check) has confirmed this person owns the address. */
+    public void markEmailVerified(Instant at) {
+        if (emailVerifiedAt == null) {
+            emailVerifiedAt = at;
+        }
+    }
+
     public void lockUntil(Instant until) {
         lockedUntil = until;
     }

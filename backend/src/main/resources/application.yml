@@ -67,6 +67,11 @@ lupin:
   public-base-url: ${LUPIN_PUBLIC_BASE_URL:https://lupinwear.store}
   jobs:
     enabled: true
+  # "Continue with Google". The client ID is public (Google Cloud project lupin-store, web client
+  # "Lupin."); the secret comes from the environment. Off until the secret is present.
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:531304085676-69ir1l2mgopbq283vdacct77re4ofb64.apps.googleusercontent.com}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
   # Outgoing email ("forgot password" links) through Resend. Nothing is sent until the key is present.
   # The sender's domain must be verified in Resend (DNS records on lupinwear.store).
   mail:

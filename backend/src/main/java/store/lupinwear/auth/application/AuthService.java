@@ -209,6 +209,14 @@ public class AuthService {
         return users.save(user);
     }
 
+    /** For sign-in methods that have already proved who the person is (Google). Starts a new session. */
+    @Transactional
+    public Tokens signInVerified(User user, ClientInfo client) {
+        user.recordSuccessfulLogin(clock.instant());
+        users.save(user);
+        return startSession(user, UUID.randomUUID(), client);
+    }
+
     private Tokens startSession(User user, UUID familyId, ClientInfo client) {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);

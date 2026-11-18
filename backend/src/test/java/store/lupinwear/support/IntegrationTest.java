@@ -86,6 +86,8 @@ public abstract class IntegrationTest {
         registry.add("spring.datasource.url", () -> URL);
         registry.add("spring.datasource.username", () -> USERNAME);
         registry.add("spring.datasource.password", () -> PASSWORD);
+        // Turns "Continue with Google" on; FakeGoogle answers instead of Google.
+        registry.add("lupin.google.client-secret", () -> "test-secret");
     }
 
     /** A clock tests can move forward, so expiry and lockout are tested without sleeping. */
@@ -140,6 +142,28 @@ public abstract class IntegrationTest {
         @Primary
         FakeMailer fakeMailer() {
             return new FakeMailer();
+        }
+
+        @Bean
+        @Primary
+        FakeGoogle fakeGoogle() {
+            return new FakeGoogle();
+        }
+    }
+
+    /** Stands in for Google's token endpoint: answers each code with the profile a test registered for it. */
+    public static class FakeGoogle implements store.lupinwear.auth.google.GoogleGateway {
+        public final java.util.Map<String, Profile> profiles = new java.util.concurrent.ConcurrentHashMap<>();
+        public volatile String lastVerifier;
+
+        @Override
+        public Profile exchange(String code, String codeVerifier, String redirectUri) {
+            lastVerifier = codeVerifier;
+            Profile p = profiles.remove(code);
+            if (p == null) {
+                throw new IllegalStateException("invalid_grant");
+            }
+            return p;
         }
     }
 
