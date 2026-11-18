@@ -49,6 +49,10 @@ public class PaymentService {
     public record Receipt(String contentType, byte[] bytes) {
     }
 
+    /** Heard after commit by NewOrderNotifier: staff should check the bank or wallet app. */
+    public record TransferSubmitted(String reference, boolean withScreenshot) {
+    }
+
     public static final int RECEIPT_MAX_BYTES = 5 * 1024 * 1024;
 
     private record OrderRow(UUID id, String reference, String status, String paymentStatus, String method,
@@ -64,12 +68,15 @@ public class PaymentService {
     private final SiteSettings settings;
     private final AuditLog audit;
     private final Clock clock;
+    private final org.springframework.context.ApplicationEventPublisher events;
     private final String publicBaseUrl;
 
     public PaymentService(JdbcClient jdbc, TransactionTemplate tx, PaymobGateway gateway, PaymobProperties paymob,
             PaymentMethods methods, OrderService orders, SiteSettings settings, AuditLog audit, Clock clock,
-            @Value("${lupin.public-base-url}") String publicBaseUrl) {
+            @Value("${lupin.public-base-url}") String publicBaseUrl,
+            org.springframework.context.ApplicationEventPublisher events) {
         this.jdbc = jdbc;
+        this.events = events;
         this.tx = tx;
         this.gateway = gateway;
         this.paymob = paymob;
@@ -338,6 +345,7 @@ public class PaymentService {
                 jdbc.sql("delete from transfer_receipts where payment_id = :p").param("p", paymentId).update();
             }
             orders.setPaymentStatus(order.id(), "VERIFYING");
+            events.publishEvent(new TransferSubmitted(order.reference(), receipt != null));
         });
     }
 

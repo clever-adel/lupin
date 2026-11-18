@@ -84,6 +84,9 @@ lupin:
     phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
     template: ${WHATSAPP_TEMPLATE:new_order}
     template-lang: ${WHATSAPP_TEMPLATE_LANG:ar}
+  # New-order alerts through a Telegram bot made with @BotFather. Off until the token is present.
+  telegram:
+    bot-token: ${TELEGRAM_BOT_TOKEN:}
   # Outgoing email ("forgot password" links) through Resend. Nothing is sent until the key is present.
   # The sender's domain must be verified in Resend (DNS records on lupinwear.store).
   mail:

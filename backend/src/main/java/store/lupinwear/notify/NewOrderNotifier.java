@@ -19,6 +19,7 @@ import store.lupinwear.content.SiteSettings;
 import store.lupinwear.mail.Mailer;
 import store.lupinwear.order.OrderService.CustomerChangedOrder;
 import store.lupinwear.order.OrderService.OrderPlaced;
+import store.lupinwear.payment.PaymentService.TransferSubmitted;
 
 /**
  * Tells the staff about each new order: by email to every active owner and admin account (unless
@@ -44,15 +45,17 @@ public class NewOrderNotifier {
     private final Mailer mailer;
     private final WhatsAppGateway whatsapp;
     private final StaffPush push;
+    private final StaffTelegram telegram;
     private final String publicBaseUrl;
 
     public NewOrderNotifier(JdbcClient jdbc, SiteSettings settings, Mailer mailer, WhatsAppGateway whatsapp,
-            StaffPush push, @Value("${lupin.public-base-url}") String publicBaseUrl) {
+            StaffPush push, StaffTelegram telegram, @Value("${lupin.public-base-url}") String publicBaseUrl) {
         this.jdbc = jdbc;
         this.settings = settings;
         this.mailer = mailer;
         this.whatsapp = whatsapp;
         this.push = push;
+        this.telegram = telegram;
         this.publicBaseUrl = publicBaseUrl.replaceAll("/+$", "");
     }
 
@@ -67,21 +70,26 @@ public class NewOrderNotifier {
         });
     }
 
-    /** A customer cancelled (or took back a cancel) on their own: email only, WhatsApp is for new orders. */
+    /** A customer cancelled (or took back a cancel) on their own: email and Telegram; WhatsApp is for new orders. */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCustomerChangedOrder(CustomerChangedOrder event) {
         Thread.ofVirtual().name("order-change-" + event.reference()).start(() -> {
             try {
-                Set<String> emails = emails(settings.get("notifications"));
-                if (emails.isEmpty()) {
+                Order order = load(event.reference());
+                if (order == null) {
                     return;
                 }
-                Order order = load(event.reference());
-                if (order != null) {
-                    List<Item> items = items(event.reference());
-                    for (String email : emails) {
-                        mailer.send(email(email, order, items, event.cancelled() ? Kind.CANCELLED : Kind.RESTORED));
-                    }
+                Kind kind = event.cancelled() ? Kind.CANCELLED : Kind.RESTORED;
+                try {
+                    telegram.send((event.cancelled() ? "❌ " : "↩️ ") + "<b>" + kind.title + " " + StaffTelegram.html(order.reference())
+                            + "</b>\n👤 " + StaffTelegram.html(order.customerName()) + " — " + money(order.total()) + " ج.م",
+                            "افتح الطلب", "/admin/orders/" + order.reference());
+                } catch (RuntimeException e) {
+                    log.error("Telegram alert for {} failed: {}", event.reference(), e.getMessage());
+                }
+                List<Item> items = items(event.reference());
+                for (String email : emails(settings.get("notifications"))) {
+                    mailer.send(email(email, order, items, kind));
                 }
             } catch (RuntimeException e) {
                 log.error("Order change alert for {} failed: {}", event.reference(), e.getMessage());
@@ -117,12 +125,14 @@ public class NewOrderNotifier {
         } catch (RuntimeException e) {
             log.error("Push alert for {} failed: {}", reference, e.getMessage());
         }
-        Set<String> emails = emails(config);
-        if (!emails.isEmpty()) {
-            List<Item> items = items(reference);
-            for (String email : emails) {
-                mailer.send(email(email, order, items, Kind.NEW));
-            }
+        List<Item> items = items(reference);
+        try {
+            telegram.send(telegramNewOrder(order, items), "افتح الطلب في الداشبورد", "/admin/orders/" + order.reference());
+        } catch (RuntimeException e) {
+            log.error("Telegram alert for {} failed: {}", reference, e.getMessage());
+        }
+        for (String email : emails(config)) {
+            mailer.send(email(email, order, items, Kind.NEW));
         }
         if (whatsapp.configured()) {
             for (String phone : phones(config.path("whatsappTo").asText(""))) {
@@ -130,6 +140,48 @@ public class NewOrderNotifier {
                         money(order.total()), paymentLabel(order.paymentMethod())));
             }
         }
+    }
+
+    /** A customer sent proof of an InstaPay or wallet transfer: someone should check the bank app. */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onTransferSubmitted(TransferSubmitted event) {
+        Thread.ofVirtual().name("transfer-" + event.reference()).start(() -> {
+            try {
+                Order order = load(event.reference());
+                if (order == null) {
+                    return;
+                }
+                String what = event.withScreenshot() ? "صورة تحويل" : "رقم عملية تحويل";
+                telegram.send("💸 <b>" + what + " للطلب " + StaffTelegram.html(order.reference()) + "</b>\n👤 "
+                        + StaffTelegram.html(order.customerName()) + " — " + money(order.total()) + " ج.م — "
+                        + paymentLabel(order.paymentMethod()) + "\nراجع الحساب وأكّد التحويل.",
+                        "راجع التحويلات", "/admin/transfers");
+                push.send("💸 " + what + " — " + order.reference(), clean(order.customerName()) + " — "
+                        + money(order.total()) + " ج.م", "/admin/transfers", "transfer-" + order.reference());
+            } catch (RuntimeException e) {
+                log.error("Transfer alert for {} failed: {}", event.reference(), e.getMessage());
+            }
+        });
+    }
+
+    /** Telegram's HTML: bold title, customer, address, payment, total, then each item. */
+    static String telegramNewOrder(Order o, List<Item> items) {
+        StringBuilder text = new StringBuilder()
+                .append("🛍 <b>طلب جديد ").append(StaffTelegram.html(o.reference())).append("</b>\n\n")
+                .append("👤 ").append(StaffTelegram.html(o.customerName())).append(" — ").append(StaffTelegram.html(o.customerPhone())).append('\n')
+                .append("📍 ").append(StaffTelegram.html(o.governorate())).append("، ").append(StaffTelegram.html(o.city()))
+                .append("، ").append(StaffTelegram.html(o.address())).append('\n')
+                .append("💳 ").append(paymentLabel(o.paymentMethod())).append('\n')
+                .append("💰 الإجمالي: <b>").append(money(o.total())).append(" ج.م</b>\n");
+        if (!items.isEmpty()) {
+            text.append('\n');
+        }
+        for (Item i : items) {
+            text.append("• ").append(StaffTelegram.html(i.name())).append(" — ").append(StaffTelegram.html(i.colour()))
+                    .append(" · ").append(StaffTelegram.html(i.size())).append(" × ").append(i.quantity()).append('\n');
+        }
+        String out = text.toString().trim();
+        return out.length() > 3900 ? out.substring(0, 3900) + "…" : out; // Telegram's limit is 4096
     }
 
     /** The extra address from Settings, then every active owner and admin (unless "emailStaff" is off). */

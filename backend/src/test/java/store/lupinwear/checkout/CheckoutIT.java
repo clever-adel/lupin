@@ -349,6 +349,22 @@ class CheckoutIT extends IntegrationTest {
 
     @Autowired
     store.lupinwear.support.IntegrationTest.FakePush pushes;
+    @Autowired
+    store.lupinwear.support.IntegrationTest.FakeTelegram telegram;
+    @Autowired
+    store.lupinwear.notify.StaffTelegram staffTelegram;
+
+    private org.springframework.test.web.servlet.ResultActions telegramUpdate(String secret, long chat, String text)
+            throws Exception {
+        var request = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/telegram/webhook").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("update_id", 1, "message", Map.of(
+                        "chat", Map.of("id", chat, "type", "private"), "from", Map.of("username", "alert_admin"),
+                        "text", text))));
+        if (secret != null) {
+            request.header("X-Telegram-Bot-Api-Secret-Token", secret);
+        }
+        return mvc.perform(request);
+    }
 
     /** Every email whose subject starts with this text that arrives within a short wait. */
     private java.util.List<store.lupinwear.mail.Mailer.Message> mailsAbout(String subjectStart) throws InterruptedException {
@@ -400,9 +416,29 @@ class CheckoutIT extends IntegrationTest {
         mvc.perform(jsonPost("/api/v1/admin/push/subscriptions/status", Map.of("endpoint", endpoint)).cookie(alertAdmin))
                 .andExpect(jsonPath("$.subscribed").value(true));
 
+        // The same admin links Telegram: the dashboard gives a one-time link, the bot's webhook ties the chat.
+        long chat = 7_000_000_000L + new java.util.Random().nextInt(1_000_000_000);
+        long stranger = chat + 1;
+        String link = body(mvc.perform(jsonPost("/api/v1/admin/telegram/link", Map.of()).cookie(alertAdmin))
+                .andExpect(status().isOk()).andReturn()).get("url").asText();
+        assertThat(link).startsWith("https://t.me/lupin_test_bot?start=");
+        String code = link.substring(link.indexOf("start=") + 6);
+        telegramUpdate(null, chat, "/start " + code).andExpect(status().isUnauthorized());
+        telegramUpdate("wrong", chat, "/start " + code).andExpect(status().isUnauthorized());
+        String secret = staffTelegram.webhookSecret();
+        telegramUpdate(secret, chat, "/start " + code).andExpect(status().isOk());
+        assertThat(telegram.next(chat).html()).contains("Alert Admin").contains("اتربط");
+        // The code works once; anyone else who presses Start is turned away.
+        telegramUpdate(secret, stranger, "/start " + code).andExpect(status().isOk());
+        assertThat(telegram.next(stranger).html()).contains("لفريق LUPIN بس");
+        mvc.perform(get("/api/v1/admin/telegram").cookie(alertAdmin))
+                .andExpect(jsonPath("$.configured").value(true))
+                .andExpect(jsonPath("$.linked[0].username").value("alert_admin"));
+
         mailer.sent.clear();
         whatsapp.sent.clear();
         pushes.sent.clear();
+        telegram.sent.clear();
         try {
             long variant = product("Alert <Jacket>", "1000.00", null, 5);
             Customer customer = customer();
@@ -447,6 +483,14 @@ class CheckoutIT extends IntegrationTest {
             assertThat(text).contains("طلب جديد " + reference).contains("/admin/orders/" + reference)
                     .contains("Test Customer");
 
+            // Telegram: the full order, customer text escaped, with a button to open it.
+            var tg = telegram.next(chat);
+            assertThat(tg).isNotNull();
+            assertThat(tg.html()).contains("طلب جديد " + reference).contains("Test Customer").contains("1,060")
+                    .contains("12 Example Street").contains("× 1");
+            assertThat(store.lupinwear.notify.StaffTelegram.html("A <b>&")).isEqualTo("A &lt;b&gt;&amp;");
+            assertThat(tg.buttonUrl()).isEqualTo("https://shop.example.test/admin/orders/" + reference);
+
             // The customer cancels, then takes it back: one email each per person, no WhatsApp.
             mvc.perform(jsonPost("/api/v1/orders/" + reference + "/cancel", Map.of()).cookie(customer.cookie))
                     .andExpect(status().isOk());
@@ -455,6 +499,15 @@ class CheckoutIT extends IntegrationTest {
             mvc.perform(jsonPost("/api/v1/orders/" + reference + "/undo-cancel", Map.of()).cookie(customer.cookie))
                     .andExpect(status().isOk());
             assertThat(mailsAbout("العميل رجّع الطلب بعد ما لغاه " + reference)).isNotEmpty();
+            String cancelled = telegram.next(chat).html();
+            String restored = telegram.next(chat).html();
+            assertThat(cancelled).contains("العميل لغى الطلب " + reference);
+            assertThat(restored).contains("العميل رجّع الطلب");
+
+            // Someone who blocked the bot is dropped.
+            telegram.blocked.add(chat);
+            mvc.perform(jsonPost("/api/v1/admin/telegram/test", Map.of()).cookie(alertAdmin)).andExpect(status().isOk());
+            mvc.perform(get("/api/v1/admin/telegram").cookie(alertAdmin)).andExpect(jsonPath("$.linked").isEmpty());
             assertThat(whatsapp.sent.poll(300, java.util.concurrent.TimeUnit.MILLISECONDS)).isNull();
 
             // A browser that was removed (410) is forgotten.

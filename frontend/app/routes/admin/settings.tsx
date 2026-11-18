@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { useOutletContext } from "react-router";
 import type { AdminContext } from "./layout";
 import { PushAlertsPanel } from "~/features/admin/push-panel";
+import { TelegramPanel } from "~/features/admin/telegram-panel";
 import { errorText, PAYMENT_LABEL, type AdminDeliveryOption, type GovernorateFee } from "~/features/admin/shared";
 import { api, deleteUploadedImage, uploadImages } from "~/lib/http";
 import type { Governorate, PaymentMethod, SiteContent } from "~/lib/types";
@@ -470,6 +471,7 @@ export default function AdminSettings() {
         hint="Each new order is sent with the customer, address, items and total. Phone notifications work even when the dashboard is closed; “Turn on order alerts” at the top plays a sound while it is open."
       >
         <NotificationsForm value={settings.data.notifications ?? {}} isOwner={isOwner} />
+        <TelegramPanel />
         <PushAlertsPanel />
       </Section>
 

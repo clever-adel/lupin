@@ -35,6 +35,7 @@ public class SecurityConfig {
      */
     public static final String WEBHOOKS = "/api/v1/payments/webhooks/**";
     public static final String SHIPPING_WEBHOOKS = "/api/v1/shipping/webhooks/**";
+    public static final String TELEGRAM_WEBHOOK = "/api/v1/telegram/webhook";
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http, JwtCookieAuthFilter jwtFilter, SecurityProperties props,
@@ -48,7 +49,7 @@ public class SecurityConfig {
             // Double-submit cookie: the SPA echoes the XSRF-TOKEN cookie in the X-XSRF-TOKEN header.
             .csrf(c -> c.csrfTokenRepository(csrfRepo)
                     .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                    .ignoringRequestMatchers(WEBHOOKS, SHIPPING_WEBHOOKS))
+                    .ignoringRequestMatchers(WEBHOOKS, SHIPPING_WEBHOOKS, TELEGRAM_WEBHOOK))
             .formLogin(f -> f.disable())
             .httpBasic(b -> b.disable())
             .logout(l -> l.disable())
@@ -65,7 +66,7 @@ public class SecurityConfig {
                     .requestMatchers("/api/v1/auth/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/catalog/**", "/api/v1/content/**",
                             "/api/v1/delivery/**").permitAll()
-                    .requestMatchers(WEBHOOKS, SHIPPING_WEBHOOKS).permitAll()
+                    .requestMatchers(WEBHOOKS, SHIPPING_WEBHOOKS, TELEGRAM_WEBHOOK).permitAll()
                     .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                     .requestMatchers("/api/v1/openapi/**", "/api/v1/docs/**", "/swagger-ui/**").permitAll()
                     .anyRequest().authenticated())

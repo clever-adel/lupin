@@ -88,6 +88,7 @@ public abstract class IntegrationTest {
         registry.add("spring.datasource.password", () -> PASSWORD);
         // Turns "Continue with Google" on; FakeGoogle answers instead of Google.
         registry.add("lupin.google.client-secret", () -> "test-secret");
+        registry.add("lupin.telegram.bot-token", () -> "123456:test-telegram-token");
     }
 
     /** A clock tests can move forward, so expiry and lockout are tested without sleeping. */
@@ -160,6 +161,59 @@ public abstract class IntegrationTest {
         @Primary
         FakePush fakePush() {
             return new FakePush();
+        }
+
+        @Bean
+        @Primary
+        FakeTelegram fakeTelegram() {
+            return new FakeTelegram();
+        }
+    }
+
+    /** Stands in for the Telegram Bot API: records each message; chats in {@code blocked} answer 403. */
+    public static class FakeTelegram implements store.lupinwear.notify.TelegramGateway {
+        public record Sent(long chatId, String html, String buttonText, String buttonUrl) {
+        }
+
+        public final java.util.concurrent.LinkedBlockingQueue<Sent> sent = new java.util.concurrent.LinkedBlockingQueue<>();
+        public final java.util.Set<Long> blocked = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        public volatile String webhookUrl;
+
+        @Override
+        public boolean configured() {
+            return true;
+        }
+
+        @Override
+        public String botUsername() {
+            return "lupin_test_bot";
+        }
+
+        @Override
+        public int sendMessage(long chatId, String html, String buttonText, String buttonUrl) {
+            if (blocked.contains(chatId)) {
+                return 403;
+            }
+            sent.add(new Sent(chatId, html, buttonText, buttonUrl));
+            return 200;
+        }
+
+        @Override
+        public boolean setWebhook(String url, String secret) {
+            webhookUrl = url;
+            return true;
+        }
+
+        /** The next message to this chat, waiting up to five seconds. */
+        public Sent next(long chatId) throws InterruptedException {
+            long until = System.currentTimeMillis() + 5000;
+            while (System.currentTimeMillis() < until) {
+                Sent s = sent.poll(100, java.util.concurrent.TimeUnit.MILLISECONDS);
+                if (s != null && s.chatId() == chatId) {
+                    return s;
+                }
+            }
+            return null;
         }
     }
 
