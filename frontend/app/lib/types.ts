@@ -237,6 +237,8 @@ export interface SiteContent {
   };
   /** Present only while manual Vodafone Cash is usable. */
   vodafoneCash?: { number: string; instructionsEn: string; instructionsAr: string };
+  /** Meta Pixel ID set in the dashboard; absent while ads tracking is off. */
+  metaPixelId?: string | null;
 }
 
 export type PaymentMethod = "COD" | "CARD" | "WALLET" | "FAWRY" | "INSTAPAY_MANUAL" | "VODAFONE_CASH_MANUAL";

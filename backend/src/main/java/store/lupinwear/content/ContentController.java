@@ -30,7 +30,7 @@ public class ContentController {
 
     public record SiteView(JsonNode brand, JsonNode hero, JsonNode announcement, JsonNode contact,
             JsonNode homeSections, BigDecimal freeDeliveryThreshold, Map<String, Boolean> paymentMethods,
-            Instapay instapay, VodafoneCash vodafoneCash, List<PolicyLink> policies) {
+            Instapay instapay, VodafoneCash vodafoneCash, List<PolicyLink> policies, String metaPixelId) {
     }
 
     private final SiteSettings settings;
@@ -51,7 +51,7 @@ public class ContentController {
         return new SiteView(settings.get("brand"), settings.get("hero"), settings.get("announcement"),
                 settings.get("contact"), settings.get("home_sections"), settings.freeDeliveryThreshold(),
                 paymentMethods.all(), paymentMethods.instapay().orElse(null),
-                paymentMethods.vodafoneCash().orElse(null), policies);
+                paymentMethods.vodafoneCash().orElse(null), policies, settings.metaPixelId());
     }
 
     @GetMapping("/policies/{slug}")

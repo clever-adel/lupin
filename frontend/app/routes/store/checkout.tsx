@@ -10,6 +10,7 @@ import { CART_KEY, useBag } from "~/features/bag/useBag";
 import { checkoutSchema, type CheckoutValues } from "~/features/checkout/schema";
 import { api, ApiError } from "~/lib/http";
 import { toLang, translate, useT } from "~/lib/i18n";
+import { track } from "~/lib/pixel";
 import { layoutOrigin, seo } from "~/lib/seo";
 import type { DeliveryOption, Governorate, Order, PaymentMethod, Quote, SiteContent } from "~/lib/types";
 
@@ -32,6 +33,12 @@ export default function Checkout() {
     resolver: zodResolver(checkoutSchema),
     defaultValues: { recipientName: "", phone: "", governorateId: "", city: "", addressLine: "", notes: "" },
   });
+  const startedCheckout = useRef(false);
+  useEffect(() => {
+    if (startedCheckout.current || bag.items.length === 0) return;
+    startedCheckout.current = true;
+    track("InitiateCheckout", { num_items: bag.items.reduce((n, i) => n + i.quantity, 0), currency: "EGP" });
+  }, [bag.items]);
   useEffect(() => {
     if (!me.data) return;
     if (!form.getValues("recipientName")) form.setValue("recipientName", me.data.fullName);

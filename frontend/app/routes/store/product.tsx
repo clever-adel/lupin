@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/product";
 import { announceBagAdded } from "~/components/bag-added";
@@ -9,6 +9,7 @@ import { useBag } from "~/features/bag/useBag";
 import { api } from "~/lib/http";
 import { apiGet } from "~/lib/api.server";
 import { localePath, pick, toLang, translate, useT } from "~/lib/i18n";
+import { track } from "~/lib/pixel";
 import { absoluteUrl, layoutOrigin, seo } from "~/lib/seo";
 import type { LookCard, ProductDetail } from "~/lib/types";
 
@@ -89,6 +90,10 @@ function ProductView({ product }: { product: ProductDetail }) {
   const [quantity, setQuantity] = useState(1);
   const [notice, setNotice] = useState<"added" | "size" | "copied" | null>(null);
   const bag = useBag();
+  const viewPrice = product.salePrice ?? product.price;
+  useEffect(() => {
+    track("ViewContent", { content_ids: [String(product.id)], content_type: "product", content_name: product.nameEn, value: viewPrice, currency: "EGP" });
+  }, [product.id, product.nameEn, viewPrice]);
   const looks = useQuery({
     queryKey: ["looks-with", product.slug],
     queryFn: () => api<LookCard[]>("GET", `/api/v1/catalog/looks?product=${encodeURIComponent(product.slug)}`),
@@ -120,6 +125,7 @@ function ProductView({ product }: { product: ProductDetail }) {
     const qty = Math.min(quantity, max);
     bag.add(variant.id, qty);
     setNotice("added");
+    track("AddToCart", { content_ids: [String(product.id)], content_type: "product", value: unit * qty, currency: "EGP", num_items: qty });
     // Fly the photo the shopper is looking at (the one most on screen) into the bag icon.
     const onScreen = (el: HTMLImageElement) => {
       const r = el.getBoundingClientRect();

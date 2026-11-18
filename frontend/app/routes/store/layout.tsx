@@ -10,6 +10,7 @@ import { useBagState } from "~/features/bag/store";
 import { useBag, useBagSync } from "~/features/bag/useBag";
 import { apiGet, siteOrigin } from "~/lib/api.server";
 import { switchLangPath, useT } from "~/lib/i18n";
+import { startPixel, track } from "~/lib/pixel";
 import type { Department, SiteContent } from "~/lib/types";
 
 export async function loader({ params, context }: Route.LoaderArgs) {
@@ -214,6 +215,11 @@ export default function StoreLayout({ loaderData }: Route.ComponentProps) {
     previousPath.current = pathname;
     document.getElementById("main")?.focus({ preventScroll: true });
   }, [pathname]);
+  // Ads tracking: one PageView per page the shopper sees (nothing while no Pixel ID is set).
+  const pixelId = loaderData.site.metaPixelId;
+  useEffect(() => {
+    if (startPixel(pixelId)) track("PageView");
+  }, [pixelId, pathname]);
 
   return (
     <>

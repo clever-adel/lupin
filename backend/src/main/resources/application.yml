@@ -84,6 +84,11 @@ lupin:
     phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
     template: ${WHATSAPP_TEMPLATE:new_order}
     template-lang: ${WHATSAPP_TEMPLATE_LANG:ar}
+  # Meta Conversions API (server copy of the Pixel's Purchase). The Pixel ID is set in the dashboard;
+  # this token comes from Events Manager. Off until both are present.
+  meta:
+    capi-token: ${META_CAPI_TOKEN:}
+    test-event-code: ${META_TEST_EVENT_CODE:}
   # New-order alerts through a Telegram bot made with @BotFather. Off until the token is present.
   telegram:
     bot-token: ${TELEGRAM_BOT_TOKEN:}

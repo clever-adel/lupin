@@ -45,6 +45,12 @@ public class SiteSettings {
         return node.isNumber() && node.decimalValue().signum() > 0 ? node.decimalValue() : null;
     }
 
+    /** The Meta Pixel ID set in the dashboard, or null when tracking is off. */
+    public String metaPixelId() {
+        String id = get("tracking").path("metaPixelId").asText("").trim();
+        return id.matches("\\d{10,20}") ? id : null;
+    }
+
     public boolean paymentMethodEnabled(String method) {
         return get("payment_methods").path(method).asBoolean(false);
     }

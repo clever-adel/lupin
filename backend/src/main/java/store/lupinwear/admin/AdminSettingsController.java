@@ -72,9 +72,13 @@ public class AdminSettingsController {
     /** Settings a staff member may edit, and extra fields allowed beyond those already stored. */
     private static final Map<String, Set<String>> EDITABLE = Map.of(
             "hero", Set.of("imageUrl", "imagePublicId"), "announcement", Set.of(), "contact", Set.of(), "home_sections", Set.of(),
-            "checkout", Set.of("unpaidOrderMinutes"), "payment_methods", Set.of(), "notifications", Set.of());
-    /** "notifications" decides where customers' order details are sent, so it is the owner's too. */
-    private static final Set<String> OWNER_ONLY = Set.of("payment_methods", "checkout", "notifications");
+            "checkout", Set.of("unpaidOrderMinutes"), "payment_methods", Set.of(), "notifications", Set.of(),
+            "tracking", Set.of("metaPixelId"));
+    /**
+     * "notifications" decides where customers' order details are sent, and "tracking" which ad account
+     * learns about each order, so both are the owner's too.
+     */
+    private static final Set<String> OWNER_ONLY = Set.of("payment_methods", "checkout", "notifications", "tracking");
 
     private final JdbcClient jdbc;
     private final SiteSettings settings;
@@ -280,6 +284,14 @@ public class AdminSettingsController {
             if (value.has("emailStaff") && !value.get("emailStaff").isBoolean()) {
                 throw ApiException.badRequest("INVALID_SETTING", "emailStaff is true or false.");
             }
+        }
+        if ("tracking".equals(key)) {
+            String pixel = value.path("metaPixelId").asText("").trim();
+            if (!pixel.isEmpty() && !pixel.matches("\\d{10,20}")) {
+                throw ApiException.badRequest("INVALID_SETTING",
+                        "The Pixel ID is the number in Meta Events Manager (10 to 20 digits).");
+            }
+            value.put("metaPixelId", pixel);
         }
         if ("payment_methods".equals(key) && value.path("INSTAPAY_MANUAL").asBoolean()
                 && value.path("instapayHandle").asText("").isBlank()) {

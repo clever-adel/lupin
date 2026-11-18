@@ -89,6 +89,7 @@ public abstract class IntegrationTest {
         // Turns "Continue with Google" on; FakeGoogle answers instead of Google.
         registry.add("lupin.google.client-secret", () -> "test-secret");
         registry.add("lupin.telegram.bot-token", () -> "123456:test-telegram-token");
+        registry.add("lupin.meta.capi-token", () -> "test-meta-token");
     }
 
     /** A clock tests can move forward, so expiry and lockout are tested without sleeping. */
@@ -167,6 +168,31 @@ public abstract class IntegrationTest {
         @Primary
         FakeTelegram fakeTelegram() {
             return new FakeTelegram();
+        }
+
+        @Bean
+        @Primary
+        FakeMeta fakeMeta() {
+            return new FakeMeta();
+        }
+    }
+
+    /** Stands in for Meta's Conversions API: records each batch of events sent. */
+    public static class FakeMeta implements store.lupinwear.tracking.MetaGateway {
+        public record Sent(String pixelId, java.util.Map<String, Object> payload) {
+        }
+
+        public final java.util.concurrent.LinkedBlockingQueue<Sent> sent = new java.util.concurrent.LinkedBlockingQueue<>();
+
+        @Override
+        public boolean configured() {
+            return true;
+        }
+
+        @Override
+        public boolean send(String pixelId, java.util.Map<String, Object> payload) {
+            sent.add(new Sent(pixelId, payload));
+            return true;
         }
     }
 

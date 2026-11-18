@@ -400,6 +400,35 @@ function NotificationsForm({ value, isOwner }: { value: Record<string, unknown>;
   );
 }
 
+function TrackingForm({ value, isOwner }: { value: Record<string, unknown>; isOwner: boolean }) {
+  const save = useSaveSetting("tracking");
+  const [pixel, setPixel] = useState(String(value.metaPixelId ?? ""));
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate({ metaPixelId: pixel.replace(/\s/g, "") });
+      }}
+    >
+      <fieldset disabled={!isOwner} className="max-w-sm">
+        <label htmlFor="pixel" className="mb-1 block text-xs font-medium">Meta Pixel ID (empty = off)</label>
+        <input id="pixel" className="field" inputMode="numeric" dir="ltr" placeholder="123456789012345" value={pixel}
+          onChange={(e) => setPixel(e.target.value)} />
+      </fieldset>
+      <ol className="ms-5 mt-3 list-decimal space-y-1 text-sm text-stone">
+        <li>In Meta Events Manager, create a Pixel (Data sources → Connect data → Web) and copy its ID here.</li>
+        <li>For orders blocked by ad blockers: in the same Pixel, Settings → Conversions API → Generate access token, and save it on Render as <code>META_CAPI_TOKEN</code>.</li>
+        <li>The site then reports page views, product views, add to bag, checkout and each order to Meta, so ads can find buyers.</li>
+      </ol>
+      {isOwner ? (
+        <SaveRow pending={save.isPending} error={save.error} saved={save.isSuccess} />
+      ) : (
+        <p className="mt-4 text-sm text-stone">Only the owner can change this.</p>
+      )}
+    </form>
+  );
+}
+
 function AnnouncementForm({ value }: { value: Record<string, unknown> }) {
   const save = useSaveSetting("announcement");
   const lines = (v: unknown) => (Array.isArray(v) ? v.join("\n") : "");
@@ -473,6 +502,10 @@ export default function AdminSettings() {
         <NotificationsForm value={settings.data.notifications ?? {}} isOwner={isOwner} />
         <TelegramPanel />
         <PushAlertsPanel />
+      </Section>
+
+      <Section title="Ads tracking" hint="Tells Meta (Facebook and Instagram ads) what shoppers do, so ads reach people who buy.">
+        <TrackingForm value={settings.data.tracking ?? {}} isOwner={isOwner} />
       </Section>
 
       <Section title="Checkout rules">

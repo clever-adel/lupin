@@ -158,6 +158,66 @@ class CheckoutIT extends IntegrationTest {
         quote(customer, CAIRO, null).andExpect(jsonPath("$.delivery.free").value(false));
     }
 
+    @Autowired
+    store.lupinwear.support.IntegrationTest.FakeMeta meta;
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void eachOrderIsSentToMetaAsOnePurchaseWithHashedCustomerDetails() throws Exception {
+        long variant = product("Pixel Jacket", "1000.00", null, 5);
+        Customer customer = customer();
+        meta.sent.clear();
+        setting("tracking", "metaPixelId", "\"\"");
+        setQuantity(customer, variant, 1).andExpect(status().isOk());
+        // No Pixel ID yet: the site shows no Pixel and nothing goes to Meta.
+        mvc.perform(get("/api/v1/content/site")).andExpect(jsonPath("$.metaPixelId").doesNotExist());
+        place(customer, request(null, "1060.00", "key-" + UUID.randomUUID())).andExpect(status().isCreated());
+        Thread.sleep(300);
+        assertThat(meta.sent).isEmpty();
+
+        // Only the owner sets it, and only as Meta's number.
+        mvc.perform(put("/api/v1/admin/settings/tracking").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"metaPixelId\":\"fbq(1)\"}").cookie(owner))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/v1/admin/settings/tracking").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"metaPixelId\":\" 123456789012345 \"}").cookie(owner))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/content/site")).andExpect(jsonPath("$.metaPixelId").value("123456789012345"));
+
+        setQuantity(customer, variant, 2).andExpect(status().isOk());
+        PlaceOrderRequest request = request(null, "2060.00", "key-" + UUID.randomUUID());
+        String reference = body(mvc.perform(jsonPost("/api/v1/orders", request)
+                        .cookie(customer.cookie, new Cookie("_fbp", "fb.1.1700000000000.123456789"))
+                        .header("X-Forwarded-For", "41.33.10.20").header("User-Agent", "TestPhone/1.0"))
+                .andExpect(status().isCreated()).andReturn()).get("reference").asText();
+
+        var sent = meta.sent.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+        assertThat(sent).isNotNull();
+        assertThat(sent.pixelId()).isEqualTo("123456789012345");
+        var event = ((List<Map<String, Object>>) sent.payload().get("data")).get(0);
+        assertThat(event).containsEntry("event_name", "Purchase").containsEntry("event_id", "purchase-" + reference)
+                .containsEntry("action_source", "website");
+        var user = (Map<String, Object>) event.get("user_data");
+        assertThat(user).containsEntry("ph", sha256("201012345678")).containsEntry("fn", sha256("test"))
+                .containsEntry("country", sha256("eg")).containsEntry("client_ip_address", "41.33.10.20")
+                .containsEntry("client_user_agent", "TestPhone/1.0").containsEntry("fbp", "fb.1.1700000000000.123456789");
+        assertThat(user.get("em")).asString().hasSize(64).doesNotContain("@");
+        var custom = (Map<String, Object>) event.get("custom_data");
+        assertThat(custom).containsEntry("currency", "EGP").containsEntry("num_items", 2).containsEntry("order_id", reference);
+        assertThat((BigDecimal) custom.get("value")).isEqualByComparingTo("2060.00");
+
+        // A retry of the same order repeats the same event id, which Meta counts once.
+        place(customer, request).andExpect(status().isCreated());
+        var again = meta.sent.poll(5, java.util.concurrent.TimeUnit.SECONDS);
+        assertThat(((List<Map<String, Object>>) again.payload().get("data")).get(0)).containsEntry("event_id", "purchase-" + reference);
+        setting("tracking", "metaPixelId", "\"\"");
+    }
+
+    private static String sha256(String value) throws Exception {
+        return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
+
     @Test
     void placingAnOrderReservesStockSnapshotsItAndIsSafeToRetry() throws Exception {
         long variant = product("Order Jacket", "1000.00", null, 5);

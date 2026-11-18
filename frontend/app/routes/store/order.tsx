@@ -6,6 +6,7 @@ import { ProductPhoto } from "~/components/product";
 import { useRequireSignIn } from "~/features/auth/session";
 import { api, ApiError } from "~/lib/http";
 import { toLang, translate, useT, type MessageKey } from "~/lib/i18n";
+import { trackPurchaseOnce } from "~/lib/pixel";
 import { layoutOrigin, seo } from "~/lib/seo";
 import type { Order, PaymentMethod, SiteContent } from "~/lib/types";
 
@@ -337,6 +338,13 @@ export default function OrderPage() {
     refetchInterval: (query) =>
       returned && query.state.data?.status === "AWAITING_PAYMENT" && query.state.dataUpdateCount < 40 ? 3000 : false,
   });
+
+  const placedNow = search.get("placed") === "1";
+  const placed = order.data;
+  useEffect(() => {
+    if (!placedNow || !placed || placed.status === "CANCELLED") return;
+    trackPurchaseOnce(placed.reference, placed.total, placed.items.reduce((n, i) => n + i.quantity, 0));
+  }, [placedNow, placed]);
 
   const act = useMutation({
     mutationFn: (action: "cancel" | "undo-cancel") =>

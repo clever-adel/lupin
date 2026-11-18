@@ -11,11 +11,12 @@ import { NonceContext } from "./lib/nonce";
 function contentSecurityPolicy(nonce: string): string {
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}'`,
+    // connect.facebook.net: the Meta Pixel, loaded only when the owner set a Pixel ID.
+    `script-src 'self' 'nonce-${nonce}' https://connect.facebook.net`,
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self'",
-    "img-src 'self' data: https://res.cloudinary.com",
-    "connect-src 'self'",
+    "img-src 'self' data: https://res.cloudinary.com https://www.facebook.com",
+    "connect-src 'self' https://www.facebook.com https://connect.facebook.net",
     "object-src 'none'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
