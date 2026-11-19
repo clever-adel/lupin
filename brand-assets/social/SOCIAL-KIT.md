@@ -202,6 +202,9 @@ TikTok gets the video posts. Stories every day, even when there is no feed post.
 4. **TikTok**: switch to a Business account so the link in the bio works. Then put the TikTok link in the store:
    Dashboard → Content → Footer contact → TikTok link: `https://www.tiktok.com/@lupin.wear.eg`
    (with `https://` at the start; the site ignores links without it).
-5. **Meta Catalog** (product tags in posts, Shop tab, catalogue ads): in Commerce Manager → Catalog → Data sources →
-   Data feed → Scheduled feed → `https://lupinwear.store/catalog/meta.csv`, daily. Then connect the Meta Pixel to that
-   catalogue. (Instagram Shopping needs Meta's review of the account; it can take a few days.)
+5. **Meta Catalog — done 2026-11-19.** Business portfolio **Lupin | Menswear** (ID 29984096994525504, created by Meta when
+   Instagram was connected) holds the catalogue **LUPIN Store** (ID 1603950748435756), fed hourly from
+   `https://lupinwear.store/catalog/meta.csv`, and the Pixel **lupinwear.store** (ID 1790053122102572), which the store now
+   uses (Dashboard → Settings → Ads tracking). The old Pixel 508091083934676 sat on a restricted personal ad account and
+   could not be connected. Still to do by the owner: in Events Manager → lupinwear.store → Settings → Conversions API,
+   generate an access token and save it on Render as `META_CAPI_TOKEN` (the old one belongs to the old Pixel).
