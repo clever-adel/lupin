@@ -200,7 +200,8 @@ TikTok gets the video posts. Stories every day, even when there is no feed post.
 2. **Facebook page**: Profile picture, cover, Intro, About, Website, contact. Add the **Shop now** button → lupinwear.store.
 3. **Link Instagram to the Facebook page** (Page settings → Linked accounts) so posts can be shared to both.
 4. **TikTok**: switch to a Business account so the link in the bio works. Then put the TikTok link in the store:
-   Dashboard → Content → Footer contact → TikTok link (or send it to me).
+   Dashboard → Content → Footer contact → TikTok link: `https://www.tiktok.com/@lupin.wear.eg`
+   (with `https://` at the start; the site ignores links without it).
 5. **Meta Catalog** (product tags in posts, Shop tab, catalogue ads): in Commerce Manager → Catalog → Data sources →
    Data feed → Scheduled feed → `https://lupinwear.store/catalog/meta.csv`, daily. Then connect the Meta Pixel to that
    catalogue. (Instagram Shopping needs Meta's review of the account; it can take a few days.)
