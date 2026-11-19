@@ -5,7 +5,7 @@ payment by **InstaPay or Vodafone Cash** (cash on delivery is off), **free deliv
 exchange or return **within 24 hours of delivery**. If any of these change, change the posts too.
 
 Folders: `profile/` (profile pictures, Facebook cover) · `highlights/` (Instagram Highlight covers) ·
-`posts/` (feed posts, 4:5, 1080×1350) · `stories/` (9:16, 1080×1920) · `../video/lupin-site-reel-en.mp4` (Reel / TikTok).
+`posts/` (feed posts: `*.png` is 4:5, 1080×1350, for Instagram; `*-square.png` is 1:1, 1080×1080, for Facebook) · `stories/` (9:16, 1080×1920) · `../video/lupin-site-reel-en.mp4` (Reel / TikTok).
 
 ---
 
