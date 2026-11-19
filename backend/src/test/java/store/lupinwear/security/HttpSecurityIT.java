@@ -50,6 +50,35 @@ class HttpSecurityIT extends IntegrationTest {
         assertThat(setCookie(created, AuthCookies.REFRESH)).contains("HttpOnly", "SameSite=Lax", "Path=/api/v1/auth");
     }
 
+    /**
+     * The staff product editor saves the product and each colour's photos in parallel, all with the one
+     * XSRF-TOKEN cookie. A signed-in request must not delete or replace that cookie, or the later saves
+     * are refused with 403 ("You are not allowed to do this.").
+     */
+    @Test
+    void signedInRequestsKeepTheCsrfToken() throws Exception {
+        HttpResponse<String> csrf = http.send(HttpRequest.newBuilder(uri("/api/v1/auth/csrf")).build(),
+                BodyHandlers.ofString());
+        String xsrf = setCookie(csrf, "XSRF-TOKEN").split(";")[0];
+        String token = json.readTree(csrf.body()).get("token").asText();
+
+        HttpResponse<String> created = http.send(post("/api/v1/auth/register", json.writeValueAsString(
+                        new RegisterBody("Token Keeper", uniqueEmail(), null, PASSWORD_OK, "en")))
+                .header("Cookie", xsrf).header("X-XSRF-TOKEN", token).build(), BodyHandlers.ofString());
+        assertThat(created.statusCode()).isEqualTo(201);
+        String cookies = xsrf + "; " + setCookie(created, AuthCookies.ACCESS).split(";")[0];
+
+        HttpResponse<String> me = http.send(HttpRequest.newBuilder(uri("/api/v1/auth/me"))
+                .header("Cookie", cookies).build(), BodyHandlers.ofString());
+        assertThat(me.statusCode()).isEqualTo(200);
+        assertThat(me.headers().allValues("Set-Cookie")).noneMatch(c -> c.startsWith("XSRF-TOKEN="));
+
+        HttpResponse<String> again = http.send(HttpRequest.newBuilder(uri("/api/v1/auth/csrf"))
+                .header("Cookie", cookies).build(), BodyHandlers.ofString());
+        assertThat(json.readTree(again.body()).get("token").asText()).isEqualTo(token);
+        assertThat(again.headers().allValues("Set-Cookie")).noneMatch(c -> c.startsWith("XSRF-TOKEN="));
+    }
+
     @Test
     void securityHeadersAndSafeErrors() throws Exception {
         HttpResponse<String> health = http.send(HttpRequest.newBuilder(uri("/actuator/health")).build(),

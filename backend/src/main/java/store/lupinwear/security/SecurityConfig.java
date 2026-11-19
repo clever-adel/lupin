@@ -17,6 +17,7 @@ import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
@@ -47,8 +48,12 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .cors(c -> c.configurationSource(cors(props)))
             // Double-submit cookie: the SPA echoes the XSRF-TOKEN cookie in the X-XSRF-TOKEN header.
+            // Stateless: every signed-in request counts as a fresh authentication, and Spring's default
+            // CsrfAuthenticationStrategy would delete the XSRF-TOKEN cookie on each one. Parallel saves
+            // (product + colour photos) then carry a token the cookie no longer matches and get 403.
             .csrf(c -> c.csrfTokenRepository(csrfRepo)
                     .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                    .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy())
                     .ignoringRequestMatchers(WEBHOOKS, SHIPPING_WEBHOOKS, TELEGRAM_WEBHOOK))
             .formLogin(f -> f.disable())
             .httpBasic(b -> b.disable())
