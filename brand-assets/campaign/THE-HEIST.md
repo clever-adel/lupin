@@ -43,9 +43,21 @@ Type: the LUPIN. wordmark from `../LUPIN — Cap Logo@2x.png`, mission number in
 |---|---|---|---|
 | 001 | **The Bershka Heist** | Launch of the original Bershka pieces already in store | Now |
 | 002 | **The Next Drop** | Teaser + reveal of the next restock | When stock is confirmed — never before |
-| 003 | **The Fashion Vault** | Best pieces / last sizes, the "vault" of everything still available | After 002 sells through |
+| 003 | **The Fashion Vault** | Every piece in store from any maker (incl. The Getaway Driver, The Stealth), last sizes | After 002 sells through |
 
 Mission 001 says "Bershka" because it describes what the pieces are. The headline brand on every asset is still LUPIN.
+
+### What is in the store (checked on lupinwear.store, 2026-11-20)
+
+| Operation | Piece | Maker | Price (was) | Sizes | Mission |
+|---|---|---|---|---|---|
+| The Alibi | Oversized hoodie, brown | Bershka | EGP 690 (900) | XS–L | 001 |
+| The Master Key | Graphic hoodie, stone (key print on the back) | Bershka | EGP 690 (900) | XS–L | 001 |
+| The Brooklyn Job | Graffiti hoodie, cream | Bershka | EGP 690 (900) | XS–L | 001 |
+| The Getaway Driver | Sherpa denim jacket, black | LC Waikiki | EGP 1,440 (1,800) | XS–XL | 003 |
+| The Stealth | Soft shell jacket, black | Team 365 | EGP 790 (990) | M–L | 003 |
+
+**The Getaway Driver and The Stealth are not Bershka.** They never appear under the "Bershka Heist" title, caption or hashtag. They go in Mission 003 (The Fashion Vault), which is not tied to one maker, or in their own posts.
 
 ---
 
@@ -66,12 +78,12 @@ Low angle down a long clothing rail in an empty, after-hours boutique. One hange
 **Product:** **The Brooklyn Job** (Bershka graffiti hoodie, cream) on the lit hanger — real photo.
 
 ### Scene 4 — The Getaway
-Night, wet street, idling black car, door open. The thief, back to camera, wears the piece; a LUPIN. shopping bag on the back seat.
-**Product:** **The Getaway Driver** worn by a model (shoot) — no AI on the garment.
+Night, wet street, idling black car, door open. The thief walks away from camera toward it, so the key print on the back of the hoodie is the hero; a LUPIN. shopping bag on the back seat.
+**Product:** **The Master Key** (Bershka graphic hoodie, stone) worn by a model (shoot) — no AI on the garment.
 
 ### Scene 5 — The Vault
 A steel vault door half open; inside, folded pieces on lit shelves and a black LUPIN. bag with the gold sticker (`../packaging/`).
-**Product:** **The Master Key** (Bershka graphic hoodie, stone) folded on the front shelf — real photo.
+**Product:** the three Bershka hoodies (The Alibi, The Master Key, The Brooklyn Job) folded on the front shelf — real photos.
 
 ### Scene 6 — Mission Complete (the order)
 A LUPIN. bag on a doorstep in soft dawn light, a handwritten card: "Mission complete."
