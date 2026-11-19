@@ -4,6 +4,7 @@ import { index, route, type RouteConfig } from "@react-router/dev/routes";
 export default [
   route("sitemap.xml", "routes/sitemap.tsx"),
   route("robots.txt", "routes/robots.tsx"),
+  route("catalog/meta.csv", "routes/catalog-meta.tsx"),
   // Staff dashboard. English only for now; a static segment, so it wins over the optional :lang below.
   route("admin", "routes/admin/layout.tsx", [
     index("routes/admin/orders.tsx"),

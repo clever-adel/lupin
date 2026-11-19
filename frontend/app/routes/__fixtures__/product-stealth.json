@@ -1,0 +1,78 @@
+{
+ "id": 6,
+ "slug": "the-stealth-team-365-soft-shell-jacket",
+ "nameEn": "The Stealth (Team 365 Soft Shell Jacket)",
+ "nameAr": "التخفّي (جاكيت سوفت شيل Team 365)",
+ "descriptionEn": "Move unseen, stay dry. A sleek soft shell jacket by Team 365 that keeps out wind and light rain while letting your body breathe. Stand-up collar with chin guard, full zip with rubber pull, zipped side pockets and a slightly longer back hem for extra cover.",
+ "fabricEn": "96% polyester, 4% spandex. Three-layer breathable soft shell, wind- and water-resistant (3,000 mm waterproof, 1,000 g breathability).",
+ "fitEn": "Regular fit",
+ "brand": "Team 365",
+ "price": 990,
+ "salePrice": 790,
+ "department": {
+  "slug": "men",
+  "nameEn": "Men",
+  "nameAr": "رجالي"
+ },
+ "category": {
+  "slug": "jackets",
+  "nameEn": "Jackets",
+  "nameAr": "جواكت"
+ },
+ "colors": [
+  {
+   "id": 6,
+   "nameEn": "black",
+   "main": true,
+   "images": [
+    {
+     "url": "/media/f5cc1c2c-a7bc-4c7c-a4b7-a9084cb824d6.jpg"
+    },
+    {
+     "url": "/media/7de50dad-c84e-4750-b64a-57d7f88bab95.jpg"
+    }
+   ],
+   "variants": [
+    {
+     "id": 24,
+     "sizeCode": "M",
+     "available": true,
+     "maxQuantity": 1
+    },
+    {
+     "id": 25,
+     "sizeCode": "L",
+     "available": false,
+     "maxQuantity": 0
+    }
+   ]
+  },
+  {
+   "id": 7,
+   "nameEn": "sport silver",
+   "main": false,
+   "images": [
+    {
+     "url": "/media/606e9ab5-3c96-4bd4-b46d-19f477facab6.jpg"
+    },
+    {
+     "url": "/media/c73cd043-4719-4314-b8d5-dd3a3e0196ef.jpg"
+    }
+   ],
+   "variants": [
+    {
+     "id": 26,
+     "sizeCode": "M",
+     "available": false,
+     "maxQuantity": 0
+    },
+    {
+     "id": 27,
+     "sizeCode": "L",
+     "available": false,
+     "maxQuantity": 0
+    }
+   ]
+  }
+ ]
+}

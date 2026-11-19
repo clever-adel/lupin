@@ -130,4 +130,21 @@ test("private pages send guests to sign in, and crawler files are served", async
   expect(xml).toContain("<urlset");
   expect(xml).toContain("/product/demo-harbour-stand-collar-jacket");
   expect(xml).not.toContain("/admin");
+
+  // Product feed for Meta Commerce Manager: one row per product, keyed by the id the Pixel sends.
+  const feed = await request.get("/catalog/meta.csv");
+  expect(feed.ok()).toBe(true);
+  expect(feed.headers()["content-type"]).toContain("text/csv");
+  const [header, ...rows] = (await feed.text()).trim().split("\n");
+  expect(header).toBe(
+    "id,title,description,availability,condition,price,sale_price,link,image_link,additional_image_link,brand,color,size,gender,age_group,product_type,item_group_id",
+  );
+  const product = await (await request.get("/api/v1/catalog/products/demo-harbour-stand-collar-jacket")).json();
+  const row = rows.find((r) => r.includes("/product/demo-harbour-stand-collar-jacket"));
+  if (product.colors.some((c: { images: unknown[] }) => c.images.length > 0)) {
+    expect(row).toMatch(new RegExp(`^"${product.id}","${product.nameEn}"`));
+    expect(row).toContain(`"${product.price.toFixed(2)} EGP"`);
+  } else {
+    expect(row).toBeUndefined(); // no photo yet: Meta would refuse the item
+  }
 });
