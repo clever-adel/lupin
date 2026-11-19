@@ -106,17 +106,18 @@ test("product page: sizes, colours, quantity, favourites and the size reminder",
 
 test("guest bag: quantities, remove, and it survives a reload", async ({ page }) => {
   await addToBag(page, "/product/demo-dune-light-jacket", "M");
-  await page.getByRole("link", { name: "View bag" }).click();
+  // The "added to bag" card and the line under the button both link to the bag; use the one in the page.
+  await page.locator("#main").getByRole("link", { name: "View bag" }).click();
   await expect(page).toHaveURL(/\/bag$/);
   await expect(page.getByText("EGP 2,070 each")).toBeVisible(); // the discount price, from the server
 
   await page.getByRole("button", { name: "Increase quantity" }).click();
-  await expect(page.getByRole("status")).toHaveText("2");
+  await expect(page.getByRole("group", { name: "Quantity" }).getByRole("status")).toHaveText("2");
   await expect(page.getByLabel("Summary").getByText("EGP 4,140")).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("status")).toHaveText("2");
+  await expect(page.getByRole("group", { name: "Quantity" }).getByRole("status")).toHaveText("2");
   await page.getByRole("button", { name: "Decrease quantity" }).click();
-  await expect(page.getByRole("status")).toHaveText("1");
+  await expect(page.getByRole("group", { name: "Quantity" }).getByRole("status")).toHaveText("1");
   await expect(page.getByRole("button", { name: "Decrease quantity" })).toBeDisabled();
 
   await page.getByRole("button", { name: "Remove" }).click();

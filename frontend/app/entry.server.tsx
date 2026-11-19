@@ -17,10 +17,13 @@ function contentSecurityPolicy(nonce: string): string {
     "font-src 'self'",
     "img-src 'self' data: https://res.cloudinary.com https://www.facebook.com",
     "connect-src 'self' https://www.facebook.com https://connect.facebook.net",
+    // The Pixel sends a large event (a product view with its details) as a form posted into a hidden
+    // frame on www.facebook.com; without these two the browser drops that event.
+    "frame-src https://www.facebook.com",
     "object-src 'none'",
     "frame-ancestors 'none'",
     "base-uri 'self'",
-    "form-action 'self'",
+    "form-action 'self' https://www.facebook.com",
   ].join("; ");
 }
 

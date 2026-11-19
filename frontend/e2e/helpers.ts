@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { expect, type Browser, type Page } from "@playwright/test";
+import { expect, type Browser, type Cookie, type Page } from "@playwright/test";
 
 const PASSWORD_FILE = "../backend/.local-owner-password";
 
@@ -31,9 +31,22 @@ export async function signIn(page: Page, email: string, password: string, next?:
   await page.locator("form button[type=submit]").click();
 }
 
+/**
+ * The owner's session, kept from the first sign-in of this test run. The API allows 10 sign-ins per
+ * account in 10 minutes, and the whole suite signs in as the owner more often than that.
+ */
+let ownerSession: Cookie[] | null = null;
+
 export async function signInAsOwner(page: Page, next = "/admin") {
+  const landed = new RegExp(next.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$");
+  if (ownerSession) {
+    await page.context().addCookies(ownerSession);
+    await page.goto(next);
+    if (landed.test(page.url())) return;
+  }
   await signIn(page, OWNER_EMAIL, ownerPassword, next);
-  await expect(page).toHaveURL(new RegExp(next.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$"));
+  await expect(page).toHaveURL(landed);
+  ownerSession = await page.context().cookies();
 }
 
 /** Creates a customer through the sign-up form and returns their email. */

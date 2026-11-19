@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { errorText, money, type AdminProduct, type AdminVariant } from "~/features/admin/shared";
-import { api } from "~/lib/http";
+import { api, imagesWithoutSizes, saveImageSizes } from "~/lib/http";
 import type { Department, Page } from "~/lib/types";
 
 const PRODUCT_STATUS: Record<string, string> = { DRAFT: "Draft (hidden)", ACTIVE: "On sale", ARCHIVED: "Archived (hidden)" };
@@ -269,6 +269,55 @@ function Departments() {
   );
 }
 
+/**
+ * Photos uploaded before the store made phone-size copies are sent full size to every phone. This makes
+ * their copies in this browser, one photo at a time. Shown only while such photos exist.
+ */
+function PhotoSizes() {
+  const pending = useQuery({ queryKey: ["admin", "media-without-sizes"], queryFn: imagesWithoutSizes });
+  const [progress, setProgress] = useState<{ done: number; failed: number; total: number } | null>(null);
+  const keys = pending.data ?? [];
+  if (!keys.length && !progress) return null;
+  const running = progress !== null && progress.done + progress.failed < progress.total;
+  const prepare = async () => {
+    const total = keys.length;
+    let done = 0;
+    let failed = 0;
+    setProgress({ done, failed, total });
+    for (const key of keys) {
+      const ok = await fetch(`/media/${encodeURIComponent(key)}`)
+        .then((response) => (response.ok ? response.blob() : Promise.reject(new Error())))
+        .then((photo) => saveImageSizes(key, photo))
+        .catch(() => false);
+      if (ok) done += 1;
+      else failed += 1;
+      setProgress({ done, failed, total });
+    }
+    await pending.refetch();
+  };
+  return (
+    <section aria-labelledby="photo-sizes" className="mt-5 border border-line bg-card p-4">
+      <h2 id="photo-sizes" className="font-semibold">Phone-size photos</h2>
+      {progress && !running ? (
+        <p className="mt-1 text-sm" role="status">
+          Prepared {progress.done} of {progress.total} photos.
+          {progress.failed > 0 && " Some could not be prepared in this browser; try again in Chrome or Edge."}
+        </p>
+      ) : (
+        <>
+          <p className="mt-1 text-sm text-stone">
+            {keys.length} {keys.length === 1 ? "photo was" : "photos were"} uploaded before smaller copies were made, so
+            phones download them full size. Preparing them takes a few seconds per photo; keep this page open.
+          </p>
+          <button type="button" className="btn btn-outline mt-3" disabled={running} onClick={() => void prepare()}>
+            {running ? `Preparing ${progress.done + progress.failed + 1} of ${progress.total}…` : "Prepare phone-size photos"}
+          </button>
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function AdminProducts() {
   const client = useQueryClient();
   const [params, setParams] = useSearchParams();
@@ -298,6 +347,7 @@ export default function AdminProducts() {
         “Reserved” is stock held for orders that have not shipped yet. “Can sell” is what customers can still buy.
       </p>
 
+      <PhotoSizes />
       <Departments />
       <Categories />
 

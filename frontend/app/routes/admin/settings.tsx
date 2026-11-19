@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { useOutletContext } from "react-router";
 import type { AdminContext } from "./layout";
 import { PushAlertsPanel } from "~/features/admin/push-panel";
@@ -18,9 +18,10 @@ const MISSING: Partial<Record<PaymentMethod, string>> = {
 };
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+  const id = useId();
   return (
-    <section className="border border-line bg-card p-5">
-      <h2 className="font-semibold">{title}</h2>
+    <section aria-labelledby={id} className="border border-line bg-card p-5">
+      <h2 id={id} className="font-semibold">{title}</h2>
       {hint && <p className="mt-1 text-sm text-stone">{hint}</p>}
       <div className="mt-4">{children}</div>
     </section>
@@ -512,7 +513,7 @@ export default function AdminSettings() {
         <CheckoutForm value={settings.data.checkout ?? {}} isOwner={isOwner} />
       </Section>
 
-      <Section title="Announcement bar" hint="Saved now; the bar itself is not shown on the storefront yet.">
+      <Section title="Announcement bar" hint="Short messages shown in a bar above the store’s header, in English and Arabic. Leave empty to hide the bar.">
         <AnnouncementForm value={settings.data.announcement ?? {}} />
       </Section>
     </div>

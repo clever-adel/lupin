@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useT } from "~/lib/i18n";
+import { photoUrl } from "~/lib/photo-sizes";
 
 /** What was just put in the bag, and where its photo was on screen (for the flight to the bag icon). */
 export interface BagAdded {
@@ -34,6 +35,14 @@ export function BagAddedFeedback() {
   const [top, setTop] = useState(72);
   const timer = useRef<number | undefined>(undefined);
   const held = useRef(false);
+  const { pathname } = useLocation();
+
+  // Going to another page (the bag, say) closes the card instead of leaving it over the new page.
+  useEffect(() => {
+    window.clearTimeout(timer.current);
+    held.current = false;
+    setOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     const close = () => setOpen(false);
@@ -123,7 +132,7 @@ export function BagAddedFeedback() {
         >
           <div className="flex items-start gap-3">
             {item.imageUrl ? (
-              <img src={item.imageUrl} alt="" className="h-20 w-16 shrink-0 bg-studio object-cover" />
+              <img src={photoUrl(item.imageUrl, 320)} alt="" className="h-20 w-16 shrink-0 bg-studio object-cover" />
             ) : (
               <span className="h-20 w-16 shrink-0 bg-studio" aria-hidden="true" />
             )}

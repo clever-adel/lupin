@@ -92,7 +92,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         <div className="shell relative grid items-center gap-8 py-10 md:grid-cols-[1fr_minmax(0,24rem)_1fr] md:gap-10 md:py-16">
           <div>
             {campaign && pick(campaign, "label") && (
-              <p data-reveal className="label mb-4 text-stone">
+              <p data-enter className="label mb-4 text-stone">
                 {pick(campaign, "label")}
               </p>
             )}
@@ -107,7 +107,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               ))}
             </h1>
             {campaign && pick(campaign, "text") && (
-              <p data-reveal className="mt-5 max-w-xs text-stone" style={{ "--reveal-delay": "900ms" } as CSSProperties}>
+              <p data-enter className="mt-5 max-w-xs text-stone" style={{ "--reveal-delay": "900ms" } as CSSProperties}>
                 {pick(campaign, "text")}
               </p>
             )}
@@ -115,7 +115,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           {(campaign?.imageUrl || hero) && (
             <Link
               to={campaign?.imageUrl || !hero ? href("/shop") : href(`/product/${hero.slug}`)}
-              data-reveal="photo"
+              data-enter="photo"
               style={{ "--reveal-delay": "150ms" } as CSSProperties}
               className="block overflow-hidden"
             >
@@ -128,7 +128,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               />
             </Link>
           )}
-          <div data-reveal className="md:text-end" style={{ "--reveal-delay": "1100ms" } as CSSProperties}>
+          <div data-enter className="md:text-end" style={{ "--reveal-delay": "1100ms" } as CSSProperties}>
             <p className="label text-stone">{t("brand.supporting")}</p>
             <Link to={href("/shop")} className="btn btn-outline mt-5">
               {t("home.heroCta")}

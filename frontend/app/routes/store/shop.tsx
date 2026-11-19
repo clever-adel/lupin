@@ -271,7 +271,7 @@ export default function Shop({ loaderData }: Route.ComponentProps) {
             {t("shop.styles", { count: products.total })}
           </p>
           {products.items.length > 0 ? (
-            <ProductGrid products={products.items} heading="h2" />
+            <ProductGrid products={products.items} heading="h2" atTop />
           ) : (
             <p className="py-16 text-center text-stone">{t("shop.noResults")}</p>
           )}

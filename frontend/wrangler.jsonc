@@ -18,7 +18,11 @@
     // Browser tests: a second local copy on its own ports (CLOUDFLARE_ENV=e2e), so tests never use
     // the database you are looking at on :5173.
     "e2e": {
-      "vars": { "API_ORIGIN": "http://localhost:8090", "SITE_ORIGIN": "http://localhost:5183" }
+      "vars": { "API_ORIGIN": "http://localhost:8090", "SITE_ORIGIN": "http://localhost:5183" },
+      // Simulated locally by Wrangler (nothing reaches Cloudflare), so the photo tests can upload.
+      "r2_buckets": [
+        { "binding": "MEDIA_BUCKET", "bucket_name": "lupin-product-images-e2e" }
+      ]
     },
     "staging": {
       "vars": { "API_ORIGIN": "https://REPLACE-WITH-STAGING-CLOUD-RUN-URL", "SITE_ORIGIN": "https://staging.lupinwear.store" }

@@ -245,6 +245,38 @@
   transform: none;
 }
 
+/* The first screen enters on its own, from the first paint, instead of waiting for JavaScript to load
+   and watch it: same rise and photo curtain as [data-reveal], as plain CSS animations. */
+.js [data-enter] {
+  animation: enter-rise 900ms var(--ease-out) both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+.js [data-enter="photo"] {
+  animation: none;
+}
+.js [data-enter="photo"] > * {
+  animation:
+    enter-curtain 1300ms var(--ease-curtain) both,
+    enter-settle 2200ms var(--ease-out) both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+@keyframes enter-rise {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem);
+  }
+}
+@keyframes enter-curtain {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+}
+@keyframes enter-settle {
+  from {
+    transform: scale(1.15);
+  }
+}
+
 /* Hero: the headline's words rise one after another; the backdrop word drifts very slowly. */
 .hero-word {
   display: inline-block;
@@ -422,6 +454,8 @@
   }
   .js [data-reveal],
   .js [data-reveal="photo"] > *,
+  .js [data-enter],
+  .js [data-enter="photo"] > *,
   .js .hero-word {
     opacity: 1 !important;
     transform: none !important;

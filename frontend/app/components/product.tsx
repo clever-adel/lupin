@@ -4,17 +4,7 @@ import { bagActions, useBagState } from "~/features/bag/store";
 import { useT } from "~/lib/i18n";
 import type { ProductCard as Card } from "~/lib/types";
 import { HeartIcon } from "./icons";
-
-const WIDTHS = [320, 480, 640, 960, 1280];
-
-/** Cloudinary delivery URL at a given width, in the best format the browser accepts. */
-export function cloudinary(url: string, width: number): string {
-  const marker = "/image/upload/";
-  const at = url.indexOf(marker);
-  if (at === -1) return url;
-  const head = url.slice(0, at + marker.length);
-  return `${head}f_auto,q_auto,c_limit,w_${width}/${url.slice(at + marker.length)}`;
-}
+import { photoSrcSet, photoUrl } from "~/lib/photo-sizes";
 
 interface PhotoProps {
   url?: string;
@@ -44,8 +34,8 @@ export function ProductPhoto({ url, alt, sizes, eager, className = "" }: PhotoPr
   }
   return (
     <img
-      src={cloudinary(url, 960)}
-      srcSet={WIDTHS.map((w) => `${cloudinary(url, w)} ${w}w`).join(", ")}
+      src={photoUrl(url, 960)}
+      srcSet={photoSrcSet(url)}
       sizes={sizes}
       alt={alt}
       // Every product photo is shown in a 4:5 frame. The attributes give browsers and crawlers that
@@ -180,11 +170,19 @@ export function ProductCard({ product, eager, heading: Heading = "h3" }: { produ
   );
 }
 
-export function ProductGrid({ products, heading }: { products: Card[]; heading?: "h2" | "h3" }) {
+/**
+ * `atTop`: the grid starts on the first screen (the shop page). Its first row then enters from the first
+ * paint, without waiting for JavaScript; the rest still rises in as it scrolls into view.
+ */
+export function ProductGrid({ products, heading, atTop }: { products: Card[]; heading?: "h2" | "h3"; atTop?: boolean }) {
   return (
     <ul className="grid grid-cols-2 gap-x-4 gap-y-10 lg:grid-cols-4">
       {products.map((product, i) => (
-        <li key={product.slug} data-reveal style={{ "--reveal-delay": `${(i % 4) * 90}ms` } as CSSProperties}>
+        <li
+          key={product.slug}
+          {...(atTop && i < 4 ? { "data-enter": "" } : { "data-reveal": "" })}
+          style={{ "--reveal-delay": `${(i % 4) * 90}ms` } as CSSProperties}
+        >
           <ProductCard product={product} eager={i < 4} heading={heading} />
         </li>
       ))}

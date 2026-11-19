@@ -121,8 +121,8 @@ test.describe.serial("staff dashboard", () => {
     // Hiding Kids takes it out of the store's list; it stays here so it can be shown again.
     await departments.getByRole("button", { name: "Hide Kids" }).click();
     await expect(departments.getByText("Hidden from the store")).toBeVisible();
-    const listed = await (await page.request.get("/api/v1/catalog/departments")).json();
-    expect(listed.map((d: { slug: string }) => d.slug)).not.toContain("kids");
+    const departmentList = await (await page.request.get("/api/v1/catalog/departments")).json();
+    expect(departmentList.map((d: { slug: string }) => d.slug)).not.toContain("kids");
     await departments.getByRole("button", { name: "Show Kids as coming soon" }).click();
     await expect(departments.getByRole("button", { name: "Hide Kids" })).toBeVisible();
 
@@ -466,10 +466,14 @@ test.describe.serial("staff dashboard", () => {
     const reference = await placeOrder(customer, /InstaPay transfer/);
     await expect(customer.getByText("demo-not-real@instapay")).toBeVisible();
 
-    // A reference that is too short is caught on the page.
+    // Sending nothing, or a reference that is too short, is caught on the page.
+    await customer.getByRole("button", { name: "I have sent it" }).click();
+    await expect(customer.getByText("Add a screenshot of the transfer or its reference number.")).toBeVisible();
+    const referenceField = customer.getByLabel(/^Reference number/);
+    await referenceField.fill("E2");
     await customer.getByRole("button", { name: "I have sent it" }).click();
     await expect(customer.getByText("Enter the reference number from your banking app.")).toBeVisible();
-    await customer.getByLabel("Transfer reference number").fill("E2E REF 111");
+    await referenceField.fill("E2E REF 111");
     await customer.getByRole("button", { name: "I have sent it" }).click();
     await expect(customer.getByText(/We are checking your transfer \(reference E2E REF 111\)/)).toBeVisible();
 
@@ -485,7 +489,7 @@ test.describe.serial("staff dashboard", () => {
 
     await customer.reload();
     await expect(customer.getByText("We could not find that transfer.")).toBeVisible();
-    await customer.getByLabel("Transfer reference number").fill("E2E REF 222");
+    await customer.getByLabel(/^Reference number/).fill("E2E REF 222");
     await customer.getByRole("button", { name: "I have sent it" }).click();
     await expect(customer.getByText(/reference E2E REF 222/)).toBeVisible();
 
@@ -548,7 +552,7 @@ test.describe.serial("staff dashboard", () => {
     await staff.goto("/admin/settings");
     await expect(staff.getByText("Only the owner can change payment settings.")).toBeVisible();
     await expect(staff.getByRole("checkbox", { name: /Cash on delivery/ })).toBeDisabled();
-    await expect(staff.getByText("Only the owner can change these.")).toBeVisible();
+    await expect(staff.getByRole("region", { name: "Checkout rules" }).getByText("Only the owner can change these.")).toBeVisible();
     // Delivery fees are theirs to edit.
     await expect(staff.getByRole("button", { name: "Add delivery option" })).toBeVisible();
     await staff.goto("/admin/content");

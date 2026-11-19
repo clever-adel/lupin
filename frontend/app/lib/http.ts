@@ -92,7 +92,36 @@ export async function uploadImages(files: File[]): Promise<UploadedImage[]> {
     const payload = await response.json().catch(() => null) as { message?: string } | null;
     throw new ApiError(response.status, "IMAGE_UPLOAD_FAILED", payload?.message ?? "Could not upload the selected images.");
   }
-  return await response.json() as UploadedImage[];
+  const uploaded = await response.json() as UploadedImage[];
+  // Phone-size copies, made here and stored next to each photo. A failure is not fatal: the store
+  // shows the original until the copies exist ("Prepare phone-size photos" on the products page).
+  await Promise.allSettled(uploaded.map((image, i) => (files[i] ? saveImageSizes(image.publicId, files[i]) : false)));
+  return uploaded;
+}
+
+/** Makes and stores the phone-size copies of one uploaded photo. Returns false if they could not be made. */
+export async function saveImageSizes(publicId: string, photo: Blob): Promise<boolean> {
+  const { makePhotoSizes } = await import("./photo-resize");
+  const sizes = await makePhotoSizes(photo).catch(() => null);
+  if (!sizes) return false;
+  const form = new FormData();
+  for (const [width, blob] of sizes) form.append(`w${width}`, blob, `w${width}.webp`);
+  const send = async () => fetch(`/media/${encodeURIComponent(publicId)}/sizes`, {
+    method: "POST",
+    headers: { "X-XSRF-TOKEN": await csrfToken(), Accept: "application/json" },
+    credentials: "same-origin",
+    body: form,
+  });
+  let response = await send();
+  if (response.status === 401 && await refreshSession()) response = await send();
+  return response.ok;
+}
+
+/** Uploaded photos that still lack their phone-size copies (staff only). */
+export async function imagesWithoutSizes(): Promise<string[]> {
+  const response = await fetch("/media/without-sizes", { credentials: "same-origin", headers: { Accept: "application/json" } });
+  if (!response.ok) return [];
+  return await response.json() as string[];
 }
 
 export async function deleteUploadedImage(publicId: string): Promise<void> {

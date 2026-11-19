@@ -7,7 +7,16 @@ const ownerPassword =
   process.env.E2E_OWNER_PASSWORD ?? (existsSync(PASSWORD_FILE) ? readFileSync(PASSWORD_FILE, "utf8").trim() : "");
 
 /** WCAG 2.1 A and AA rules that a machine can check. It does not replace a manual screen-reader pass. */
-async function scan(page: Page, label: string): Promise<string[]> {
+async function scan(page: Page, label: string, settle = true): Promise<string[]> {
+  // Cards fade in as they scroll into view; a half-faded card would be reported as low contrast.
+  if (settle) await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   return results.violations.map(
     (v) => `${label}: ${v.id} (${v.impact}) — ${v.help} — ${v.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(" | ")}`,
@@ -39,7 +48,7 @@ test("public pages have no automatic accessibility violations, in English and Ar
 
 test("the opening animation has no violations and can be dismissed from the keyboard", async ({ page }) => {
   await page.goto("/");
-  const problems = await scan(page, "/ with intro");
+  const problems = await scan(page, "/ with intro", false); // scanned while the intro is showing
   await page.keyboard.press("Escape");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   expect(problems).toEqual([]);

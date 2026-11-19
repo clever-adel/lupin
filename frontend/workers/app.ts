@@ -1,5 +1,6 @@
 import { createRequestHandler } from "react-router";
 import { EDGE_KEY_HEADER, edgeKey } from "../app/lib/edge";
+import { isPhotoWidth, PHOTO_WIDTHS, sizedKey } from "../app/lib/photo-sizes";
 
 declare module "react-router" {
   export interface AppLoadContext {
@@ -80,8 +81,9 @@ function csrfValid(request: Request): boolean {
     && cookieValue(request, "XSRF-TOKEN") === request.headers.get("X-XSRF-TOKEN");
 }
 
-async function authorizeAdmin(request: Request, env: Env): Promise<Response | null> {
-  if (!csrfValid(request)) return Response.json({ message: "Refresh the page and try again." }, { status: 403 });
+/** Staff only. Changes also need the CSRF check; reads do not (browsers send no Origin on same-origin GETs). */
+async function authorizeAdmin(request: Request, env: Env, { read = false } = {}): Promise<Response | null> {
+  if (!read && !csrfValid(request)) return Response.json({ message: "Refresh the page and try again." }, { status: 403 });
   const cookie = request.headers.get("Cookie");
   if (!cookie) return Response.json({ message: "Please sign in again." }, { status: 401 });
   const headers = new Headers({ Accept: "application/json", Cookie: cookie });
@@ -161,15 +163,23 @@ async function uploadImages(request: Request, env: Env): Promise<Response> {
   return Response.json(images, { headers: { "Cache-Control": "no-store" } });
 }
 
+/**
+ * /media/<key> is the photo as uploaded; /media/<key>?w=<width> is its WebP copy at that width, or the
+ * original while no copy exists yet (answered with a short cache, so the copy is picked up once made).
+ */
 async function serveImage(request: Request, env: Env, key: string): Promise<Response> {
   if (!IMAGE_KEY.test(key) || !("MEDIA_BUCKET" in env)) return new Response("Not found", { status: 404 });
-  const object = await (env as MediaEnv).MEDIA_BUCKET.get(key);
+  const bucket = (env as MediaEnv).MEDIA_BUCKET;
+  const width = Number(new URL(request.url).searchParams.get("w"));
+  const sized = isPhotoWidth(width) ? await bucket.get(sizedKey(key, width)) : null;
+  const object = sized ?? await bucket.get(key);
   if (!object) return new Response("Not found", { status: 404 });
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   headers.set("ETag", object.httpEtag);
   headers.set("X-Content-Type-Options", "nosniff");
-  headers.set("Cache-Control", "public, max-age=31536000, immutable");
+  const fallback = isPhotoWidth(width) && !sized;
+  headers.set("Cache-Control", fallback ? "public, max-age=600" : "public, max-age=31536000, immutable");
   return new Response(request.method === "HEAD" ? null : object.body, { headers });
 }
 
@@ -177,8 +187,55 @@ async function deleteImage(request: Request, env: Env, key: string): Promise<Res
   const denied = await authorizeAdmin(request, env);
   if (denied) return denied;
   if (!IMAGE_KEY.test(key) || !("MEDIA_BUCKET" in env)) return new Response(null, { status: 404 });
-  await (env as MediaEnv).MEDIA_BUCKET.delete(key);
+  await (env as MediaEnv).MEDIA_BUCKET.delete([key, ...PHOTO_WIDTHS.map((w) => sizedKey(key, w))]);
   return new Response(null, { status: 204 });
+}
+
+const SIZED_MAX_BYTES = 3 * 1024 * 1024;
+
+/** Stores the WebP copies of one uploaded photo: form fields w320, w480, … one file each, all required. */
+async function saveImageSizes(request: Request, env: Env, key: string): Promise<Response> {
+  const denied = await authorizeAdmin(request, env);
+  if (denied) return denied;
+  if (!IMAGE_KEY.test(key) || !("MEDIA_BUCKET" in env)) return Response.json({ message: "Photo not found." }, { status: 404 });
+  const bucket = (env as MediaEnv).MEDIA_BUCKET;
+  if (!(await bucket.head(key))) return Response.json({ message: "Photo not found." }, { status: 404 });
+  let form: FormData;
+  try { form = await request.formData(); } catch {
+    return Response.json({ message: "Send the photo sizes as a form." }, { status: 400 });
+  }
+  const copies: { width: (typeof PHOTO_WIDTHS)[number]; file: File }[] = [];
+  for (const width of PHOTO_WIDTHS) {
+    const file = form.get(`w${width}`);
+    if (!(file instanceof File) || file.type !== "image/webp" || file.size === 0 || file.size > SIZED_MAX_BYTES) {
+      return Response.json({ message: `The ${width}px copy is missing or not a WebP image.` }, { status: 400 });
+    }
+    if (!imageSignatureMatches("image/webp", new Uint8Array(await file.slice(0, 16).arrayBuffer()))) {
+      return Response.json({ message: `The ${width}px copy is not a valid WebP image.` }, { status: 415 });
+    }
+    copies.push({ width, file });
+  }
+  await Promise.all(copies.map(({ width, file }) => bucket.put(sizedKey(key, width), file.stream(), {
+    httpMetadata: { contentType: "image/webp", cacheControl: "public, max-age=31536000, immutable" },
+  })));
+  return new Response(null, { status: 204 });
+}
+
+/** Uploaded photos that do not have their phone-size copies yet (photos from before copies were made). */
+async function imagesWithoutSizes(request: Request, env: Env): Promise<Response> {
+  const denied = await authorizeAdmin(request, env, { read: true });
+  if (denied) return denied;
+  if (!("MEDIA_BUCKET" in env)) return Response.json([]);
+  const keys: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await (env as MediaEnv).MEDIA_BUCKET.list({ cursor, limit: 1000 });
+    keys.push(...page.objects.map((object) => object.key));
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  const present = new Set(keys);
+  const missing = keys.filter((key) => IMAGE_KEY.test(key) && PHOTO_WIDTHS.some((w) => !present.has(sizedKey(key, w))));
+  return Response.json(missing, { headers: { "Cache-Control": "no-store" } });
 }
 
 export default {
@@ -196,6 +253,12 @@ export default {
     }
     if (pathname === "/media/upload" && request.method === "POST") {
       return uploadImages(request, env);
+    }
+    if (pathname === "/media/without-sizes" && request.method === "GET") {
+      return imagesWithoutSizes(request, env);
+    }
+    if (pathname.startsWith("/media/") && pathname.endsWith("/sizes") && request.method === "POST") {
+      return saveImageSizes(request, env, pathname.slice("/media/".length, -"/sizes".length));
     }
     if (pathname.startsWith("/media/")) {
       const key = pathname.slice("/media/".length);
