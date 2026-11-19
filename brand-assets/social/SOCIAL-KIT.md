@@ -64,7 +64,7 @@ Hashtags: use 5 to 8 per post, never the same full set every time.
 Core: `#LUPIN #StealTheLook #اسرق_الأنظار #StreetwearEgypt #ستريت_وير`
 Mix in: `#هوديز #هودي #جاكيت #موضة_مصر #CairoStreetwear #EgyptFashion #OOTDEgypt #LimitedDrop`
 
-**post-01-launch.png** (with the Reel the same day)
+**post-01-launch.png** (Instagram, 4:5) / **post-01-launch-square.png** (Facebook, 1:1 — Facebook shows tall images with empty bars) — with the Reel the same day. Posted on Facebook on 2026-11-19.
 ```
 Steal the look. 🖤
 LUPIN. is live: curated streetwear from original brands, released in limited drops. Every piece has an operation name.
