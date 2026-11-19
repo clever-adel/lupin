@@ -206,5 +206,6 @@ TikTok gets the video posts. Stories every day, even when there is no feed post.
    Instagram was connected) holds the catalogue **LUPIN Store** (ID 1603950748435756), fed hourly from
    `https://lupinwear.store/catalog/meta.csv`, and the Pixel **lupinwear.store** (ID 1790053122102572), which the store now
    uses (Dashboard → Settings → Ads tracking). The old Pixel 508091083934676 sat on a restricted personal ad account and
-   could not be connected. Still to do by the owner: in Events Manager → lupinwear.store → Settings → Conversions API,
-   generate an access token and save it on Render as `META_CAPI_TOKEN` (the old one belongs to the old Pixel).
+   could not be connected. The Conversions API token for this Pixel is saved on Render as `META_CAPI_TOKEN`
+   (2026-11-19), so the server also reports each Purchase. Generating a token needs an email on your profile in the
+   portfolio (Business info → Profile contact info: lupin.wear.eg@gmail.com).
