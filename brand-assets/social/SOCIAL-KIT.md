@@ -103,7 +103,7 @@ Operation: The Stealth 🕶️
 Team 365 soft shell jacket. Keeps out wind and light rain, lets you breathe. Black or sport silver.
 EGP 790 instead of 990 — limited pieces.
 
-عملية: التخفّي 🕶️
+عملية: The Stealth 🕶️
 جاكيت سوفت شيل من Team 365. بيصد الهوا والمطر الخفيف وبيسيبك تتنفس. أسود أو فضي.
 ٧٩٠ جنيه بدل ٩٩٠ — كمية محدودة.
 #LUPIN #جاكيت #StreetwearEgypt #CairoStreetwear #ستريت_وير
@@ -115,7 +115,7 @@ Operation: The Getaway Driver 🏁
 LC Waikiki black denim jacket with a warm sherpa collar and lining.
 EGP 1,440 instead of 1,800.
 
-عملية: سوّاق الهروب 🏁
+عملية: The Getaway Driver 🏁
 جاكيت جينز أسود من LC Waikiki بياقة وبطانة فرو دافية.
 ١٤٤٠ جنيه بدل ١٨٠٠.
 #LUPIN #جاكيت #DenimJacket #StreetwearEgypt #ستريت_وير
@@ -127,7 +127,7 @@ Operation: The Alibi 🤎
 Bershka oversized hoodie, dropped shoulders, soft cotton blend.
 EGP 690 instead of 900.
 
-عملية: حجة الغياب 🤎
+عملية: The Alibi 🤎
 هودي برشكا أوفر سايز، كتف نازل، قطن ناعم.
 ٦٩٠ جنيه بدل ٩٠٠.
 #LUPIN #هودي #هوديز #StreetwearEgypt #ستريت_وير
@@ -139,7 +139,7 @@ Operation: The Master Key 🗝️
 Bershka graphic hoodie in stone. Relaxed oversized fit, brushed fleece inside.
 EGP 690 instead of 900.
 
-عملية: المفتاح الماستر 🗝️
+عملية: The Master Key 🗝️
 هودي برشكا مطبوع بلون بيج حجري. أوفر سايز ومن جوه فليس ناعم.
 ٦٩٠ جنيه بدل ٩٠٠.
 #LUPIN #هودي #هوديز #CairoStreetwear #ستريت_وير
@@ -151,7 +151,7 @@ Operation: The Brooklyn Job 🎨
 Bershka graffiti hoodie in cream. Relaxed boxy fit, brushed fleece inside.
 EGP 690 instead of 900.
 
-عملية: عملية بروكلين 🎨
+عملية: The Brooklyn Job 🎨
 هودي برشكا جرافيتي بلون كريمي. قصّة بوكسي واسعة ومن جوه فليس ناعم.
 ٦٩٠ جنيه بدل ٩٠٠.
 #LUPIN #هودي #Graffiti #StreetwearEgypt #ستريت_وير

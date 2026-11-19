@@ -49,13 +49,13 @@ Mission 001 says "Bershka" because it describes what the pieces are. The headlin
 
 ### What is in the store (checked on lupinwear.store, 2026-11-20)
 
-| Operation | Piece | Maker | Price (was) | Sizes | Mission |
+| Operation | Piece | Maker | Price (was) | Sizes in stock | Mission |
 |---|---|---|---|---|---|
-| The Alibi | Oversized hoodie, brown | Bershka | EGP 690 (900) | XS–L | 001 |
+| The Alibi | Oversized hoodie, brown | Bershka | EGP 690 (900) | S–L | 001 |
 | The Master Key | Graphic hoodie, stone (key print on the back) | Bershka | EGP 690 (900) | XS–L | 001 |
 | The Brooklyn Job | Graffiti hoodie, cream | Bershka | EGP 690 (900) | XS–L | 001 |
-| The Getaway Driver | Sherpa denim jacket, black | LC Waikiki | EGP 1,440 (1,800) | XS–XL | 003 |
-| The Stealth | Soft shell jacket, black | Team 365 | EGP 790 (990) | M–L | 003 |
+| The Getaway Driver | Sherpa denim jacket, black | LC Waikiki | EGP 1,440 (1,800) | M, L | 003 |
+| The Stealth | Soft shell jacket, black | Team 365 | EGP 790 (990) | M | 003 |
 
 **The Getaway Driver and The Stealth are not Bershka.** They never appear under the "Bershka Heist" title, caption or hashtag. They go in Mission 003 (The Fashion Vault), which is not tied to one maker, or in their own posts.
 
