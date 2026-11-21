@@ -242,3 +242,11 @@ export interface LookGeneration {
   createdAt: string;
   finishedAt?: string;
 }
+
+/** Egyptian mobile 01xxxxxxxxx -> wa.me/201xxxxxxxxx; anything else gets no WhatsApp link. */
+export function whatsAppLink(phone: string | null): string | null {
+  const digits = (phone ?? "").replace(/\D/g, "");
+  if (/^01\d{9}$/.test(digits)) return `https://wa.me/2${digits}`;
+  if (/^201\d{9}$/.test(digits)) return `https://wa.me/${digits}`;
+  return null;
+}
