@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { errorText } from "~/features/admin/shared";
+import { SizeGuideEditor } from "~/features/admin/size-guide-editor";
 import { api, deleteUploadedImage, uploadImages } from "~/lib/http";
-import type { Department } from "~/lib/types";
+import type { Department, SizeGuide } from "~/lib/types";
 
 interface Detail {
   id: number;
@@ -30,6 +31,7 @@ interface Detail {
   colors: Colour[];
   /** The sizes the product is sold in; a colour added later gets the same ones. */
   sizes?: string[];
+  sizeGuide?: SizeGuide | null;
 }
 
 interface ImageInput {
@@ -791,6 +793,10 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
             onAdded={(colour) => setColours((list) => [...list, colour])}
           />
         </section>
+      )}
+
+      {existing && (existing.sizes?.length ?? 0) > 0 && (
+        <SizeGuideEditor productId={existing.id} sizes={existing.sizes ?? []} initial={existing.sizeGuide} />
       )}
 
       <div className="flex flex-wrap items-center gap-3">

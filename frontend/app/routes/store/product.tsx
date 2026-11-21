@@ -5,6 +5,7 @@ import type { Route } from "./+types/product";
 import { announceBagAdded } from "~/components/bag-added";
 import { ShareIcon } from "~/components/icons";
 import { FavouriteButton, Price, ProductPhoto } from "~/components/product";
+import { SizeGuidePanel } from "~/components/size-guide";
 import { useBag } from "~/features/bag/useBag";
 import { api } from "~/lib/http";
 import { apiGet } from "~/lib/api.server";
@@ -297,6 +298,7 @@ function ProductView({ product }: { product: ProductDetail }) {
                 </button>
               ))}
             </div>
+            {product.sizeGuide && <SizeGuidePanel guide={product.sizeGuide} sizes={color.variants.map((v) => v.sizeCode)} />}
           </fieldset>
 
           <div className="mt-7 flex flex-wrap gap-2">

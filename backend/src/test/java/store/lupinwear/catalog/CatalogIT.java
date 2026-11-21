@@ -409,6 +409,45 @@ class CatalogIT extends IntegrationTest {
         assertThat(audits).isEqualTo(2);
     }
 
+    @Test
+    void staffSetASizeChartThatCustomersSeeOnTheProduct() throws Exception {
+        JsonNode created = create(request("Chart Hoodie", "900.00", null, 2));
+        long id = created.get("id").asLong();
+        String slug = created.get("slug").asText();
+        publish(id);
+        Map<String, Object> chart = Map.of("kind", "BODY", "noteEn", "Runs one size large.", "noteAr", "بييجي أكبر بمقاس.",
+                "rows", List.of(Map.of("labelEn", "Chest", "labelAr", "الصدر",
+                        "values", Map.of("S", "86-94", "M", "94-102", "L", "102-110"))));
+
+        Cookie customer = cookie(register(uniqueEmail()), store.lupinwear.security.AuthCookies.ACCESS);
+        mvc.perform(put("/api/v1/admin/products/" + id + "/size-guide").with(csrf()).cookie(customer)
+                        .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(chart)))
+                .andExpect(status().isForbidden());
+
+        // A size the product is not sold in is refused.
+        Map<String, Object> wrong = Map.of("kind", "BODY", "rows", List.of(Map.of("labelEn", "Chest",
+                "labelAr", "الصدر", "values", Map.of("XXL", "118-126"))));
+        mvc.perform(put("/api/v1/admin/products/" + id + "/size-guide").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(wrong)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("SIZE_NOT_SOLD"));
+
+        mvc.perform(put("/api/v1/admin/products/" + id + "/size-guide").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(chart)))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/catalog/products/" + slug))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sizeGuide.kind").value("BODY"))
+                .andExpect(jsonPath("$.sizeGuide.rows[0].labelAr").value("الصدر"))
+                .andExpect(jsonPath("$.sizeGuide.rows[0].values.M").value("94-102"))
+                .andExpect(jsonPath("$.sizeGuide.noteEn").value("Runs one size large."));
+        mvc.perform(get("/api/v1/admin/products/" + id).cookie(owner))
+                .andExpect(jsonPath("$.sizeGuide.rows[0].values.L").value("102-110"));
+
+        mvc.perform(delete("/api/v1/admin/products/" + id + "/size-guide").with(csrf()).cookie(owner))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/catalog/products/" + slug)).andExpect(jsonPath("$.sizeGuide").doesNotExist());
+    }
+
     private ProductRequest request(String name, String price, String salePrice, int stock) {
         List<ImageRequest> photos = List.of(
                 new ImageRequest("lupin/test/a", "https://res.cloudinary.com/demo/a.jpg", "Front", "أمام"),

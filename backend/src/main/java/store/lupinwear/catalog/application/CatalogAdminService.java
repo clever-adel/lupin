@@ -19,6 +19,8 @@ import store.lupinwear.catalog.api.CatalogDtos.ImageRequest;
 import store.lupinwear.catalog.api.CatalogDtos.InitialVariantStock;
 import store.lupinwear.catalog.api.CatalogDtos.ProductCreated;
 import store.lupinwear.catalog.api.CatalogDtos.ProductRequest;
+import store.lupinwear.catalog.api.CatalogDtos.SizeGuide;
+import store.lupinwear.catalog.api.CatalogDtos.SizeGuideRow;
 import store.lupinwear.catalog.api.CatalogDtos.StockView;
 import store.lupinwear.catalog.api.CatalogDtos.AdminProductDetail;
 import store.lupinwear.catalog.api.CatalogDtos.AdminColor;
@@ -351,7 +353,7 @@ public class CatalogAdminService {
         AdminProductDetail product = jdbc.sql("""
                 select p.id, p.slug, p.status, d.slug, c.slug, p.name_en, p.name_ar, p.description_en,
                        p.description_ar, p.fabric_en, p.fabric_ar, p.fit_en, p.fit_ar, p.badge, p.price, p.sale_price,
-                       p.featured, p.badge_en, p.badge_ar, p.brand
+                       p.featured, p.badge_en, p.badge_ar, p.brand, p.size_guide::text
                 from products p join departments d on d.id = p.department_id join categories c on c.id = p.category_id
                 where p.id = :id and p.deleted_at is null
                 """).param("id", id)
@@ -359,7 +361,7 @@ public class CatalogAdminService {
                         rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8),
                         rs.getString(9), rs.getString(10), rs.getString(11), rs.getString(12), rs.getString(13),
                         rs.getString(20), rs.getString(14), rs.getString(18), rs.getString(19), rs.getBigDecimal(15),
-                        rs.getBigDecimal(16), rs.getBoolean(17), List.of(), List.of()))
+                        rs.getBigDecimal(16), rs.getBoolean(17), List.of(), List.of(), SizeGuides.read(rs.getString(21))))
                 .optional().orElseThrow(() -> ApiException.notFound("Product"));
         record ColorHead(long id, String nameEn, String nameAr, String hex, boolean main) {
         }
@@ -384,7 +386,31 @@ public class CatalogAdminService {
                 product.categorySlug(), product.nameEn(), product.nameAr(), product.descriptionEn(),
                 product.descriptionAr(), product.fabricEn(), product.fabricAr(), product.fitEn(), product.fitAr(),
                 product.brand(), product.badge(), product.badgeEn(), product.badgeAr(), product.price(), product.salePrice(),
-                product.featured(), colors, productSizes(id).stream().map(ProductSize::code).toList());
+                product.featured(), colors, productSizes(id).stream().map(ProductSize::code).toList(),
+                product.sizeGuide());
+    }
+
+    /** Sets or clears (null) a product's size chart. Every size named in it must be one the product is sold in. */
+    public void setSizeGuide(UUID actor, long id, SizeGuide guide) {
+        boolean exists = jdbc.sql("select count(*) from products where id = :id and deleted_at is null")
+                .param("id", id).query(Long.class).single() == 1;
+        if (!exists) {
+            throw ApiException.notFound("Product");
+        }
+        if (guide != null) {
+            java.util.Set<String> sizes = new java.util.HashSet<>(productSizes(id).stream().map(ProductSize::code).toList());
+            for (SizeGuideRow row : guide.rows()) {
+                for (String size : row.values().keySet()) {
+                    if (!sizes.contains(size)) {
+                        throw ApiException.badRequest("SIZE_NOT_SOLD",
+                                "The size chart names size " + size + ", which this product is not sold in.");
+                    }
+                }
+            }
+        }
+        jdbc.sql("update products set size_guide = cast(:g as jsonb), updated_at = now() where id = :id")
+                .param("g", guide == null ? null : SizeGuides.write(guide)).param("id", id).update();
+        audit.record(actor, guide == null ? "SIZE_GUIDE_CLEAR" : "SIZE_GUIDE_SET", "product", id, null);
     }
 
     private record ProductSize(int id, String code) {

@@ -106,6 +106,21 @@ export interface ProductDetail {
   department: Crumb;
   category: Crumb;
   colors: ProductColor[];
+  sizeGuide?: SizeGuide | null;
+}
+
+/** A product's size chart in cm: BODY gives the wearer's measurements, GARMENT the piece's own. */
+export interface SizeGuide {
+  kind: "BODY" | "GARMENT";
+  rows: SizeGuideRow[];
+  noteEn?: string | null;
+  noteAr?: string | null;
+}
+
+export interface SizeGuideRow {
+  labelEn: string;
+  labelAr: string;
+  values: Record<string, string>;
 }
 
 export interface Facets {

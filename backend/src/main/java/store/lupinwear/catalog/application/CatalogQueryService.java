@@ -265,7 +265,8 @@ public class CatalogQueryService {
                         rs.getString("badge_en"), rs.getString("badge_ar"), rs.getBigDecimal("price"), rs.getBigDecimal("sale_price"),
                         discountPercent(rs.getBigDecimal("price"), rs.getBigDecimal("sale_price")),
                         new Crumb(rs.getString("d_slug"), rs.getString("d_en"), rs.getString("d_ar")),
-                        new Crumb(rs.getString("c_slug"), rs.getString("c_en"), rs.getString("c_ar")), null)))
+                        new Crumb(rs.getString("c_slug"), rs.getString("c_en"), rs.getString("c_ar")), null,
+                        SizeGuides.read(rs.getString("size_guide")))))
                 .optional()
                 .orElseThrow(() -> ApiException.notFound("Product"));
 
@@ -309,7 +310,7 @@ public class CatalogQueryService {
         ProductDetail p = head.partial();
         return new ProductDetail(p.id(), p.slug(), p.nameEn(), p.nameAr(), p.descriptionEn(), p.descriptionAr(),
                 p.fabricEn(), p.fabricAr(), p.fitEn(), p.fitAr(), p.brand(), p.badge(), p.badgeEn(), p.badgeAr(), p.price(), p.salePrice(),
-                p.discountPercent(), p.department(), p.category(), List.copyOf(colors.values()));
+                p.discountPercent(), p.department(), p.category(), List.copyOf(colors.values()), p.sizeGuide());
     }
 
     /** Variants that are no longer purchasable are simply absent from the result. */

@@ -53,7 +53,20 @@ public final class CatalogDtos {
             String descriptionAr, String fabricEn, String fabricAr, String fitEn, String fitAr, String brand,
             String badge, String badgeEn, String badgeAr, BigDecimal price, BigDecimal salePrice,
             Integer discountPercent, Crumb department,
-            Crumb category, List<ColorView> colors) {
+            Crumb category, List<ColorView> colors, SizeGuide sizeGuide) {
+    }
+
+    /**
+     * A product's size chart, in cm. BODY charts give the wearer's measurements, GARMENT charts the piece's own.
+     * Each row is one measurement with a value per size code ("94-102", "58"); sizes left out show a dash.
+     */
+    public record SizeGuide(@NotNull @Pattern(regexp = "BODY|GARMENT") String kind,
+            @NotEmpty @Size(max = 8) List<@Valid @NotNull SizeGuideRow> rows,
+            @Size(max = 240) String noteEn, @Size(max = 240) String noteAr) {
+    }
+
+    public record SizeGuideRow(@NotBlank @Size(max = 40) String labelEn, @NotBlank @Size(max = 40) String labelAr,
+            @NotNull @Size(max = 12) java.util.Map<@NotBlank @Size(max = 12) String, @NotNull @Size(max = 20) String> values) {
     }
 
     /** A bag line as the server sees it right now: current price and current availability. */
@@ -186,7 +199,7 @@ public final class CatalogDtos {
             String fabricEn, String fabricAr, String fitEn, String fitAr, String brand, String badge, String badgeEn,
             String badgeAr, BigDecimal price, BigDecimal salePrice, boolean featured, List<AdminColor> colors,
             /** The product's sizes, in size order: a colour added later gets one variant for each. */
-            List<String> sizes) {
+            List<String> sizes, SizeGuide sizeGuide) {
     }
 
     /** A colour added to a product that already exists: same sizes as the others, its own stock and photos. */

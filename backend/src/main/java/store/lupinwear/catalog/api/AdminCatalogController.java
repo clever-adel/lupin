@@ -135,6 +135,19 @@ public class AdminCatalogController {
         catalog.updateProduct(user.id(), id, body);
     }
 
+    @org.springframework.web.bind.annotation.PutMapping("/products/{id}/size-guide")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void setSizeGuide(@AuthenticationPrincipal CurrentUser user, @PathVariable long id,
+            @Valid @RequestBody CatalogDtos.SizeGuide body) {
+        catalog.setSizeGuide(user.id(), id, body);
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/products/{id}/size-guide")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void clearSizeGuide(@AuthenticationPrincipal CurrentUser user, @PathVariable long id) {
+        catalog.setSizeGuide(user.id(), id, null);
+    }
+
     @org.springframework.web.bind.annotation.PutMapping("/products/{productId}/colors/{colorId}/images")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void replaceColorImages(@AuthenticationPrincipal CurrentUser user, @PathVariable long productId,
