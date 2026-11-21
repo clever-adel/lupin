@@ -32,14 +32,34 @@ function StockCell({ variant, onDone }: { variant: AdminVariant; onDone: () => v
       <td className={`px-3 py-2 font-semibold ${variant.available <= 2 ? "text-danger" : ""}`}>{variant.available}</td>
       <td className="py-2 ps-3">
         <form
-          className="flex items-center gap-2"
+          className="flex flex-wrap items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             if (valid) adjust.mutate(amount);
           }}
         >
+          <button
+            type="button"
+            className="btn btn-outline h-9 w-11 px-0 text-base"
+            aria-label={`Remove one ${variant.color} ${variant.sizeCode}`}
+            title="Remove one piece"
+            disabled={adjust.isPending || variant.available <= 0}
+            onClick={() => adjust.mutate(-1)}
+          >
+            −1
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary h-9 w-11 px-0 text-base"
+            aria-label={`Add one ${variant.color} ${variant.sizeCode}`}
+            title="Add one piece"
+            disabled={adjust.isPending}
+            onClick={() => adjust.mutate(1)}
+          >
+            +1
+          </button>
           <label htmlFor={id} className="sr-only">Add or remove stock for {variant.color} {variant.sizeCode}</label>
-          <input id={id} className="field h-9 w-20" inputMode="numeric" placeholder="+5 / -2" value={delta} onChange={(e) => setDelta(e.target.value)} />
+          <input id={id} className="field h-9 w-20" inputMode="numeric" placeholder="+10" value={delta} onChange={(e) => setDelta(e.target.value)} />
           <button type="submit" className="btn btn-outline h-9" disabled={!valid || adjust.isPending}>Apply</button>
         </form>
         {adjust.isError && <p role="alert" className="mt-1 text-xs text-danger">{errorText(adjust.error)}</p>}
@@ -392,14 +412,14 @@ export default function AdminProducts() {
               </div>
             </div>
             <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[34rem] text-sm">
+              <table className="w-full min-w-[40rem] text-sm">
                 <thead className="text-xs text-stone">
                   <tr>
                     <th scope="col" className="py-1 pe-3 text-start font-medium">Colour · size</th>
                     <th scope="col" className="px-3 py-1 text-start font-medium">In warehouse</th>
                     <th scope="col" className="px-3 py-1 text-start font-medium">Reserved</th>
                     <th scope="col" className="px-3 py-1 text-start font-medium">Can sell</th>
-                    <th scope="col" className="py-1 ps-3 text-start font-medium">Add / remove</th>
+                    <th scope="col" className="py-1 ps-3 text-start font-medium">Add / remove pieces</th>
                   </tr>
                 </thead>
                 <tbody>
