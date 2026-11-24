@@ -107,6 +107,114 @@ class ShopIT extends IntegrationTest {
     }
 
     @Test
+    void piecesHeldForOnlineOrdersCannotBeSoldAtTheShop() throws Exception {
+        jdbc.sql("update inventory set reserved = 4 where variant_id = :v").param("v", variant).update();
+        mvc.perform(jsonPost("/api/v1/admin/shop/sales", Map.of(
+                "items", List.of(Map.of("variantId", variant, "quantity", 2, "unitPrice", "600")))).cookie(admin))
+                .andExpect(status().isConflict());
+        mvc.perform(jsonPost("/api/v1/admin/shop/sales", Map.of(
+                "items", List.of(Map.of("variantId", variant, "quantity", 1, "unitPrice", "600")))).cookie(admin))
+                .andExpect(status().isCreated());
+        assertThat(onHand()).isEqualTo(4);
+    }
+
+    @Test
+    void aFailedLineUndoesTheWholeSale() throws Exception {
+        long before = receipts();
+        // The same piece on two lines: 3 + 3 is more than the 5 there are, so nothing is sold at all.
+        mvc.perform(jsonPost("/api/v1/admin/shop/sales", Map.of("items", List.of(
+                Map.of("variantId", variant, "quantity", 3, "unitPrice", "600"),
+                Map.of("variantId", variant, "quantity", 3, "unitPrice", "600")))).cookie(admin))
+                .andExpect(status().isConflict());
+        assertThat(onHand()).isEqualTo(5);
+        assertThat(receipts()).isEqualTo(before);
+
+        // 2 + 3 fits exactly.
+        JsonNode sale = body(mvc.perform(jsonPost("/api/v1/admin/shop/sales", Map.of("items", List.of(
+                Map.of("variantId", variant, "quantity", 2, "unitPrice", "600"),
+                Map.of("variantId", variant, "quantity", 3, "unitPrice", "550.50")))).cookie(admin))
+                .andExpect(status().isCreated()).andReturn());
+        assertThat(sale.get("total").decimalValue()).isEqualByComparingTo("2851.50");
+        assertThat(onHand()).isZero();
+    }
+
+    @Test
+    void badInputIsRefusedWithoutTouchingStock() throws Exception {
+        List<Map<String, Object>> bad = List.of(
+                Map.of("items", List.of()),
+                Map.of("items", List.of(Map.of("variantId", variant, "quantity", 1, "unitPrice", "-1"))),
+                Map.of("items", List.of(Map.of("variantId", variant, "quantity", 1, "unitPrice", "12.345"))),
+                Map.of("items", List.of(Map.of("variantId", variant, "quantity", 0, "unitPrice", "10"))),
+                Map.of("items", List.of(Map.of("quantity", 1, "unitPrice", "10"))),
+                Map.of("paymentMethod", "GOLD", "items", List.of(Map.of("variantId", variant, "quantity", 1, "unitPrice", "10"))));
+        for (Map<String, Object> body : bad) {
+            mvc.perform(jsonPost("/api/v1/admin/shop/sales", body).cookie(admin)).andExpect(status().isBadRequest());
+        }
+        mvc.perform(jsonPost("/api/v1/admin/shop/sales", Map.of(
+                "items", List.of(Map.of("variantId", 999_999_999L, "quantity", 1, "unitPrice", "10")))).cookie(admin))
+                .andExpect(status().isNotFound());
+        assertThat(onHand()).isEqualTo(5);
+    }
+
+    @Test
+    void aReturnCannotPointAtAnotherReceiptsLineOrAtAReturn() throws Exception {
+        JsonNode first = sell(1);
+        JsonNode second = sell(1);
+        long lineOfFirst = first.get("items").get(0).get("id").asLong();
+        mvc.perform(jsonPost("/api/v1/admin/shop/returns", Map.of("originalSaleId", second.get("id").asLong(),
+                "items", List.of(Map.of("originalItemId", lineOfFirst, "quantity", 1, "unitPrice", "600")))).cookie(admin))
+                .andExpect(status().isNotFound());
+        // The same line twice in one return counts both.
+        mvc.perform(jsonPost("/api/v1/admin/shop/returns", Map.of("originalSaleId", first.get("id").asLong(),
+                "items", List.of(Map.of("originalItemId", lineOfFirst, "quantity", 1, "unitPrice", "600"),
+                        Map.of("originalItemId", lineOfFirst, "quantity", 1, "unitPrice", "600")))).cookie(admin))
+                .andExpect(status().isConflict());
+        JsonNode back = body(mvc.perform(jsonPost("/api/v1/admin/shop/returns", Map.of("originalSaleId",
+                first.get("id").asLong(), "items", List.of(Map.of("originalItemId", lineOfFirst, "quantity", 1,
+                        "unitPrice", "600")))).cookie(admin)).andExpect(status().isCreated()).andReturn());
+        mvc.perform(jsonPost("/api/v1/admin/shop/returns", Map.of("originalSaleId", back.get("id").asLong(),
+                "items", List.of(Map.of("variantId", variant, "quantity", 1, "unitPrice", "600")))).cookie(admin))
+                .andExpect(status().isBadRequest());
+        assertThat(onHand()).isEqualTo(4);
+    }
+
+    @Test
+    void hiddenAndArchivedProductsCanBeSoldButRemovedSizesAreNotOffered() throws Exception {
+        long product = jdbc.sql("select product_id from product_variants where id = :v").param("v", variant)
+                .query(Long.class).single();
+        jdbc.sql("update products set status = 'ARCHIVED' where id = :p").param("p", product).update();
+        JsonNode pieces = body(mvc.perform(get("/api/v1/admin/shop/pieces").param("q", name).cookie(admin))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(pieces.size()).isEqualTo(1);
+        assertThat(pieces.get(0).get("status").asText()).isEqualTo("ARCHIVED");
+        sell(1);
+
+        jdbc.sql("update product_variants set active = false where id = :v").param("v", variant).update();
+        assertThat(body(mvc.perform(get("/api/v1/admin/shop/pieces").param("q", name).cookie(admin))
+                .andExpect(status().isOk()).andReturn()).size()).isZero();
+    }
+
+    @Test
+    void aDeletedColourKeepsItsReceiptsReadable() throws Exception {
+        long product = jdbc.sql("select product_id from product_variants where id = :v").param("v", variant)
+                .query(Long.class).single();
+        JsonNode sale = sell(2);
+        // Remove the colour the way the dashboard does (stock history first, then the colour with its sizes).
+        jdbc.sql("delete from inventory_movements where variant_id = :v").param("v", variant).update();
+        jdbc.sql("delete from product_colors where product_id = :p").param("p", product).update();
+
+        JsonNode receipt = body(mvc.perform(get("/api/v1/admin/shop/sales/" + sale.get("id").asLong()).cookie(admin))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(receipt.get("items").get(0).get("productName").asText()).isEqualTo(name);
+        assertThat(receipt.get("items").get(0).hasNonNull("variantId")).isFalse();
+        // The money can still be given back; there is no stock left to put it into.
+        mvc.perform(jsonPost("/api/v1/admin/shop/returns", Map.of("originalSaleId", sale.get("id").asLong(),
+                "items", List.of(Map.of("originalItemId", receipt.get("items").get(0).get("id").asLong(),
+                        "quantity", 2, "unitPrice", "600")))).cookie(admin))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     void customersCannotUseTheShopCounter() throws Exception {
         Cookie customer = cookie(register(uniqueEmail()), AuthCookies.ACCESS);
         mvc.perform(get("/api/v1/admin/shop/pieces")).andExpect(status().isUnauthorized());
@@ -115,6 +223,16 @@ class ShopIT extends IntegrationTest {
                 "items", List.of(Map.of("variantId", variant, "quantity", 1, "unitPrice", "1.00")))).cookie(customer))
                 .andExpect(status().isForbidden());
         assertThat(onHand()).isEqualTo(5);
+    }
+
+    private JsonNode sell(int quantity) throws Exception {
+        return body(mvc.perform(jsonPost("/api/v1/admin/shop/sales", Map.of(
+                "items", List.of(Map.of("variantId", variant, "quantity", quantity, "unitPrice", "600")))).cookie(admin))
+                .andExpect(status().isCreated()).andReturn());
+    }
+
+    private long receipts() {
+        return jdbc.sql("select count(*) from shop_sales").query(Long.class).single();
     }
 
     private int onHand() {
