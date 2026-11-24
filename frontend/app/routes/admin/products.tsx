@@ -41,7 +41,7 @@ function StockCell({ variant, onDone }: { variant: AdminVariant; onDone: () => v
           <button
             type="button"
             className="btn btn-outline h-9 w-11 px-0 text-base"
-            aria-label={`Remove one ${variant.color} ${variant.sizeCode}`}
+            aria-label={`−1: remove one ${variant.color} ${variant.sizeCode}`}
             title="Remove one piece"
             disabled={adjust.isPending || variant.available <= 0}
             onClick={() => adjust.mutate(-1)}
@@ -51,7 +51,7 @@ function StockCell({ variant, onDone }: { variant: AdminVariant; onDone: () => v
           <button
             type="button"
             className="btn btn-primary h-9 w-11 px-0 text-base"
-            aria-label={`Add one ${variant.color} ${variant.sizeCode}`}
+            aria-label={`+1: add one ${variant.color} ${variant.sizeCode}`}
             title="Add one piece"
             disabled={adjust.isPending}
             onClick={() => adjust.mutate(1)}

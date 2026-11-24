@@ -47,7 +47,10 @@ public class ShopService {
         this.audit = audit;
     }
 
-    /** Pieces staff can pick from: by product name (English or Arabic) or SKU. Newest products first. */
+    /**
+     * Pieces staff can pick from: by product name (English or Arabic) or SKU. Newest products first. Hidden
+     * and archived products are included, since the shop may still have them on the rail; removed sizes are not.
+     */
     @Transactional(readOnly = true)
     public List<Piece> pieces(String query) {
         Map<String, Object> params = new HashMap<>();
@@ -67,7 +70,7 @@ public class ShopService {
                 join product_colors pc on pc.id = v.color_id
                 join sizes s on s.id = v.size_id
                 join inventory i on i.variant_id = v.id
-                where p.deleted_at is null and p.status <> 'ARCHIVED'
+                where p.deleted_at is null and v.active
                 """ + where + """
                  order by p.id desc, pc.sort_order, pc.id, s.sort_order limit 120
                 """)

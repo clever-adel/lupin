@@ -156,7 +156,7 @@ test("staff dashboard pages have no automatic accessibility violations", async (
   await expect(page.getByRole("heading", { name: "Orders" })).toBeVisible();
 
   const problems: string[] = [];
-  for (const path of ["/admin", "/admin/transfers", "/admin/products", "/admin/products/new", "/admin/promotions", "/admin/content", "/admin/settings", "/admin/staff"]) {
+  for (const path of ["/admin", "/admin/transfers", "/admin/shop", "/admin/shop?tab=return", "/admin/shop?tab=receipts", "/admin/customers", "/admin/products", "/admin/products/new", "/admin/promotions", "/admin/content", "/admin/settings", "/admin/staff"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

@@ -1,7 +1,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { errorText, money, when } from "~/features/admin/shared";
+import { clampQuantity, linesTotal, normalizeNumber, priceOk } from "~/features/admin/shop";
 import { api } from "~/lib/http";
 import type { Page } from "~/lib/types";
 
@@ -87,8 +88,17 @@ function useShopRefresh() {
   };
 }
 
-const priceOk = (value: string) => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) >= 0;
-const lineTotal = (lines: Line[]) => lines.reduce((sum, l) => sum + (priceOk(l.price) ? Number(l.price) * l.quantity : 0), 0);
+/** Ignores a second tap on a save button that lands before the first one has disabled it. */
+function useOnce() {
+  const busy = useRef(false);
+  return (run: () => Promise<unknown>) => {
+    if (busy.current) return;
+    busy.current = true;
+    run().finally(() => {
+      busy.current = false;
+    });
+  };
+}
 
 /** Search the catalogue and pick a size. Sold-out pieces stay visible for returns. */
 function PiecePicker({ mode, onPick, taken }: { mode: "sale" | "return"; onPick: (piece: Piece) => void; taken: (id: number) => number }) {
@@ -131,7 +141,7 @@ function PiecePicker({ mode, onPick, taken }: { mode: "sale" | "return"; onPick:
                 <span className="block truncate font-medium">{p.productName}</span>
                 <span className="block text-xs text-stone">
                   {p.color} · <strong className="text-ink">{p.sizeCode}</strong> · {p.sku}
-                  {p.status === "DRAFT" ? " · hidden online" : ""}
+                  {p.status === "DRAFT" ? " · hidden online" : p.status === "ARCHIVED" ? " · archived online" : ""}
                 </span>
                 <span className="block text-xs text-stone">
                   Online {money(p.onlinePrice)} ·{" "}
@@ -171,18 +181,28 @@ function Basket({ lines, setLines, priceLabel }: { lines: Line[]; setLines: (fn:
       {lines.map((l) => (
         <li key={l.key} className="flex flex-wrap items-center gap-3 p-3">
           {l.imageUrl && <img src={l.imageUrl} alt="" className="h-12 w-10 shrink-0 bg-paper object-cover" />}
-          <span className="min-w-0 flex-1 text-sm">
+          <span className="min-w-[12rem] flex-1 text-sm">
             <span className="block font-medium">{l.label}</span>
             <span className="block text-xs text-stone">{l.detail}</span>
           </span>
           <span className="flex items-center gap-1" role="group" aria-label={`Quantity of ${l.label}`}>
-            <button type="button" className="btn btn-outline h-9 w-9 px-0" disabled={l.quantity <= 1} onClick={() => update(l.key, { quantity: l.quantity - 1 })} aria-label="One less">−</button>
-            <span className="w-8 text-center font-semibold" aria-live="polite">{l.quantity}</span>
+            <button type="button" className="btn btn-outline h-9 w-9 px-0" disabled={l.quantity <= 1} onClick={() => update(l.key, { quantity: clampQuantity(l.quantity - 1, l.max) })} aria-label="One less">−</button>
+            <input
+              className="field h-9 w-14 px-1 text-center font-semibold"
+              inputMode="numeric"
+              aria-label={`How many ${l.label}`}
+              value={l.quantity}
+              onChange={(e) => {
+                const n = Number(normalizeNumber(e.target.value));
+                if (e.target.value.trim() !== "" && Number.isFinite(n)) update(l.key, { quantity: clampQuantity(n, l.max) });
+              }}
+              onFocus={(e) => e.target.select()}
+            />
             <button
               type="button"
               className="btn btn-outline h-9 w-9 px-0"
               disabled={l.max !== undefined && l.quantity >= l.max}
-              onClick={() => update(l.key, { quantity: l.quantity + 1 })}
+              onClick={() => update(l.key, { quantity: clampQuantity(l.quantity + 1, l.max) })}
               aria-label="One more"
             >
               +
@@ -194,10 +214,10 @@ function Basket({ lines, setLines, priceLabel }: { lines: Line[]; setLines: (fn:
               className={`field mt-1 block h-9 w-28 ${priceOk(l.price) ? "" : "border-danger"}`}
               inputMode="decimal"
               value={l.price}
-              onChange={(e) => update(l.key, { price: e.target.value.replace(",", ".") })}
+              onChange={(e) => update(l.key, { price: normalizeNumber(e.target.value) })}
             />
           </label>
-          <span className="w-28 text-end text-sm font-semibold">{priceOk(l.price) ? money(Number(l.price) * l.quantity) : "—"}</span>
+          <span className="w-28 text-end text-sm font-semibold">{priceOk(l.price) ? money(linesTotal([l])) : "—"}</span>
           <button type="button" className="cursor-pointer text-sm text-danger underline" onClick={() => setLines((all) => all.filter((x) => x.key !== l.key))}>
             Remove <span className="sr-only">{l.label}</span>
           </button>
@@ -261,6 +281,7 @@ function NewSale() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [note, setNote] = useState("");
+  const once = useOnce();
   const sell = useMutation({
     mutationFn: () =>
       api<Receipt>("POST", "/api/v1/admin/shop/sales", {
@@ -292,13 +313,13 @@ function NewSale() {
   const ready = lines.length > 0 && lines.every((l) => priceOk(l.price));
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
       <PiecePicker mode="sale" onPick={add} taken={(id) => lines.find((l) => l.variantId === id)?.quantity ?? 0} />
       <form
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
-          if (ready) sell.mutate();
+          if (ready) once(() => sell.mutateAsync().catch(() => undefined));
         }}
       >
         <h2 className="text-sm font-semibold">This sale</h2>
@@ -320,7 +341,7 @@ function NewSale() {
         </label>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
           <span className="text-lg">
-            Total <strong>{money(lineTotal(lines))}</strong>
+            Total <strong>{money(linesTotal(lines))}</strong>
           </span>
           <button type="submit" className="btn btn-primary" disabled={!ready || sell.isPending}>
             {sell.isPending ? "Saving…" : "Complete sale"}
@@ -347,13 +368,22 @@ function NewReturn({ receiptId, setReceiptId }: { receiptId: string; setReceiptI
     queryFn: () => api<Receipt>("GET", `/api/v1/admin/shop/sales/${receiptId}`),
     enabled: /^\d+$/.test(receiptId),
     retry: false,
+    // Coming back to the tab must not reload the receipt under lines staff are still choosing.
+    refetchOnWindowFocus: false,
   });
   const fromReceipt = Boolean(receiptId);
+  const badNumber = fromReceipt && !/^\d+$/.test(receiptId);
+  // A different receipt (or none) starts the return afresh; the money goes back the way it came in.
+  useEffect(() => setLinesState([]), [receiptId]);
+  const methodFor = useRef("");
   useEffect(() => {
-    setLinesState([]);
-    if (original.data) setMethod(original.data.paymentMethod);
+    if (original.data && methodFor.current !== receiptId) {
+      methodFor.current = receiptId;
+      setMethod(original.data.paymentMethod);
+    }
   }, [original.data, receiptId]);
 
+  const once = useOnce();
   const giveBack = useMutation({
     mutationFn: () =>
       api<Receipt>("POST", "/api/v1/admin/shop/returns", {
@@ -381,13 +411,13 @@ function NewReturn({ receiptId, setReceiptId }: { receiptId: string; setReceiptI
   const sale = original.data?.kind === "SALE" ? original.data : undefined;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
       <div className="space-y-4">
         <form
           className="flex flex-wrap items-end gap-2 border border-line bg-card p-4"
           onSubmit={(e) => {
             e.preventDefault();
-            setReceiptId(typed.trim().replace(/^#/, ""));
+            setReceiptId(normalizeNumber(typed).replace(/^#/, ""));
           }}
         >
           <label className="text-sm">
@@ -405,6 +435,7 @@ function NewReturn({ receiptId, setReceiptId }: { receiptId: string; setReceiptI
           </p>
         </form>
 
+        {badNumber && <p role="alert" className="text-sm text-danger">Type the receipt number in digits, like 12.</p>}
         {fromReceipt && original.isError && <p role="alert" className="text-sm text-danger">No receipt #{receiptId}.</p>}
         {original.data && original.data.kind !== "SALE" && <p role="alert" className="text-sm text-danger">Receipt #{receiptId} is a return, not a sale.</p>}
         {fromReceipt && sale && (
@@ -473,7 +504,7 @@ function NewReturn({ receiptId, setReceiptId }: { receiptId: string; setReceiptI
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
-          if (ready) giveBack.mutate();
+          if (ready) once(() => giveBack.mutateAsync().catch(() => undefined));
         }}
       >
         <h2 className="text-sm font-semibold">This return</h2>
@@ -485,7 +516,7 @@ function NewReturn({ receiptId, setReceiptId }: { receiptId: string; setReceiptI
         </label>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
           <span className="text-lg">
-            Give back <strong>{money(lineTotal(lines))}</strong>
+            Give back <strong>{money(linesTotal(lines))}</strong>
           </span>
           <button type="submit" className="btn btn-primary" disabled={!ready || giveBack.isPending}>
             {giveBack.isPending ? "Saving…" : "Complete return"}
