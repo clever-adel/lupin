@@ -11,6 +11,7 @@ export default [
     route("orders/:reference", "routes/admin/order.tsx"),
     route("transfers", "routes/admin/transfers.tsx"),
     route("customers", "routes/admin/customers.tsx"),
+    route("shop", "routes/admin/shop.tsx"),
     route("products", "routes/admin/products.tsx"),
     route("products/:id", "routes/admin/product.tsx"),
     route("looks", "routes/admin/looks.tsx"),

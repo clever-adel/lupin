@@ -94,6 +94,7 @@ export default function AdminLayout() {
         <nav aria-label="Dashboard" className="shell flex gap-6 overflow-x-auto">
           <NavLink to="/admin" end className={link}>Orders</NavLink>
           <NavLink to="/admin/transfers" className={link}>Transfers to check {badge(summary.data?.transfersToCheck)}</NavLink>
+          <NavLink to="/admin/shop" className={link}>Shop</NavLink>
           <NavLink to="/admin/customers" className={link}>Customers</NavLink>
           <NavLink to="/admin/products" className={link}>Products &amp; stock {badge(summary.data?.lowStockVariants)}</NavLink>
           <NavLink to="/admin/looks" className={link}>Looks</NavLink>
