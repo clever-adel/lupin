@@ -215,6 +215,48 @@ class ShopIT extends IntegrationTest {
     }
 
     @Test
+    void theTestReceiptCleanUpRemovesOnlyOldReceiptsAndPutsTheirStockBack() throws Exception {
+        // Tests made before the cut-off: 3 sold, 1 back against the receipt, 1 back without one.
+        JsonNode sale = sell(3);
+        mvc.perform(jsonPost("/api/v1/admin/shop/returns", Map.of("originalSaleId", sale.get("id").asLong(),
+                "items", List.of(Map.of("originalItemId", sale.get("items").get(0).get("id").asLong(), "quantity", 1,
+                        "unitPrice", "600")))).cookie(admin)).andExpect(status().isCreated());
+        mvc.perform(jsonPost("/api/v1/admin/shop/returns", Map.of(
+                "items", List.of(Map.of("variantId", variant, "quantity", 1, "unitPrice", "600")))).cookie(admin))
+                .andExpect(status().isCreated());
+        List<Long> old = jdbc.sql("""
+                select distinct s.id from shop_sales s join shop_sale_items it on it.sale_id = s.id
+                where it.variant_id = :v""").param("v", variant).query(Long.class).list();
+        assertThat(old).hasSize(3);
+        jdbc.sql("update shop_sales set created_at = timestamptz '2026-11-24 10:00:00+00' where id in (:ids)")
+                .param("ids", old).update();
+        // A real sale after the cut-off.
+        JsonNode real = sell(2);
+        jdbc.sql("update shop_sales set created_at = timestamptz '2026-11-25 10:00:00+00' where id = :id")
+                .param("id", real.get("id").asLong()).update();
+        // 5 - 3 + 1 + 1 - 2 = 2 on hand; someone also reserved 1 online in between.
+        jdbc.sql("update inventory set reserved = 1 where variant_id = :v").param("v", variant).update();
+        assertThat(onHand()).isEqualTo(2);
+
+        new org.springframework.jdbc.datasource.init.ResourceDatabasePopulator(new org.springframework.core.io
+                .ClassPathResource("db/migration/V17__clear_shop_test_receipts.sql")).execute(dataSource);
+
+        assertThat(jdbc.sql("select count(*) from shop_sales where id in (:ids)").param("ids", old)
+                .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("""
+                select count(*) from inventory_movements where reference_type in ('SHOP_SALE', 'SHOP_RETURN')
+                and reference_id in (:ids)""").param("ids", old.stream().map(String::valueOf).toList())
+                .query(Long.class).single()).isZero();
+        // The tests' net 1 piece is back; the real sale's 2 stay sold.
+        assertThat(onHand()).isEqualTo(3);
+        mvc.perform(get("/api/v1/admin/shop/sales/" + real.get("id").asLong()).cookie(admin))
+                .andExpect(status().isOk());
+    }
+
+    @Autowired
+    javax.sql.DataSource dataSource;
+
+    @Test
     void customersCannotUseTheShopCounter() throws Exception {
         Cookie customer = cookie(register(uniqueEmail()), AuthCookies.ACCESS);
         mvc.perform(get("/api/v1/admin/shop/pieces")).andExpect(status().isUnauthorized());
