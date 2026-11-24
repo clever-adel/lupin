@@ -253,6 +253,48 @@ class ShopIT extends IntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void somethingNotOnTheSiteIsSoldAndReturnedForMoneyOnly() throws Exception {
+        long movements = jdbc.sql("select count(*) from inventory_movements").query(Long.class).single();
+        JsonNode sale = body(mvc.perform(jsonPost("/api/v1/admin/shop/sales", Map.of("items", List.of(
+                Map.of("description", "  Old-season cap, no tag  ", "quantity", 2, "unitPrice", "150"),
+                Map.of("variantId", variant, "quantity", 1, "unitPrice", "600")))).cookie(admin))
+                .andExpect(status().isCreated()).andReturn());
+        assertThat(sale.get("total").decimalValue()).isEqualByComparingTo("900.00");
+        JsonNode custom = null;
+        for (JsonNode l : sale.get("items")) {
+            if (l.get("custom").asBoolean()) {
+                custom = l;
+            }
+        }
+        assertThat(custom).isNotNull();
+        assertThat(custom.get("productName").asText()).isEqualTo("Old-season cap, no tag");
+        assertThat(custom.hasNonNull("variantId")).isFalse();
+        // Only the real piece touched stock.
+        assertThat(onHand()).isEqualTo(4);
+        assertThat(jdbc.sql("select count(*) from inventory_movements").query(Long.class).single())
+                .isEqualTo(movements + 1);
+
+        // Back against the receipt, never more than was sold, and still no stock.
+        mvc.perform(jsonPost("/api/v1/admin/shop/returns", Map.of("originalSaleId", sale.get("id").asLong(),
+                "items", List.of(Map.of("originalItemId", custom.get("id").asLong(), "quantity", 3, "unitPrice", "150"))))
+                .cookie(admin)).andExpect(status().isConflict());
+        mvc.perform(jsonPost("/api/v1/admin/shop/returns", Map.of("originalSaleId", sale.get("id").asLong(),
+                "items", List.of(Map.of("originalItemId", custom.get("id").asLong(), "quantity", 1, "unitPrice", "150"))))
+                .cookie(admin)).andExpect(status().isCreated());
+        // And without a receipt, by describing it.
+        JsonNode free = body(mvc.perform(jsonPost("/api/v1/admin/shop/returns", Map.of(
+                "items", List.of(Map.of("description", "Belt from before", "quantity", 1, "unitPrice", "80"))))
+                .cookie(admin)).andExpect(status().isCreated()).andReturn());
+        assertThat(free.get("items").get(0).get("custom").asBoolean()).isTrue();
+        assertThat(onHand()).isEqualTo(4);
+
+        // A line with neither a piece nor a description is refused.
+        mvc.perform(jsonPost("/api/v1/admin/shop/sales", Map.of("items", List.of(
+                Map.of("description", "   ", "quantity", 1, "unitPrice", "10")))).cookie(admin))
+                .andExpect(status().isBadRequest());
+    }
+
     @Autowired
     javax.sql.DataSource dataSource;
 
