@@ -85,13 +85,16 @@ public class ShopService {
     public Receipt sell(UUID actor, SaleRequest req) {
         String method = method(req.paymentMethod());
         List<LineRequest> lines = req.items();
-        if (lines.stream().anyMatch(l -> l.variantId() == null)) {
-            throw ApiException.badRequest("PIECE_REQUIRED", "Choose a piece for every line.");
-        }
+        lines.forEach(ShopService::requirePieceOrDescription);
         long saleId = insertReceipt("SALE", null, method, total(lines), req.customerName(), req.customerPhone(),
                 req.note(), actor);
+        // Something that is not on the site: money only, no stock.
+        for (LineRequest line : lines.stream().filter(l -> l.variantId() == null).toList()) {
+            insertLine(saleId, null, null, custom(line), line.quantity(), line.unitPrice());
+        }
         // Same order every time, so two tills selling the same pieces cannot deadlock.
-        for (LineRequest line : lines.stream().sorted(Comparator.comparing(LineRequest::variantId)).toList()) {
+        for (LineRequest line : lines.stream().filter(l -> l.variantId() != null)
+                .sorted(Comparator.comparing(LineRequest::variantId)).toList()) {
             Snapshot piece = snapshot(line.variantId());
             int taken = jdbc.sql("""
                     update inventory set on_hand = on_hand - :q, updated_at = now()
@@ -100,8 +103,8 @@ public class ShopService {
             if (taken == 0) {
                 int free = jdbc.sql("select on_hand - reserved from inventory where variant_id = :v")
                         .param("v", line.variantId()).query(Integer.class).optional().orElse(0);
-                throw ApiException.conflict("NOT_ENOUGH_STOCK", "Only %d left of %s · %s · %s."
-                        .formatted(Math.max(free, 0), piece.productName(), piece.color(), piece.sizeCode()));
+                throw ApiException.conflict("NOT_ENOUGH_STOCK", "Only %d left of %s."
+                        .formatted(Math.max(free, 0), piece.label()));
             }
             insertLine(saleId, line.variantId(), null, piece, line.quantity(), line.unitPrice());
             movement(line.variantId(), "ADJUST", -line.quantity(), "SHOP_SALE", saleId, "Sold at the shop", actor);
@@ -136,24 +139,25 @@ public class ShopService {
                 }
                 OriginalLine sold = jdbc.sql("""
                         select it.variant_id, it.product_id, it.product_name, it.color, it.size_code, it.sku, it.quantity,
-                               coalesce((select sum(r.quantity) from shop_sale_items r where r.original_item_id = it.id), 0)
+                               coalesce((select sum(r.quantity) from shop_sale_items r where r.original_item_id = it.id), 0),
+                               it.custom
                         from shop_sale_items it where it.id = :id and it.sale_id = :sale
                         """).param("id", line.originalItemId()).param("sale", originalSaleId)
                         .query((rs, n) -> new OriginalLine((Long) rs.getObject(1),
                                 new Snapshot((Long) rs.getObject(2), rs.getString(3), rs.getString(4), rs.getString(5),
-                                        rs.getString(6)), rs.getInt(7), rs.getInt(8)))
+                                        rs.getString(6), rs.getBoolean(9)), rs.getInt(7), rs.getInt(8)))
                         .optional().orElseThrow(() -> ApiException.notFound("Receipt line"));
                 if (sold.returned() + line.quantity() > sold.quantity()) {
-                    throw ApiException.conflict("RETURN_TOO_MANY", "Only %d of %s · %s · %s can still come back."
-                            .formatted(sold.quantity() - sold.returned(), sold.piece().productName(),
-                                    sold.piece().color(), sold.piece().sizeCode()));
+                    throw ApiException.conflict("RETURN_TOO_MANY", "Only %d of %s can still come back."
+                            .formatted(sold.quantity() - sold.returned(), sold.piece().label()));
                 }
                 variantId = sold.variantId();
                 piece = sold.piece();
+            } else if (line.variantId() == null) {
+                requirePieceOrDescription(line);
+                variantId = null;
+                piece = custom(line);
             } else {
-                if (line.variantId() == null) {
-                    throw ApiException.badRequest("PIECE_REQUIRED", "Choose a piece for every line.");
-                }
                 variantId = line.variantId();
                 piece = snapshot(variantId);
             }
@@ -222,13 +226,15 @@ public class ShopService {
                        it.quantity, it.unit_price, it.original_item_id,
                        coalesce((select sum(r.quantity) from shop_sale_items r where r.original_item_id = it.id), 0),
                        (select pi.url from product_variants v join product_images pi on pi.color_id = v.color_id
-                        where v.id = it.variant_id order by pi.position limit 1)
+                        where v.id = it.variant_id order by pi.position limit 1),
+                       it.custom
                 from shop_sale_items it where it.sale_id in (:ids) order by it.id
                 """).param("ids", heads.stream().map(Head::id).toList())
                 .query((rs, n) -> lines.computeIfAbsent(rs.getLong(1), k -> new ArrayList<>())
                         .add(new ReceiptLine(rs.getLong(2), (Long) rs.getObject(3), (Long) rs.getObject(4),
                                 rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8), rs.getInt(9),
-                                rs.getBigDecimal(10), (Long) rs.getObject(11), rs.getInt(12), rs.getString(13))))
+                                rs.getBigDecimal(10), (Long) rs.getObject(11), rs.getInt(12), rs.getString(13),
+                                rs.getBoolean(14))))
                 .list();
         Map<Long, List<Long>> returns = new HashMap<>();
         jdbc.sql("select original_sale_id, id from shop_sales where original_sale_id in (:ids) order by id")
@@ -264,7 +270,24 @@ public class ShopService {
                 .single();
     }
 
-    private record Snapshot(Long productId, String productName, String color, String sizeCode, String sku) {
+    /** What a receipt line keeps of the piece. {@code custom}: typed in by staff, not on the site. */
+    private record Snapshot(Long productId, String productName, String color, String sizeCode, String sku,
+            boolean custom) {
+
+        String label() {
+            return custom ? productName : productName + " · " + color + " · " + sizeCode;
+        }
+    }
+
+    private static Snapshot custom(LineRequest line) {
+        return new Snapshot(null, line.description().trim(), "", "", "", true);
+    }
+
+    private static void requirePieceOrDescription(LineRequest line) {
+        if (line.variantId() == null && line.originalItemId() == null
+                && (line.description() == null || line.description().isBlank())) {
+            throw ApiException.badRequest("PIECE_REQUIRED", "Choose a piece, or write what was sold, for every line.");
+        }
     }
 
     private record OriginalLine(Long variantId, Snapshot piece, int quantity, int returned) {
@@ -278,7 +301,7 @@ public class ShopService {
                 where v.id = :v and p.deleted_at is null
                 """).param("v", variantId)
                 .query((rs, n) -> new Snapshot(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4),
-                        rs.getString(5)))
+                        rs.getString(5), false))
                 .optional().orElseThrow(() -> ApiException.notFound("Piece"));
     }
 
@@ -297,12 +320,12 @@ public class ShopService {
             BigDecimal unitPrice) {
         jdbc.sql("""
                 insert into shop_sale_items (sale_id, variant_id, original_item_id, product_id, product_name, color,
-                                             size_code, sku, quantity, unit_price)
-                values (:sale, :v, :orig, :p, :name, :color, :size, :sku, :q, :price)
+                                             size_code, sku, quantity, unit_price, custom)
+                values (:sale, :v, :orig, :p, :name, :color, :size, :sku, :q, :price, :custom)
                 """).param("sale", saleId).param("v", variantId).param("orig", originalItemId)
                 .param("p", piece.productId()).param("name", piece.productName()).param("color", piece.color())
                 .param("size", piece.sizeCode()).param("sku", piece.sku()).param("q", quantity)
-                .param("price", unitPrice).update();
+                .param("price", unitPrice).param("custom", piece.custom()).update();
     }
 
     private void movement(long variantId, String type, int quantity, String refType, long refId, String note,

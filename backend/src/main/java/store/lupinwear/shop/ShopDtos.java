@@ -25,8 +25,12 @@ public final class ShopDtos {
             String imageUrl) {
     }
 
-    /** For a sale: variantId. For a return: originalItemId (a line of the earlier receipt) or variantId. */
-    public record LineRequest(Long variantId, Long originalItemId, @NotNull @Min(1) @Max(1000) Integer quantity,
+    /**
+     * For a sale: variantId, or a description for something not on the site (money only, no stock).
+     * For a return: originalItemId (a line of the earlier receipt), variantId, or a description.
+     */
+    public record LineRequest(Long variantId, Long originalItemId, @Size(max = 160) String description,
+            @NotNull @Min(1) @Max(1000) Integer quantity,
             @NotNull @DecimalMin("0.00") @DecimalMax("1000000.00") @Digits(integer = 10, fraction = 2) BigDecimal unitPrice) {
     }
 
@@ -39,10 +43,13 @@ public final class ShopDtos {
             @NotEmpty @Size(max = 50) List<@Valid @NotNull LineRequest> items) {
     }
 
-    /** {@code returned} is how many of this line have come back since (sales only). */
+    /**
+     * {@code returned} is how many of this line have come back since (sales only). {@code custom}: something not
+     * on the site, typed in by staff; productName holds what they wrote, and colour, size and SKU are empty.
+     */
     public record ReceiptLine(long id, Long variantId, Long productId, String productName, String color,
             String sizeCode, String sku, int quantity, BigDecimal unitPrice, Long originalItemId, int returned,
-            String imageUrl) {
+            String imageUrl, boolean custom) {
     }
 
     public record Receipt(long id, String kind, Long originalSaleId, String paymentMethod, BigDecimal total,

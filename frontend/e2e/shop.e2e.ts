@@ -146,4 +146,44 @@ test.describe.serial("shop counter", () => {
     await expect(page.getByRole("listitem").filter({ hasText: "Back from receipt" }).first()).toBeVisible();
     await expect(page.getByText("Returned today")).toBeVisible();
   });
+
+  test("something not on the site goes on the receipt with its price, and stock does not move", async ({ page }) => {
+    await signInAsOwner(page, "/admin/shop");
+    const before = { m: await stock(page, "M"), l: await stock(page, "L") };
+    const what = `Gift wrap ${Date.now()}`;
+
+    const box = page.locator("form", { has: page.getByRole("heading", { name: "Not on the site?" }) });
+    await expect(box.getByRole("button", { name: "Add to receipt" })).toBeDisabled();
+    await box.getByLabel("What was sold").fill(what);
+    await box.getByLabel("Price").fill("٧٥"); // Arabic keyboard
+    await box.getByRole("button", { name: "Add to receipt" }).click();
+    await expect(box.getByLabel("What was sold")).toHaveValue("");
+
+    // It sits in the basket with a piece from the site.
+    await page.getByLabel("Product name or SKU").fill(name);
+    await piece(page, "M").click();
+    await expect(line(page)).toHaveCount(2);
+    await expect(line(page).filter({ hasText: what })).toContainText("Not on the site");
+    await page.getByLabel(`How many ${what}`).fill("2");
+    await expect(page.getByText("Total")).toContainText("EGP"); // 2 × 75 + the M at its online price
+    await page.getByRole("button", { name: "Complete sale" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Sale saved" })).toBeVisible();
+    expect(await stock(page, "M")).toBe(before.m - 1);
+    expect(await stock(page, "L")).toBe(before.l);
+
+    await page.goto("/admin/shop?tab=receipts");
+    const card = page.getByRole("listitem").filter({ hasText: what }).first();
+    await expect(card).toContainText(`2 × ${what}`);
+    await expect(card).toContainText("not on the site");
+    await expect(card).toContainText("@ EGP 75");
+
+    // Back against the receipt: money only.
+    await card.getByRole("button", { name: "Return pieces" }).click();
+    const orig = page.locator("section", { has: page.getByRole("heading", { name: /^Receipt #/ }) });
+    await orig.getByRole("listitem").filter({ hasText: what }).getByRole("button", { name: "Return" }).click();
+    await expect(page.getByLabel(`How many ${what}`)).toHaveValue("2");
+    await page.getByRole("button", { name: "Complete return" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Return saved" })).toBeVisible();
+    expect(await stock(page, "M")).toBe(before.m - 1);
+  });
 });

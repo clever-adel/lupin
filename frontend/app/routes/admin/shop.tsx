@@ -36,7 +36,13 @@ interface ReceiptLine {
   originalItemId?: number | null;
   returned: number;
   imageUrl?: string | null;
+  /** Something not on the site: productName is what staff wrote; no colour, size or stock. */
+  custom: boolean;
 }
+
+/** Colour and size of a receipt line, or that it is not on the site. */
+const lineKind = (l: { custom: boolean; color: string; sizeCode: string }) =>
+  l.custom ? "not on the site" : `${l.color} · ${l.sizeCode}`;
 
 interface Receipt {
   id: number;
@@ -65,11 +71,16 @@ interface Totals {
 type Method = "CASH" | "CARD" | "INSTAPAY" | "WALLET";
 const METHODS: Record<Method, string> = { CASH: "Cash", CARD: "Card", INSTAPAY: "InstaPay", WALLET: "Wallet" };
 
-/** A line being rung up. For a sale or a free return it names a piece; a receipt return names a receipt line. */
+/**
+ * A line being rung up. For a sale or a free return it names a piece, or describes something not on the
+ * site; a receipt return names a receipt line.
+ */
 interface Line {
   key: string;
   variantId?: number;
   originalItemId?: number;
+  /** Something not on the site, in staff's own words. Money only: no stock moves. */
+  description?: string;
   label: string;
   detail: string;
   imageUrl?: string | null;
@@ -169,6 +180,57 @@ function PiecePicker({ mode, onPick, taken }: { mode: "sale" | "return"; onPick:
     </section>
   );
 }
+
+/** Something that is not on the site: staff write what it is and its price. It takes nothing from stock. */
+function CustomItem({ mode, onAdd }: { mode: "sale" | "return"; onAdd: (description: string, price: string) => void }) {
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const ok = description.trim() !== "" && priceOk(price);
+  return (
+    <form
+      className="border border-line bg-card p-4"
+      aria-labelledby={`custom-${mode}`}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!ok) return;
+        onAdd(description.trim(), price);
+        setDescription("");
+        setPrice("");
+      }}
+    >
+      <h2 id={`custom-${mode}`} className="text-sm font-semibold">Not on the site?</h2>
+      <p className="mt-1 text-xs text-stone">
+        Write what it is and its price. It is added to the receipt’s money; stock does not change.
+      </p>
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <label className="min-w-[12rem] flex-1 text-sm">
+          {mode === "sale" ? "What was sold" : "What came back"}
+          <input className="field mt-1 block w-full" maxLength={160} value={description} onChange={(e) => setDescription(e.target.value)} />
+        </label>
+        <label className="text-sm">
+          {mode === "sale" ? "Price" : "Money back"}
+          <input
+            className="field mt-1 block w-28"
+            inputMode="decimal"
+            value={price}
+            onChange={(e) => setPrice(normalizeNumber(e.target.value))}
+          />
+        </label>
+        <button type="submit" className="btn btn-outline" disabled={!ok}>Add to receipt</button>
+      </div>
+    </form>
+  );
+}
+
+let customKey = 0;
+const customLine = (description: string, price: string): Line => ({
+  key: `c${++customKey}`,
+  description,
+  label: description,
+  detail: "Not on the site · stock does not change",
+  quantity: 1,
+  price,
+});
 
 /** The lines of the receipt being written, with quantity and the price agreed for each piece. */
 function Basket({ lines, setLines, priceLabel }: { lines: Line[]; setLines: (fn: (lines: Line[]) => Line[]) => void; priceLabel: string }) {
@@ -289,7 +351,12 @@ function NewSale() {
         customerName,
         customerPhone,
         note,
-        items: lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity, unitPrice: Number(l.price) })),
+        items: lines.map((l) => ({
+          variantId: l.description ? undefined : l.variantId,
+          description: l.description,
+          quantity: l.quantity,
+          unitPrice: Number(l.price),
+        })),
       }),
     onSuccess: refresh,
   });
@@ -314,7 +381,10 @@ function NewSale() {
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-      <PiecePicker mode="sale" onPick={add} taken={(id) => lines.find((l) => l.variantId === id)?.quantity ?? 0} />
+      <div className="space-y-4">
+        <PiecePicker mode="sale" onPick={add} taken={(id) => lines.find((l) => l.variantId === id)?.quantity ?? 0} />
+        <CustomItem mode="sale" onAdd={(d, p) => setLines((all) => [...all, customLine(d, p)])} />
+      </div>
       <form
         className="space-y-4"
         onSubmit={(e) => {
@@ -391,8 +461,9 @@ function NewReturn({ receiptId, setReceiptId }: { receiptId: string; setReceiptI
         paymentMethod: method,
         note,
         items: lines.map((l) => ({
-          variantId: l.originalItemId ? undefined : l.variantId,
+          variantId: l.originalItemId || l.description ? undefined : l.variantId,
           originalItemId: l.originalItemId,
+          description: l.originalItemId ? undefined : l.description,
           quantity: l.quantity,
           unitPrice: Number(l.price),
         })),
@@ -452,7 +523,7 @@ function NewReturn({ receiptId, setReceiptId }: { receiptId: string; setReceiptI
                     <span className="min-w-0 flex-1">
                       <span className="block font-medium">{it.productName}</span>
                       <span className="block text-xs text-stone">
-                        {it.color} · {it.sizeCode} · {it.quantity} × {money(it.unitPrice)}
+                        {lineKind(it)} · {it.quantity} × {money(it.unitPrice)}
                         {it.returned > 0 ? ` · ${it.returned} already back` : ""}
                       </span>
                     </span>
@@ -468,7 +539,7 @@ function NewReturn({ receiptId, setReceiptId }: { receiptId: string; setReceiptI
                             originalItemId: it.id,
                             variantId: it.variantId ?? undefined,
                             label: it.productName,
-                            detail: `${it.color} · ${it.sizeCode} · sold at ${money(it.unitPrice)}`,
+                            detail: `${lineKind(it)} · sold at ${money(it.unitPrice)}`,
                             imageUrl: it.imageUrl,
                             max: out,
                             quantity: out,
@@ -498,6 +569,7 @@ function NewReturn({ receiptId, setReceiptId }: { receiptId: string; setReceiptI
             }
           />
         )}
+        {!fromReceipt && <CustomItem mode="return" onAdd={(d, p) => setLines((all) => [...all, customLine(d, p)])} />}
       </div>
 
       <form
@@ -579,7 +651,7 @@ function Receipts({ onReturn }: { onReturn: (id: number) => void }) {
                 {r.items.map((l) => (
                   <li key={l.id} className="flex flex-wrap gap-x-2">
                     <span>{l.quantity} × {l.productName}</span>
-                    <span className="text-stone">{l.color} · {l.sizeCode}</span>
+                    <span className="text-stone">{lineKind(l)}</span>
                     <span className="text-stone">@ {money(l.unitPrice)}</span>
                     {l.returned > 0 && <span className="text-danger">{l.returned} returned</span>}
                   </li>
