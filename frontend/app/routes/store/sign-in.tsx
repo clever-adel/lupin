@@ -9,6 +9,7 @@ import { registerSchema, signInSchema, type RegisterValues, type SignInValues } 
 import { needsTwoStep, useMe, useRegister, useSignIn, useVerifyTwoStep } from "~/features/auth/session";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "~/lib/http";
+import { useHydrated } from "~/lib/hydrated";
 import { toLang, translate, useT, type MessageKey } from "~/lib/i18n";
 import { layoutOrigin, seo } from "~/lib/seo";
 
@@ -61,6 +62,7 @@ function TwoStepForm({ onBack }: { onBack: () => void }) {
 
   return (
     <form
+      method="post"
       noValidate
       className="mt-6 space-y-4"
       onSubmit={(event) => {
@@ -126,6 +128,7 @@ export default function SignIn() {
 
   const signIn = useSignIn();
   const register = useRegister();
+  const hydrated = useHydrated();
   const signInForm = useForm<SignInValues>({ resolver: zodResolver(signInSchema), defaultValues: { email: "", password: "" } });
   const registerForm = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -201,7 +204,7 @@ export default function SignIn() {
           {mode === "signin" && needsTwoStep(signIn.data) ? (
             <TwoStepForm onBack={() => { signIn.reset(); signInForm.setValue("password", ""); }} />
           ) : mode === "signin" ? (
-            <form noValidate className="mt-6 space-y-4" onSubmit={signInForm.handleSubmit((values) => signIn.mutate(values))}>
+            <form method="post" noValidate className="mt-6 space-y-4" onSubmit={signInForm.handleSubmit((values) => signIn.mutate(values))}>
               <Field label={t("auth.email")} type="email" autoComplete="email" error={signInForm.formState.errors.email} registration={signInForm.register("email")} />
               <div>
                 <Field label={t("auth.password")} type="password" autoComplete="current-password" error={signInForm.formState.errors.password} registration={signInForm.register("password")} />
@@ -209,17 +212,17 @@ export default function SignIn() {
                   {t("auth.forgot")}
                 </Link>
               </div>
-              <button type="submit" className="btn btn-primary w-full" disabled={signIn.isPending}>
+              <button type="submit" className="btn btn-primary w-full" disabled={!hydrated || signIn.isPending}>
                 {signIn.isPending ? t("auth.working") : t("auth.submitSignIn")}
               </button>
             </form>
           ) : (
-            <form noValidate className="mt-6 space-y-4" onSubmit={registerForm.handleSubmit((values) => register.mutate({ ...values, lang }))}>
+            <form method="post" noValidate className="mt-6 space-y-4" onSubmit={registerForm.handleSubmit((values) => register.mutate({ ...values, lang }))}>
               <Field label={t("auth.fullName")} autoComplete="name" error={registerForm.formState.errors.fullName} serverError={failure?.fields?.fullName} registration={registerForm.register("fullName")} />
               <Field label={t("auth.email")} type="email" autoComplete="email" error={registerForm.formState.errors.email} serverError={failure?.fields?.email} registration={registerForm.register("email")} />
               <Field label={t("auth.phone")} type="tel" inputMode="tel" autoComplete="tel-national" error={registerForm.formState.errors.phone} serverError={failure?.fields?.phone} registration={registerForm.register("phone")} />
               <Field label={t("auth.password")} type="password" autoComplete="new-password" hint={t("auth.passwordHint")} error={registerForm.formState.errors.password} serverError={failure?.fields?.password} registration={registerForm.register("password")} />
-              <button type="submit" className="btn btn-primary w-full" disabled={register.isPending}>
+              <button type="submit" className="btn btn-primary w-full" disabled={!hydrated || register.isPending}>
                 {register.isPending ? t("auth.working") : t("auth.submitCreate")}
               </button>
             </form>

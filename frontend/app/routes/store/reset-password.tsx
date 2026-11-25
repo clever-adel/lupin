@@ -6,6 +6,7 @@ import { Link } from "react-router";
 import { z } from "zod";
 import type { Route } from "./+types/reset-password";
 import { Field } from "~/components/form";
+import { useHydrated } from "~/lib/hydrated";
 import { api, ApiError } from "~/lib/http";
 import { toLang, translate, useT, type MessageKey } from "~/lib/i18n";
 import { layoutOrigin, seo } from "~/lib/seo";
@@ -70,6 +71,7 @@ function errorText(error: unknown, t: (key: MessageKey) => string) {
 function RequestLink() {
   const { t, href, lang } = useT();
   const form = useForm<{ email: string }>({ resolver: zodResolver(emailSchema), defaultValues: { email: "" } });
+  const hydrated = useHydrated();
   const send = useMutation({
     mutationFn: (email: string) => api<void>("POST", "/api/v1/auth/forgot-password", { email, lang }),
   });
@@ -89,9 +91,9 @@ function RequestLink() {
     <>
       <p className="mt-3 text-sm text-stone">{t("reset.intro")}</p>
       {send.isError && <p role="alert" className="mt-6 border border-danger px-3 py-2 text-sm text-danger">{errorText(send.error, t)}</p>}
-      <form noValidate className="mt-6 space-y-4" onSubmit={form.handleSubmit((v) => send.mutate(v.email.trim()))}>
+      <form method="post" noValidate className="mt-6 space-y-4" onSubmit={form.handleSubmit((v) => send.mutate(v.email.trim()))}>
         <Field label={t("auth.email")} type="email" autoComplete="email" error={form.formState.errors.email} registration={form.register("email")} />
-        <button type="submit" className="btn btn-primary w-full" disabled={send.isPending}>
+        <button type="submit" className="btn btn-primary w-full" disabled={!hydrated || send.isPending}>
           {send.isPending ? t("auth.working") : t("reset.send")}
         </button>
       </form>
@@ -106,6 +108,7 @@ function NewPassword({ token }: { token: string }) {
     resolver: zodResolver(passwordSchema),
     defaultValues: { password: "", confirm: "" },
   });
+  const hydrated = useHydrated();
   const reset = useMutation({
     mutationFn: (newPassword: string) => api<void>("POST", "/api/v1/auth/reset-password", { token, newPassword }),
   });
@@ -130,10 +133,10 @@ function NewPassword({ token }: { token: string }) {
           )}
         </div>
       )}
-      <form noValidate className="mt-6 space-y-4" onSubmit={form.handleSubmit((v) => reset.mutate(v.password))}>
+      <form method="post" noValidate className="mt-6 space-y-4" onSubmit={form.handleSubmit((v) => reset.mutate(v.password))}>
         <Field label={t("reset.newPassword")} type="password" autoComplete="new-password" hint={t("auth.passwordHint")} error={form.formState.errors.password} registration={form.register("password")} />
         <Field label={t("reset.confirm")} type="password" autoComplete="new-password" error={form.formState.errors.confirm} registration={form.register("confirm")} />
-        <button type="submit" className="btn btn-primary w-full" disabled={reset.isPending}>
+        <button type="submit" className="btn btn-primary w-full" disabled={!hydrated || reset.isPending}>
           {reset.isPending ? t("auth.working") : t("reset.save")}
         </button>
       </form>
