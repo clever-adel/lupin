@@ -22,7 +22,7 @@
         <springdoc.version>2.8.9</springdoc.version>
         <bouncycastle.version>1.86</bouncycastle.version>
         <embedded-postgres.version>2.2.2</embedded-postgres.version>
-        <embedded-postgres-binaries.version>18.6.0</embedded-postgres-binaries.version>
+        <embedded-postgres-binaries.version>19.0.0</embedded-postgres-binaries.version>
     </properties>
 
     <dependencyManagement>
