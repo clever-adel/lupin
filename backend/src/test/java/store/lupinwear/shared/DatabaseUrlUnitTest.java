@@ -38,6 +38,17 @@ class DatabaseUrlUnitTest {
     }
 
     @Test
+    void aRemoteDatabaseIsNeverReachedUnencrypted() {
+        for (String weak : new String[] {"disable", "allow", "prefer"}) {
+            assertThat(DatabaseUrlPostProcessor.parse("postgresql://u:p@db.example.test/db?sslmode=" + weak)
+                    .orElseThrow().url()).endsWith("?sslmode=require");
+        }
+        // Only a database on this machine may go without.
+        assertThat(DatabaseUrlPostProcessor.parse("postgresql://u:p@localhost/db?sslmode=disable").orElseThrow().url())
+                .endsWith("?sslmode=disable");
+    }
+
+    @Test
     void aJdbcAddressOrNothingIsLeftAlone() {
         assertThat(DatabaseUrlPostProcessor.parse("jdbc:postgresql://localhost:5432/lupin")).isEmpty();
         assertThat(DatabaseUrlPostProcessor.parse(null)).isEmpty();

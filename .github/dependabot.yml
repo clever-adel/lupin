@@ -1,4 +1,8 @@
 # Weekly checks for libraries with known security holes (and plain updates), opened as pull requests.
+#
+# Small updates (minor and patch) come as ONE grouped pull request per part of the project each week.
+# Major versions (Spring Boot 4, React Router 8, a new Java…) are ignored here: they need planned
+# migration work, not a one-click merge; plan them on their own.
 version: 2
 updates:
   - package-ecosystem: maven
@@ -6,16 +10,34 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      backend:
+        update-types: ["minor", "patch"]
   - package-ecosystem: npm
     directory: /frontend
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      frontend:
+        update-types: ["minor", "patch"]
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

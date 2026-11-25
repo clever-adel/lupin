@@ -49,8 +49,19 @@ public class CatalogController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "24") int pageSize) {
         String query = q == null ? null : q.substring(0, Math.min(q.length(), 80));
-        return catalog.search(new ProductFilter(department, category, query, size, color, minPrice, maxPrice, sale,
-                inStock, Sort.parse(sort), page, pageSize));
+        return catalog.search(new ProductFilter(department, category, query, filterValues(size), filterValues(color),
+                minPrice, maxPrice, sale, inStock, Sort.parse(sort), Math.max(0, page), pageSize));
+    }
+
+    /** The shop offers a handful of sizes and colours; a longer or odd list is not a real filter. */
+    private static List<String> filterValues(List<String> values) {
+        if (values == null) {
+            return null;
+        }
+        if (values.size() > 20 || values.stream().anyMatch(v -> v == null || v.length() > 40)) {
+            throw ApiException.badRequest("INVALID_FILTER", "Too many or too long filter values.");
+        }
+        return values;
     }
 
     @GetMapping("/facets")

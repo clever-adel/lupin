@@ -28,6 +28,8 @@ public class DatabaseUrlPostProcessor implements EnvironmentPostProcessor {
     public record Jdbc(String url, String username, String password) {
     }
 
+    private static final java.util.Set<String> WEAK_SSL_MODES = java.util.Set.of("disable", "allow", "prefer");
+
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
         String raw = Optional.ofNullable(environment.getProperty("DATABASE_URL_UNPOOLED")).filter(s -> !s.isBlank())
@@ -85,6 +87,12 @@ public class DatabaseUrlPostProcessor implements EnvironmentPostProcessor {
                     sslMode = decode(pair.substring(8));
                 }
             }
+        }
+        // A database on another machine is always reached encrypted: a setting that would allow plain
+        // text (disable, allow, prefer) is raised to require. Only a database on this machine may skip it.
+        boolean local = "localhost".equals(uri.getHost()) || "127.0.0.1".equals(uri.getHost()) || "[::1]".equals(uri.getHost());
+        if (!local && WEAK_SSL_MODES.contains(sslMode)) {
+            sslMode = "require";
         }
         String url = "jdbc:postgresql://" + uri.getHost() + (uri.getPort() > 0 ? ":" + uri.getPort() : "")
                 + uri.getRawPath() + "?sslmode=" + sslMode;
