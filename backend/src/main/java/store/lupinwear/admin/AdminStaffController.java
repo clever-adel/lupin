@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import store.lupinwear.audit.AuditLog;
 import store.lupinwear.auth.application.AuthService;
+import store.lupinwear.auth.mfa.TwoFactorService;
 import store.lupinwear.security.CurrentUser;
 import store.lupinwear.shared.ApiException;
 
@@ -40,7 +41,7 @@ import store.lupinwear.shared.ApiException;
 public class AdminStaffController {
 
     public record StaffView(UUID id, String email, String fullName, String role, String status, Instant lastLoginAt,
-            boolean you) {
+            boolean you, boolean twoFactor) {
     }
 
     public record CreateRequest(
@@ -58,7 +59,7 @@ public class AdminStaffController {
     }
 
     private static final String STAFF = """
-            select u.id, u.email, u.full_name, u.status, u.last_login_at,
+            select u.id, u.email, u.full_name, u.status, u.last_login_at, u.totp_enabled_at is not null as two_factor,
                    max(case when r.code = 'OWNER' then 2 else 1 end) as level
             from users u join user_roles ur on ur.user_id = u.id join roles r on r.id = ur.role_id
             where r.code in ('ADMIN', 'OWNER') and u.deleted_at is null
@@ -67,11 +68,13 @@ public class AdminStaffController {
     private final JdbcClient jdbc;
     private final AuthService auth;
     private final AuditLog audit;
+    private final TwoFactorService twoFactor;
 
-    public AdminStaffController(JdbcClient jdbc, AuthService auth, AuditLog audit) {
+    public AdminStaffController(JdbcClient jdbc, AuthService auth, AuditLog audit, TwoFactorService twoFactor) {
         this.jdbc = jdbc;
         this.auth = auth;
         this.audit = audit;
+        this.twoFactor = twoFactor;
     }
 
     @GetMapping
@@ -83,7 +86,8 @@ public class AdminStaffController {
                     UUID id = rs.getObject("id", UUID.class);
                     return new StaffView(id, rs.getString("email"), rs.getString("full_name"),
                             rs.getInt("level") == 2 ? "OWNER" : "ADMIN", rs.getString("status"),
-                            last == null ? null : last.toInstant(), id.equals(user.id()));
+                            last == null ? null : last.toInstant(), id.equals(user.id()),
+                            rs.getBoolean("two_factor"));
                 }).list();
     }
 
@@ -118,6 +122,18 @@ public class AdminStaffController {
         requireOtherStaff(user, id);
         auth.resetStaffPassword(id, body.password());
         audit.record(user.id(), "STAFF_PASSWORD_RESET", "user", id, null);
+    }
+
+    /**
+     * For someone who lost their phone and their recovery codes: two-step sign-in goes off and every
+     * session ends; at their next sign-in the dashboard asks them to pair their new phone.
+     */
+    @PostMapping("/{id}/two-factor/reset")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetTwoFactor(@AuthenticationPrincipal CurrentUser user, @PathVariable UUID id) {
+        requireOtherStaff(user, id);
+        twoFactor.reset(id);
+        audit.record(user.id(), "STAFF_MFA_RESET", "user", id, null);
     }
 
     private void requireOtherStaff(CurrentUser actor, UUID id) {

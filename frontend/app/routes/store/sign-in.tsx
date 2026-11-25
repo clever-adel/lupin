@@ -1,14 +1,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/sign-in";
 import { LogoLockup } from "~/components/brand";
 import { Field } from "~/components/form";
 import { registerSchema, signInSchema, type RegisterValues, type SignInValues } from "~/features/auth/schemas";
-import { useMe, useRegister, useSignIn } from "~/features/auth/session";
+import { needsTwoStep, useMe, useRegister, useSignIn, useVerifyTwoStep } from "~/features/auth/session";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "~/lib/http";
+import { useHydrated } from "~/lib/hydrated";
 import { toLang, translate, useT, type MessageKey } from "~/lib/i18n";
 import { layoutOrigin, seo } from "~/lib/seo";
 
@@ -44,6 +45,60 @@ function GoogleMark() {
   );
 }
 
+/**
+ * Staff with two-step sign-in: the password was right, now the code from the authenticator app (or a
+ * recovery code). On success the signed-in profile is cached and the page's redirect takes over.
+ */
+function TwoStepForm({ onBack }: { onBack: () => void }) {
+  const { t } = useT();
+  const verify = useVerifyTwoStep();
+  const [code, setCode] = useState("");
+  const id = useId();
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => ref.current?.focus(), []);
+  const failure = verify.error instanceof ApiError ? verify.error.message || t("error.generic") : verify.isError ? t("error.generic") : null;
+  // The challenge lasts five minutes; after that only a fresh password helps.
+  const expired = verify.error instanceof ApiError && verify.error.code === "MFA_CHALLENGE_EXPIRED";
+
+  return (
+    <form
+      method="post"
+      noValidate
+      className="mt-6 space-y-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (code.trim()) verify.mutate(code.trim());
+      }}
+    >
+      <h2 className="text-lg font-semibold">{t("auth.twoStep.title")}</h2>
+      <p className="text-sm text-stone">{t("auth.twoStep.intro")}</p>
+      {failure && <p role="alert" className="border border-danger px-3 py-2 text-sm text-danger">{failure}</p>}
+      <div>
+        <label htmlFor={id} className="mb-1.5 block text-sm font-medium">{t("auth.twoStep.code")}</label>
+        <input
+          ref={ref}
+          id={id}
+          dir="ltr"
+          autoComplete="one-time-code"
+          maxLength={20}
+          className="field text-center text-lg tracking-[0.3em]"
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+        />
+        <p className="mt-1 text-xs text-stone">{t("auth.twoStep.recovery")}</p>
+      </div>
+      {!expired && (
+        <button type="submit" className="btn btn-primary w-full" disabled={verify.isPending || !code.trim()}>
+          {verify.isPending ? t("auth.working") : t("auth.twoStep.submit")}
+        </button>
+      )}
+      <button type="button" className={`${expired ? "btn btn-primary" : "btn btn-outline"} w-full`} onClick={onBack}>
+        {t("auth.twoStep.back")}
+      </button>
+    </form>
+  );
+}
+
 export default function SignIn() {
   const { t, href, lang } = useT();
   const [mode, setMode] = useState<"signin" | "register">("signin");
@@ -73,6 +128,7 @@ export default function SignIn() {
 
   const signIn = useSignIn();
   const register = useRegister();
+  const hydrated = useHydrated();
   const signInForm = useForm<SignInValues>({ resolver: zodResolver(signInSchema), defaultValues: { email: "", password: "" } });
   const registerForm = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -145,8 +201,10 @@ export default function SignIn() {
             <p role="alert" className="mt-6 border border-danger px-3 py-2 text-sm text-danger">{formError}</p>
           )}
 
-          {mode === "signin" ? (
-            <form noValidate className="mt-6 space-y-4" onSubmit={signInForm.handleSubmit((values) => signIn.mutate(values))}>
+          {mode === "signin" && needsTwoStep(signIn.data) ? (
+            <TwoStepForm onBack={() => { signIn.reset(); signInForm.setValue("password", ""); }} />
+          ) : mode === "signin" ? (
+            <form method="post" noValidate className="mt-6 space-y-4" onSubmit={signInForm.handleSubmit((values) => signIn.mutate(values))}>
               <Field label={t("auth.email")} type="email" autoComplete="email" error={signInForm.formState.errors.email} registration={signInForm.register("email")} />
               <div>
                 <Field label={t("auth.password")} type="password" autoComplete="current-password" error={signInForm.formState.errors.password} registration={signInForm.register("password")} />
@@ -154,17 +212,17 @@ export default function SignIn() {
                   {t("auth.forgot")}
                 </Link>
               </div>
-              <button type="submit" className="btn btn-primary w-full" disabled={signIn.isPending}>
+              <button type="submit" className="btn btn-primary w-full" disabled={!hydrated || signIn.isPending}>
                 {signIn.isPending ? t("auth.working") : t("auth.submitSignIn")}
               </button>
             </form>
           ) : (
-            <form noValidate className="mt-6 space-y-4" onSubmit={registerForm.handleSubmit((values) => register.mutate({ ...values, lang }))}>
+            <form method="post" noValidate className="mt-6 space-y-4" onSubmit={registerForm.handleSubmit((values) => register.mutate({ ...values, lang }))}>
               <Field label={t("auth.fullName")} autoComplete="name" error={registerForm.formState.errors.fullName} serverError={failure?.fields?.fullName} registration={registerForm.register("fullName")} />
               <Field label={t("auth.email")} type="email" autoComplete="email" error={registerForm.formState.errors.email} serverError={failure?.fields?.email} registration={registerForm.register("email")} />
               <Field label={t("auth.phone")} type="tel" inputMode="tel" autoComplete="tel-national" error={registerForm.formState.errors.phone} serverError={failure?.fields?.phone} registration={registerForm.register("phone")} />
               <Field label={t("auth.password")} type="password" autoComplete="new-password" hint={t("auth.passwordHint")} error={registerForm.formState.errors.password} serverError={failure?.fields?.password} registration={registerForm.register("password")} />
-              <button type="submit" className="btn btn-primary w-full" disabled={register.isPending}>
+              <button type="submit" className="btn btn-primary w-full" disabled={!hydrated || register.isPending}>
                 {register.isPending ? t("auth.working") : t("auth.submitCreate")}
               </button>
             </form>

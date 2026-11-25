@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
+import { createHmac } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { expect, type Browser, type Cookie, type Page } from "@playwright/test";
 
 const PASSWORD_FILE = "../backend/.local-owner-password";
@@ -31,6 +32,82 @@ export async function signIn(page: Page, email: string, password: string, next?:
   await page.locator("form button[type=submit]").click();
 }
 
+// ── Two-step sign-in for staff: the tests act as the authenticator app. ──
+
+/** The local owner's app key, so later runs against the same local database can sign in. Git-ignored. */
+const OWNER_KEY_FILE = "../backend/.local-owner-totp";
+const appKeys = new Map<string, string>();
+const lastStep = new Map<string, number>();
+
+function base32Decode(text: string): Buffer {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const bytes: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const char of text.replace(/\s/g, "").toUpperCase()) {
+    buffer = (buffer << 5) | alphabet.indexOf(char);
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((buffer >> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(bytes);
+}
+
+/** RFC 6238, as the phone apps do it: HMAC-SHA1, 30-second steps, 6 digits. */
+export function appCode(key: string, step: number): string {
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(step));
+  const hash = createHmac("sha1", base32Decode(key)).update(counter).digest();
+  const offset = hash[hash.length - 1] & 0x0f;
+  return String((hash.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
+}
+
+const currentStep = () => Math.floor(Date.now() / 30_000);
+
+/** A fresh code: the server accepts each code once, so wait for the next one if this one was used. */
+async function nextCode(email: string): Promise<string> {
+  let key = appKeys.get(email);
+  if (!key && email === OWNER_EMAIL && existsSync(OWNER_KEY_FILE)) {
+    key = readFileSync(OWNER_KEY_FILE, "utf8").trim();
+    appKeys.set(email, key);
+    // An earlier test run may have used this very code a moment ago: start from the next one.
+    lastStep.set(email, currentStep());
+  }
+  if (!key) throw new Error(`No authenticator key known for ${email}`);
+  while (currentStep() <= (lastStep.get(email) ?? -1)) await new Promise((resolve) => setTimeout(resolve, 1000));
+  lastStep.set(email, currentStep());
+  return appCode(key, currentStep());
+}
+
+/** The dashboard's "Turn on two-step sign-in" screen, done as a staff member would. */
+export async function pairAuthenticator(page: Page, email: string) {
+  await page.getByRole("button", { name: "Show the QR code" }).click();
+  const key = (await page.getByLabel("Setup key").innerText()).replace(/\s/g, "");
+  appKeys.set(email, key);
+  if (email === OWNER_EMAIL) writeFileSync(OWNER_KEY_FILE, key);
+  await page.getByLabel(/Type the 6-digit code/).fill(await nextCode(email));
+  await page.getByRole("button", { name: "Turn on" }).click();
+  await expect(page.getByRole("heading", { name: "Save your recovery codes" })).toBeVisible();
+  await page.getByLabel("I have saved them somewhere safe").check();
+  await page.getByRole("button", { name: "Continue" }).click();
+}
+
+/** Staff sign-in: password, then either the app code or (first time) pairing the app. */
+export async function signInStaff(page: Page, email: string, password: string, next?: string) {
+  await signIn(page, email, password, next);
+  const code = page.getByLabel("Code", { exact: true });
+  const pairing = page.getByRole("heading", { name: "Turn on two-step sign-in" });
+  await expect(code.or(pairing)).toBeVisible();
+  if (await code.isVisible()) {
+    await code.fill(await nextCode(email));
+    await page.getByRole("button", { name: "Confirm" }).click();
+  } else {
+    await pairAuthenticator(page, email);
+  }
+}
+
 /**
  * The owner's session, kept from the first sign-in of this test run. The API allows 10 sign-ins per
  * account in 10 minutes, and the whole suite signs in as the owner more often than that.
@@ -44,8 +121,9 @@ export async function signInAsOwner(page: Page, next = "/admin") {
     await page.goto(next);
     if (landed.test(page.url())) return;
   }
-  await signIn(page, OWNER_EMAIL, ownerPassword, next);
+  await signInStaff(page, OWNER_EMAIL, ownerPassword, next);
   await expect(page).toHaveURL(landed);
+  await expect(page.getByRole("navigation", { name: "Dashboard" })).toBeVisible();
   ownerSession = await page.context().cookies();
 }
 

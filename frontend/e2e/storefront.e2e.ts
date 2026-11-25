@@ -148,6 +148,27 @@ test("missing pages show a helpful not-found page", async ({ page }) => {
   expect((await page.goto("/policies/not-a-policy"))?.status()).toBe(404);
 });
 
+test("a password never ends up in the address bar, even before the page's scripts have run", async ({ browser }) => {
+  // No JavaScript at all: what a press does in the moment before the page has loaded.
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  const secret = "never-in-the-url-123";
+  for (const path of ["/sign-in", "/ar/sign-in"]) {
+    await page.goto(path);
+    await expect(page.locator("form button[type=submit]")).toBeDisabled();
+    await page.locator('input[type="email"]').first().fill("someone@example.test");
+    await page.locator('input[type="password"]').first().fill(secret);
+    await page.locator('input[type="password"]').first().press("Enter");
+    await page.locator("form button[type=submit]").click({ force: true });
+    await page.waitForLoadState();
+    expect(page.url()).not.toContain(secret);
+    expect(page.url()).not.toContain("someone");
+  }
+  await page.goto("/reset-password");
+  await expect(page.locator("form button[type=submit]")).toBeDisabled();
+  await context.close();
+});
+
 test("sign in and sign up: every error a customer can hit, and no redirect to other sites", async ({ page }) => {
   await page.goto("/sign-in");
 

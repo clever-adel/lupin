@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import java.util.Set;
 import java.util.UUID;
 import store.lupinwear.auth.domain.User;
+import store.lupinwear.auth.mfa.TwoFactorService;
 
 public final class AuthDtos {
 
@@ -42,13 +43,21 @@ public final class AuthDtos {
             @NotBlank @Size(min = 10, max = 128, message = "Use at least 10 characters") String newPassword) {
     }
 
+    /** {@code twoFactor}: staff only (ON, SETUP or SIGN_IN_AGAIN, see TwoFactorService.State); null for customers. */
     public record MeResponse(UUID id, String email, String phone, String fullName, Set<String> roles,
-            boolean emailVerified, String preferredLang) {
+            boolean emailVerified, String preferredLang, String twoFactor) {
 
-        public static MeResponse of(User u) {
+        public static MeResponse of(User u, TwoFactorService.State twoFactor) {
             return new MeResponse(u.getId(), u.getEmail(), u.getPhone(), u.getFullName(), u.roleCodes(),
-                    u.getEmailVerifiedAt() != null, u.getPreferredLang());
+                    u.getEmailVerifiedAt() != null, u.getPreferredLang(), twoFactor == null ? null : twoFactor.name());
         }
+    }
+
+    /** The password was right; the authenticator-app code is asked for next. */
+    public record MfaChallengeResponse(boolean mfaRequired) {
+    }
+
+    public record CodeRequest(@NotBlank @Size(max = 20) String code) {
     }
 
     public record CsrfResponse(String headerName, String token) {

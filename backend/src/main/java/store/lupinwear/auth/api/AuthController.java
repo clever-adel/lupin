@@ -12,14 +12,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import store.lupinwear.auth.api.AuthDtos.CodeRequest;
 import store.lupinwear.auth.api.AuthDtos.CsrfResponse;
 import store.lupinwear.auth.api.AuthDtos.LoginRequest;
 import store.lupinwear.auth.api.AuthDtos.MeResponse;
+import store.lupinwear.auth.api.AuthDtos.MfaChallengeResponse;
 import store.lupinwear.auth.api.AuthDtos.RegisterRequest;
 import store.lupinwear.auth.application.AuthService;
 import store.lupinwear.auth.application.AuthService.ClientInfo;
+import store.lupinwear.auth.application.AuthService.LoginResult;
 import store.lupinwear.auth.application.AuthService.Tokens;
 import store.lupinwear.auth.application.PasswordResetService;
+import store.lupinwear.auth.domain.User;
+import store.lupinwear.auth.mfa.TwoFactorService;
 import store.lupinwear.security.AuthCookies;
 import store.lupinwear.security.CurrentUser;
 import store.lupinwear.shared.ApiException;
@@ -31,11 +36,14 @@ public class AuthController {
     private final AuthService auth;
     private final AuthCookies cookies;
     private final PasswordResetService resets;
+    private final TwoFactorService twoFactor;
 
-    public AuthController(AuthService auth, AuthCookies cookies, PasswordResetService resets) {
+    public AuthController(AuthService auth, AuthCookies cookies, PasswordResetService resets,
+            TwoFactorService twoFactor) {
         this.auth = auth;
         this.cookies = cookies;
         this.resets = resets;
+        this.twoFactor = twoFactor;
     }
 
     /** Reading the token makes Spring Security set the XSRF-TOKEN cookie the SPA echoes back. */
@@ -50,9 +58,24 @@ public class AuthController {
         return signedIn(auth.register(body, client(req)), res);
     }
 
+    /** A session, or for staff with two-step sign-in on: {"mfaRequired": true} and a five-minute challenge cookie. */
     @PostMapping("/login")
-    MeResponse login(@Valid @RequestBody LoginRequest body, HttpServletRequest req, HttpServletResponse res) {
-        return signedIn(auth.login(body, client(req)), res);
+    Object login(@Valid @RequestBody LoginRequest body, HttpServletRequest req, HttpServletResponse res) {
+        LoginResult result = auth.login(body, client(req));
+        if (result.mfaChallenge() != null) {
+            cookies.writeMfaChallenge(res, result.mfaChallenge());
+            return new MfaChallengeResponse(true);
+        }
+        return signedIn(result.tokens(), res);
+    }
+
+    /** The second step: the code from the authenticator app, or a recovery code. */
+    @PostMapping("/mfa/verify")
+    MeResponse verifyTwoStep(@Valid @RequestBody CodeRequest body, HttpServletRequest req, HttpServletResponse res) {
+        String challenge = AuthCookies.read(req, AuthCookies.MFA).orElse(null);
+        Tokens tokens = auth.completeTwoStep(challenge, body.code(), client(req));
+        cookies.clearMfaChallenge(res);
+        return signedIn(tokens, res);
     }
 
     @PostMapping("/refresh")
@@ -110,12 +133,14 @@ public class AuthController {
 
     @GetMapping("/me")
     MeResponse me(@AuthenticationPrincipal CurrentUser user) {
-        return MeResponse.of(auth.me(user.id()));
+        User me = auth.me(user.id());
+        return MeResponse.of(me, twoFactor.state(me.getId(), me.roleCodes(), user.family()));
     }
 
     private MeResponse signedIn(Tokens tokens, HttpServletResponse res) {
         cookies.write(res, tokens.accessToken(), tokens.refreshToken());
-        return MeResponse.of(tokens.user());
+        User user = tokens.user();
+        return MeResponse.of(user, twoFactor.state(user.getId(), user.roleCodes(), tokens.family()));
     }
 
     private static ClientInfo client(HttpServletRequest req) {

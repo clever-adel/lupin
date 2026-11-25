@@ -13,13 +13,15 @@ interface Staff {
   status: "ACTIVE" | "DISABLED";
   lastLoginAt?: string;
   you: boolean;
+  /** Two-step sign-in (authenticator app) is on. */
+  twoFactor: boolean;
 }
 
 const label = "mb-1 block text-xs font-medium";
 
 function StaffRow({ person }: { person: Staff }) {
   const client = useQueryClient();
-  const [mode, setMode] = useState<"idle" | "confirm" | "password">("idle");
+  const [mode, setMode] = useState<"idle" | "confirm" | "password" | "twoFactor">("idle");
   const [password, setPassword] = useState("");
   const refresh = () => client.invalidateQueries({ queryKey: ["admin", "staff"] });
   const active = person.status === "ACTIVE";
@@ -38,7 +40,14 @@ function StaffRow({ person }: { person: Staff }) {
       setPassword("");
     },
   });
-  const failure = setStatus.error ?? reset.error;
+  const resetTwoFactor = useMutation({
+    mutationFn: () => api("POST", `/api/v1/admin/staff/${person.id}/two-factor/reset`),
+    onSuccess: () => {
+      setMode("idle");
+      refresh();
+    },
+  });
+  const failure = setStatus.error ?? reset.error ?? resetTwoFactor.error;
 
   return (
     <li className={`border bg-card p-4 text-sm ${active ? "border-line" : "border-line opacity-70"}`}>
@@ -55,10 +64,16 @@ function StaffRow({ person }: { person: Staff }) {
             {" · "}
             {person.lastLoginAt ? `last signed in ${when(person.lastLoginAt)}` : "never signed in"}
           </p>
+          <p className={`mt-1 text-xs font-semibold ${person.twoFactor ? "" : "text-danger"}`}>
+            {person.twoFactor ? "Two-step sign-in: on" : "Two-step sign-in: not set up yet (asked for at their next sign-in)"}
+          </p>
         </div>
         {!person.you && mode === "idle" && (
           <div className="flex gap-2">
             <button type="button" className="btn btn-outline" onClick={() => setMode("password")}>Set new password</button>
+            {person.twoFactor && (
+              <button type="button" className="btn btn-outline" onClick={() => setMode("twoFactor")}>Reset two-step</button>
+            )}
             <button type="button" className="btn btn-outline" onClick={() => (active ? setMode("confirm") : setStatus.mutate())} disabled={setStatus.isPending}>
               {active ? "Switch off" : "Switch on"}
             </button>
@@ -75,6 +90,20 @@ function StaffRow({ person }: { person: Staff }) {
           </div>
         </div>
       )}
+      {mode === "twoFactor" && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
+          <p className="max-w-md">
+            <span className="font-semibold">Reset two-step sign-in for {person.fullName}?</span> Only if they lost their
+            phone and their recovery codes. They are signed out, and pair their new phone at their next sign-in.
+            Check it is really them first (call them).
+          </p>
+          <div className="flex gap-2">
+            <button type="button" className="btn btn-outline" onClick={() => setMode("idle")}>Back</button>
+            <button type="button" className="btn btn-primary" disabled={resetTwoFactor.isPending} onClick={() => resetTwoFactor.mutate()}>Yes, reset</button>
+          </div>
+        </div>
+      )}
+      {resetTwoFactor.isSuccess && mode === "idle" && <p role="status" className="mt-2">Two-step sign-in reset. They pair a new phone at their next sign-in.</p>}
       {mode === "password" && (
         <form
           className="mt-3 flex flex-wrap items-end gap-3 border-t border-line pt-3"

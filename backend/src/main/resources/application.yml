@@ -65,6 +65,10 @@ lupin:
     # Shared with the storefront Worker (its EDGE_SHARED_SECRET). Required in staging and production:
     # requests without it are refused, so the API cannot be reached around the Worker.
     edge-secret: ${LUPIN_EDGE_SECRET:}
+    # Encrypts staff authenticator-app keys in the database (32+ characters). Keep it fixed: changing it
+    # means every staff member pairs their app again. Unset, a key derived from LUPIN_JWT_SECRET is used,
+    # and then changing LUPIN_JWT_SECRET has that effect instead.
+    mfa-secret: ${LUPIN_MFA_SECRET:}
   bootstrap:
     owner-email: ${LUPIN_BOOTSTRAP_OWNER_EMAIL:}
     owner-password: ${LUPIN_BOOTSTRAP_OWNER_PASSWORD:}

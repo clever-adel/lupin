@@ -55,10 +55,30 @@ export interface RegisterInput extends SignInInput {
   lang: "en" | "ar";
 }
 
+/** Staff with two-step sign-in on get this instead of a session: the app code is asked for next. */
+export interface TwoStepNeeded {
+  mfaRequired: true;
+}
+
+export function needsTwoStep(result: Me | TwoStepNeeded | undefined): result is TwoStepNeeded {
+  return Boolean(result && "mfaRequired" in result && result.mfaRequired);
+}
+
 export function useSignIn() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: SignInInput) => api<Me>("POST", "/api/v1/auth/login", input),
+    mutationFn: (input: SignInInput) => api<Me | TwoStepNeeded>("POST", "/api/v1/auth/login", input),
+    onSuccess: (result) => {
+      if (!needsTwoStep(result)) client.setQueryData(ME_KEY, result);
+    },
+  });
+}
+
+/** The second sign-in step: the 6-digit code from the authenticator app, or a recovery code. */
+export function useVerifyTwoStep() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => api<Me>("POST", "/api/v1/auth/mfa/verify", { code }),
     onSuccess: (me) => client.setQueryData(ME_KEY, me),
   });
 }

@@ -11,6 +11,8 @@ backend/target/
 backend/.localdb/
 backend/.local-pg/
 backend/.local-owner-password
+backend/.local-owner-totp
+backend/.local-mfa-secret
 
 # frontend
 node_modules/

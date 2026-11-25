@@ -458,6 +458,7 @@ class CheckoutIT extends IntegrationTest {
         String adminEmail = uniqueEmail();
         authService.createStaff(adminEmail, "staff-" + PASSWORD_OK, "Alert Admin", store.lupinwear.auth.domain.Role.ADMIN);
         Cookie alertAdmin = cookie(login(adminEmail, "staff-" + PASSWORD_OK), store.lupinwear.security.AuthCookies.ACCESS);
+        enableTwoFactor(alertAdmin);
         java.security.KeyPair browser = store.lupinwear.notify.WebPush.newKeyPair();
         byte[] auth = new byte[16];
         new java.security.SecureRandom().nextBytes(auth);
