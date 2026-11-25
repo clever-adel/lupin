@@ -4,7 +4,7 @@
 # Keep the two in step.
 
 # Build
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:25-jdk AS build
 WORKDIR /src
 COPY backend/.mvn .mvn
 COPY backend/mvnw backend/pom.xml ./
@@ -14,7 +14,7 @@ RUN ./mvnw -B -ntp package -DskipTests && \
     java -Djarmode=tools -jar target/lupin-backend-*.jar extract --layers --destination /layers
 
 # Run (the host sets PORT)
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 RUN useradd --system --uid 10001 lupin
 WORKDIR /app
 COPY --from=build /layers/dependencies/ ./
