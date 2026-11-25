@@ -21,7 +21,7 @@
         <jjwt.version>0.12.7</jjwt.version>
         <springdoc.version>2.8.9</springdoc.version>
         <bouncycastle.version>1.86</bouncycastle.version>
-        <embedded-postgres.version>2.2.2</embedded-postgres.version>
+        <embedded-postgres.version>2.2.3</embedded-postgres.version>
         <embedded-postgres-binaries.version>18.6.0</embedded-postgres-binaries.version>
     </properties>
 
