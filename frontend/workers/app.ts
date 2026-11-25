@@ -1,5 +1,5 @@
 import { createRequestHandler } from "react-router";
-import { EDGE_KEY_HEADER, edgeKey } from "../app/lib/edge";
+import { EDGE_KEY_HEADER, edgeKey, httpsRedirect } from "../app/lib/edge";
 import { isPhotoWidth, PHOTO_WIDTHS, sizedKey } from "../app/lib/photo-sizes";
 
 declare module "react-router" {
@@ -245,6 +245,11 @@ async function imagesWithoutSizes(request: Request, env: Env): Promise<Response>
 export default {
   async fetch(request, env, ctx) {
     const { pathname, hostname } = new URL(request.url);
+    // HTTPS only. Plain-HTTP requests are sent to the same address over HTTPS (308 keeps the method and
+    // body), so nothing, cookies or passwords included, travels unencrypted even if the Cloudflare
+    // "Always Use HTTPS" setting is ever switched off. Local development runs on plain http.
+    const secure = httpsRedirect(request.url);
+    if (secure) return Response.redirect(secure, 308);
     // One address for the store: www.lupinwear.store permanently redirects to lupinwear.store, so
     // cookies, search engines and shared links all agree on a single origin.
     if (hostname.startsWith("www.")) {

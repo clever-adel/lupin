@@ -82,6 +82,19 @@ class CatalogIT extends IntegrationTest {
     }
 
     @Test
+    void oversizedFiltersAreRefusedAndOddPagingIsHarmless() throws Exception {
+        String many = String.join(",", java.util.Collections.nCopies(21, "M"));
+        mvc.perform(get("/api/v1/catalog/products").param("size", many))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_FILTER"));
+        mvc.perform(get("/api/v1/catalog/products").param("color", "x".repeat(41)))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/catalog/products").param("page", "-5").param("pageSize", "100000"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/catalog/products").param("q", "' or 1=1; drop table products; --"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0));
+    }
+
+    @Test
     void hidingTheDepartmentHidesItsProducts() throws Exception {
         JsonNode created = create(request("Hidden Dept Jacket", "1000.00", null, 1));
         publish(created.get("id").asLong());
