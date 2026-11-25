@@ -41,19 +41,29 @@ public class AuthSession {
 
     private String ip;
 
+    /** When this sign-in passed the authenticator-app code (staff). Carried over on every refresh. */
+    @Column(name = "mfa_at")
+    private Instant mfaAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
     protected AuthSession() {
     }
 
-    public AuthSession(UUID userId, UUID familyId, String tokenHash, Instant expiresAt, String userAgent, String ip) {
+    public AuthSession(UUID userId, UUID familyId, String tokenHash, Instant expiresAt, String userAgent, String ip,
+            Instant mfaAt) {
         this.userId = userId;
         this.familyId = familyId;
         this.tokenHash = tokenHash;
         this.expiresAt = expiresAt;
         this.userAgent = userAgent;
         this.ip = ip;
+        this.mfaAt = mfaAt;
+    }
+
+    public Instant getMfaAt() {
+        return mfaAt;
     }
 
     public UUID getId() {

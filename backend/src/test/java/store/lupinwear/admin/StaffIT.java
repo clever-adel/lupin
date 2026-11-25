@@ -76,6 +76,7 @@ class StaffIT extends IntegrationTest {
 
         // The new admin can work, but still cannot manage staff.
         Cookie fresh = cookie(login(email, STAFF_PASSWORD), AuthCookies.ACCESS);
+        enableTwoFactor(fresh);
         mvc.perform(get("/api/v1/admin/orders").cookie(fresh)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/admin/staff").cookie(fresh)).andExpect(status().isForbidden());
 
@@ -96,6 +97,7 @@ class StaffIT extends IntegrationTest {
         MvcResult signedIn = login(email, STAFF_PASSWORD);
         Cookie access = cookie(signedIn, AuthCookies.ACCESS);
         Cookie refresh = cookie(signedIn, AuthCookies.REFRESH);
+        byte[] secret = enableTwoFactor(access);
         mvc.perform(get("/api/v1/admin/summary").cookie(access)).andExpect(status().isOk());
 
         mvc.perform(jsonPost("/api/v1/admin/staff/" + id + "/status", Map.of("status", "DISABLED")).cookie(owner))
@@ -111,7 +113,8 @@ class StaffIT extends IntegrationTest {
         // Switched back on, they sign in again.
         mvc.perform(jsonPost("/api/v1/admin/staff/" + id + "/status", Map.of("status", "ACTIVE")).cookie(owner))
                 .andExpect(status().isNoContent());
-        mvc.perform(get("/api/v1/admin/summary").cookie(cookie(login(email, STAFF_PASSWORD), AuthCookies.ACCESS)))
+        mvc.perform(get("/api/v1/admin/summary").cookie(cookie(signInWithCode(email, STAFF_PASSWORD, secret),
+                        AuthCookies.ACCESS)))
                 .andExpect(status().isOk());
     }
 
@@ -145,6 +148,7 @@ class StaffIT extends IntegrationTest {
         MvcResult signedIn = login(email, STAFF_PASSWORD);
         Cookie access = cookie(signedIn, AuthCookies.ACCESS);
         Cookie refresh = cookie(signedIn, AuthCookies.REFRESH);
+        byte[] secret = enableTwoFactor(access);
 
         // Changing your own password needs the current one, and a strong new one for staff.
         mvc.perform(jsonPost("/api/v1/auth/password", Map.of("currentPassword", "not-my-password",
@@ -171,7 +175,7 @@ class StaffIT extends IntegrationTest {
         // The owner resets it for someone who is locked out; an admin cannot reset anyone's.
         mvc.perform(jsonPost("/api/v1/admin/staff/" + id + "/password", Map.of("password", "reset-by-the-owner-3"))
                 .cookie(admin)).andExpect(status().isForbidden());
-        Cookie openDashboard = cookie(login(email, "another-long-password-2"), AuthCookies.ACCESS);
+        Cookie openDashboard = cookie(signInWithCode(email, "another-long-password-2", secret), AuthCookies.ACCESS);
         mvc.perform(get("/api/v1/admin/summary").cookie(openDashboard)).andExpect(status().isOk());
         mvc.perform(jsonPost("/api/v1/admin/staff/" + id + "/password", Map.of("password", "reset-by-the-owner-3"))
                 .cookie(owner)).andExpect(status().isNoContent());

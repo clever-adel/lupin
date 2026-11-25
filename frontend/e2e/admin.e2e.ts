@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
-  addToBag, CUSTOMER_PASSWORD, newVisitor, ownerPassword, placeOrder, registerCustomer, signIn, signInAsOwner,
+  addToBag, CUSTOMER_PASSWORD, newVisitor, OWNER_EMAIL, ownerPassword, pairAuthenticator, placeOrder, registerCustomer, signIn, signInAsOwner, signInStaff,
   skipIntro, unique,
 } from "./helpers";
 
@@ -23,7 +23,7 @@ test.describe.serial("staff dashboard", () => {
   });
 
   test("staff who sign in land on the dashboard, and their account page links to it", async ({ page }) => {
-    await signIn(page, "owner@lupin.local", ownerPassword); // no destination given
+    await signInStaff(page, OWNER_EMAIL, ownerPassword); // no destination given
     await expect(page).toHaveURL(/\/admin$/);
     await expect(page.getByRole("heading", { name: "Orders" })).toBeVisible();
     for (const name of ["Orders", "Transfers to check", "Products & stock", "Offers", "Content", "Settings", "Staff"]) {
@@ -523,6 +523,8 @@ test.describe.serial("staff dashboard", () => {
   });
 
   test("staff accounts: the owner adds an admin, the admin's limits hold, and switching off locks them out", async ({ page, browser }) => {
+    // Several two-step sign-ins: each waits for a fresh 30-second app code (a code works only once).
+    test.setTimeout(240_000);
     const adminEmail = `${unique("e2e-admin")}@example.test`;
     const adminPassword = "e2e-admin-password-1";
     await signInAsOwner(page, "/admin/staff");
@@ -542,10 +544,18 @@ test.describe.serial("staff dashboard", () => {
     await expect(person).toContainText("Admin: daily work");
     await expect(person).toContainText("never signed in");
 
-    // The admin signs in and lands on the dashboard, with the owner-only parts closed.
+    // The admin signs in, must pair an authenticator app first, then lands on the dashboard with the
+    // owner-only parts closed.
     const staff = await newVisitor(browser);
     await signIn(staff, adminEmail, adminPassword);
     await expect(staff).toHaveURL(/\/admin$/);
+    await expect(staff.getByRole("heading", { name: "Turn on two-step sign-in" })).toBeVisible();
+    await expect(staff.getByRole("navigation", { name: "Dashboard" })).toHaveCount(0);
+    expect((await staff.request.get("/api/v1/admin/orders")).status()).toBe(403);
+    await pairAuthenticator(staff, adminEmail);
+    await expect(staff.getByRole("navigation", { name: "Dashboard" })).toBeVisible();
+    await page.reload();
+    await expect(person).toContainText("Two-step sign-in: on");
     await expect(staff.getByRole("navigation", { name: "Dashboard" }).getByRole("link", { name: "Staff" })).toHaveCount(0);
     await staff.goto("/admin/staff");
     await expect(staff.getByText("Only the owner can add or switch off staff accounts.")).toBeVisible();
@@ -574,7 +584,12 @@ test.describe.serial("staff dashboard", () => {
     await expect(staff).toHaveURL(/\/sign-in/);
     await signIn(staff, adminEmail, adminPassword);
     await expect(staff.getByRole("alert")).toContainText("Email or password is not correct.");
+    // The new password alone is not enough: a wrong app code is refused, the right one lets them in.
     await signIn(staff, adminEmail, "e2e-admin-password-2");
+    await staff.getByLabel("Code", { exact: true }).fill("000000");
+    await staff.getByRole("button", { name: "Confirm" }).click();
+    await expect(staff.getByRole("alert")).toContainText("That code is not right.");
+    await signInStaff(staff, adminEmail, "e2e-admin-password-2");
     await expect(staff).toHaveURL(/\/admin$/);
 
     // Switched off: locked out at once, even though their browser still holds a session.
@@ -589,8 +604,17 @@ test.describe.serial("staff dashboard", () => {
 
     await person.getByRole("button", { name: "Switch on" }).click();
     await expect(person).toContainText("Can sign in");
-    await signIn(staff, adminEmail, "e2e-admin-password-2");
+    await signInStaff(staff, adminEmail, "e2e-admin-password-2");
     await expect(staff).toHaveURL(/\/admin$/);
+
+    // Lost phone: the owner resets two-step sign-in; the admin is signed out and pairs again.
+    await person.getByRole("button", { name: "Reset two-step" }).click();
+    await person.getByRole("button", { name: "Yes, reset" }).click();
+    await expect(person).toContainText("Two-step sign-in: not set up yet");
+    await staff.goto("/admin");
+    await expect(staff).toHaveURL(/\/sign-in/);
+    await signInStaff(staff, adminEmail, "e2e-admin-password-2");
+    await expect(staff.getByRole("navigation", { name: "Dashboard" })).toBeVisible();
     await staff.context().close();
   });
 

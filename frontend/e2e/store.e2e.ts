@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { signInStaff } from "./helpers";
 
 const PRODUCT = "/product/demo-harbour-stand-collar-jacket"; // local demo data: EGP 2,450
 const OWNER_EMAIL = process.env.E2E_OWNER_EMAIL ?? "owner@lupin.local";
@@ -65,10 +66,7 @@ test.describe.serial("buying and fulfilling an order", () => {
     test.skip(!reference, "The customer test did not produce an order.");
     await skipIntro(page);
 
-    await page.goto(`/sign-in?next=/admin/orders/${reference}`);
-    await page.getByLabel("Email").fill(OWNER_EMAIL);
-    await page.getByLabel("Password").fill(ownerPassword);
-    await page.locator("form button[type=submit]").click();
+    await signInStaff(page, OWNER_EMAIL, ownerPassword, `/admin/orders/${reference}`);
 
     await expect(page.getByRole("heading", { name: reference })).toBeVisible();
     await page.getByRole("button", { name: "Confirm order" }).click();

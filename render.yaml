@@ -35,6 +35,9 @@ services:
       # service's Environment page in Render.
       - key: LUPIN_EDGE_SECRET
         generateValue: true
+      # Encrypts staff authenticator-app keys in the database. Never change it once staff have paired.
+      - key: LUPIN_MFA_SECRET
+        generateValue: true
       # Bosta sends delivery updates with this value in a header; the app checks it. Never shared.
       - key: BOSTA_WEBHOOK_SECRET
         generateValue: true

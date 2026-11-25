@@ -40,7 +40,8 @@ public class LocalDevServer {
                 "--lupin.security.jwt-secret=" + Base64.getEncoder().encodeToString(key),
                 "--lupin.bootstrap.owner-email=" + LOCAL_OWNER_EMAIL,
                 "--lupin.bootstrap.owner-password=" + localOwnerPassword(),
-                "--lupin.security.edge-secret=" + localEdgeSecret());
+                "--lupin.security.edge-secret=" + localEdgeSecret(),
+                "--lupin.security.mfa-secret=" + localSecret(".local-mfa-secret", 36));
     }
 
     /**
@@ -66,11 +67,19 @@ public class LocalDevServer {
      * machine on first run and kept in the git-ignored file backend/.local-owner-password.
      */
     private static String localOwnerPassword() throws java.io.IOException {
-        Path file = Path.of(".local-owner-password").toAbsolutePath();
+        return localSecret(".local-owner-password", 18);
+    }
+
+    /**
+     * A random value made on this machine on first run and kept in a git-ignored file, so it stays the
+     * same across restarts (the authenticator-app keys of the local staff stay readable).
+     */
+    private static String localSecret(String fileName, int randomBytes) throws java.io.IOException {
+        Path file = Path.of(fileName).toAbsolutePath();
         if (java.nio.file.Files.exists(file)) {
             return java.nio.file.Files.readString(file).trim();
         }
-        byte[] random = new byte[18];
+        byte[] random = new byte[randomBytes];
         new SecureRandom().nextBytes(random);
         String password = Base64.getUrlEncoder().withoutPadding().encodeToString(random);
         java.nio.file.Files.writeString(file, password);

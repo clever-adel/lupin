@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { OWNER_EMAIL, signInStaff } from "./helpers";
 
 const PASSWORD_FILE = "../backend/.local-owner-password";
 const ownerPassword =
@@ -149,14 +150,11 @@ test("signed-in customer pages have no automatic accessibility violations", asyn
 test("staff dashboard pages have no automatic accessibility violations", async ({ page }) => {
   test.skip(!ownerPassword, "No local owner password.");
   await skipIntro(page);
-  await page.goto("/sign-in?next=/admin");
-  await page.getByLabel("Email").fill(process.env.E2E_OWNER_EMAIL ?? "owner@lupin.local");
-  await page.getByLabel("Password").fill(ownerPassword);
-  await page.locator("form button[type=submit]").click();
+  await signInStaff(page, OWNER_EMAIL, ownerPassword, "/admin");
   await expect(page.getByRole("heading", { name: "Orders" })).toBeVisible();
 
   const problems: string[] = [];
-  for (const path of ["/admin", "/admin/transfers", "/admin/shop", "/admin/shop?tab=return", "/admin/shop?tab=receipts", "/admin/customers", "/admin/products", "/admin/products/new", "/admin/promotions", "/admin/content", "/admin/settings", "/admin/staff"]) {
+  for (const path of ["/admin", "/admin/transfers", "/admin/shop", "/admin/shop?tab=return", "/admin/shop?tab=receipts", "/admin/customers", "/admin/products", "/admin/products/new", "/admin/promotions", "/admin/content", "/admin/settings", "/admin/staff", "/admin/security"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

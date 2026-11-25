@@ -328,6 +328,11 @@ export interface Me {
   roles: string[];
   emailVerified: boolean;
   preferredLang: Lang;
+  /**
+   * Staff only: two-step sign-in. ON = this sign-in passed the app code; SETUP = not switched on yet
+   * (the dashboard asks for it); SIGN_IN_AGAIN = switched on, but this sign-in is older than that.
+   */
+  twoFactor?: "ON" | "SETUP" | "SIGN_IN_AGAIN";
 }
 
 // Mirrors store.lupinwear.look.LookDtos (public read models).

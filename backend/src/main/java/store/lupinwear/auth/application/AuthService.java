@@ -11,6 +11,7 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,7 @@ import store.lupinwear.auth.domain.User;
 import store.lupinwear.auth.infra.AuthSessionRepository;
 import store.lupinwear.auth.infra.RoleRepository;
 import store.lupinwear.auth.infra.UserRepository;
+import store.lupinwear.auth.mfa.TwoFactorService;
 import store.lupinwear.security.JwtService;
 import store.lupinwear.security.RateLimiter;
 import store.lupinwear.security.SecurityProperties;
@@ -34,7 +36,12 @@ public class AuthService {
     private static final Duration ROTATION_GRACE = Duration.ofSeconds(10);
     private static final Duration MAX_LOCKOUT = Duration.ofHours(24);
 
-    public record Tokens(User user, String accessToken, String refreshToken) {
+    /** {@code family} is the sign-in these tokens belong to; {@code twoStep} whether it passed the app code. */
+    public record Tokens(User user, String accessToken, String refreshToken, UUID family, boolean twoStep) {
+    }
+
+    /** Either a session, or (staff with two-step sign-in on) a short challenge to be answered with the app code. */
+    public record LoginResult(Tokens tokens, String mfaChallenge) {
     }
 
     public record ClientInfo(String ip, String userAgent) {
@@ -48,13 +55,14 @@ public class AuthService {
     private final RateLimiter rateLimiter;
     private final SecurityProperties props;
     private final Clock clock;
+    private final TwoFactorService twoFactor;
     private final SecureRandom random = new SecureRandom();
     /** Verified against when the email is unknown, so both paths cost the same time. */
     private final String dummyHash;
 
     public AuthService(UserRepository users, RoleRepository roles, AuthSessionRepository sessions,
             PasswordEncoder passwords, JwtService jwt, RateLimiter rateLimiter, SecurityProperties props,
-            Clock clock) {
+            Clock clock, TwoFactorService twoFactor) {
         this.users = users;
         this.roles = roles;
         this.sessions = sessions;
@@ -63,6 +71,7 @@ public class AuthService {
         this.rateLimiter = rateLimiter;
         this.props = props;
         this.clock = clock;
+        this.twoFactor = twoFactor;
         this.dummyHash = passwords.encode(UUID.randomUUID().toString());
     }
 
@@ -84,12 +93,12 @@ public class AuthService {
                 req.lang() == null ? "en" : req.lang());
         user.grant(role(Role.CUSTOMER));
         users.save(user);
-        return startSession(user, UUID.randomUUID(), client);
+        return startSession(user, UUID.randomUUID(), client, null);
     }
 
     /** Failed attempts must be persisted even though the call ends in an exception. */
     @Transactional(noRollbackFor = ApiException.class)
-    public Tokens login(LoginRequest req, ClientInfo client) {
+    public LoginResult login(LoginRequest req, ClientInfo client) {
         String email = normalizeEmail(req.email());
         rateLimiter.check("login:ip:" + client.ip(), 30);
         rateLimiter.check("login:id:" + email, 10);
@@ -106,17 +115,51 @@ public class AuthService {
             throw invalidCredentials();
         }
         if (!passwords.matches(req.password(), user.getPasswordHash())) {
-            users.incrementFailedLogins(user.getId());
-            User fresh = users.findById(user.getId()).orElseThrow();
-            int over = fresh.getFailedLoginCount() - props.maxFailedLogins();
-            if (over >= 0) {
-                Duration lock = props.lockoutBase().multipliedBy(1L << Math.min(over, 10));
-                fresh.lockUntil(now.plus(lock.compareTo(MAX_LOCKOUT) > 0 ? MAX_LOCKOUT : lock));
-            }
+            recordFailure(user, now);
             throw invalidCredentials();
         }
+        if (TwoFactorService.isStaff(user.roleCodes()) && twoFactor.enabled(user.getId())) {
+            // Half way: the failure count is not cleared until the app code is right too, so a stolen
+            // password does not buy unlimited guesses at the code.
+            return new LoginResult(null, jwt.issueMfaChallenge(user.getId()));
+        }
         user.recordSuccessfulLogin(now);
-        return startSession(user, UUID.randomUUID(), client);
+        return new LoginResult(startSession(user, UUID.randomUUID(), client, null), null);
+    }
+
+    /**
+     * The second step for staff: the challenge from {@link #login} plus a code from the authenticator app
+     * (or a recovery code). Wrong codes count towards the same lockout as wrong passwords.
+     */
+    @Transactional(noRollbackFor = ApiException.class)
+    public Tokens completeTwoStep(String challenge, String code, ClientInfo client) {
+        UUID userId = jwt.parseMfaChallenge(challenge).orElseThrow(() -> ApiException.unauthorized(
+                "MFA_CHALLENGE_EXPIRED", "That took too long. Sign in again with your password."));
+        rateLimiter.check("mfa:ip:" + client.ip(), 30);
+        rateLimiter.check("mfa:id:" + userId, 10);
+        Instant now = clock.instant();
+        User user = users.findById(userId).filter(User::canSignIn).orElseThrow(AuthService::sessionExpired);
+        if (user.isLocked(now)) {
+            throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS",
+                    "Too many wrong attempts. Please wait a while and sign in again.");
+        }
+        if (!twoFactor.checkSignInCode(userId, code)) {
+            recordFailure(user, now);
+            throw ApiException.unauthorized("MFA_CODE_WRONG", "That code is not right. Use the newest code in the app.");
+        }
+        user.recordSuccessfulLogin(now);
+        users.save(user);
+        return startSession(user, UUID.randomUUID(), client, now);
+    }
+
+    private void recordFailure(User user, Instant now) {
+        users.incrementFailedLogins(user.getId());
+        User fresh = users.findById(user.getId()).orElseThrow();
+        int over = fresh.getFailedLoginCount() - props.maxFailedLogins();
+        if (over >= 0) {
+            Duration lock = props.lockoutBase().multipliedBy(1L << Math.min(over, 10));
+            fresh.lockUntil(now.plus(lock.compareTo(MAX_LOCKOUT) > 0 ? MAX_LOCKOUT : lock));
+        }
     }
 
     @Transactional(noRollbackFor = ApiException.class)
@@ -135,7 +178,8 @@ public class AuthService {
             throw sessionExpired();
         }
         User user = users.findById(session.getUserId()).filter(User::canSignIn).orElseThrow(AuthService::sessionExpired);
-        return startSession(user, session.getFamilyId(), client);
+        // The new token belongs to the same sign-in, so it keeps that sign-in's two-step proof.
+        return startSession(user, session.getFamilyId(), client, session.getMfaAt());
     }
 
     @Transactional
@@ -214,18 +258,19 @@ public class AuthService {
     public Tokens signInVerified(User user, ClientInfo client) {
         user.recordSuccessfulLogin(clock.instant());
         users.save(user);
-        return startSession(user, UUID.randomUUID(), client);
+        return startSession(user, UUID.randomUUID(), client, null);
     }
 
-    private Tokens startSession(User user, UUID familyId, ClientInfo client) {
+    private Tokens startSession(User user, UUID familyId, ClientInfo client, Instant mfaAt) {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
         String refresh = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         String agent = client.userAgent() == null ? null
                 : client.userAgent().substring(0, Math.min(300, client.userAgent().length()));
         sessions.save(new AuthSession(user.getId(), familyId, sha256(refresh),
-                clock.instant().plus(props.refreshTokenTtl()), agent, client.ip()));
-        return new Tokens(user, jwt.issueAccessToken(user.getId(), user.roleCodes()), refresh);
+                clock.instant().plus(props.refreshTokenTtl()), agent, client.ip(), mfaAt));
+        return new Tokens(user, jwt.issueAccessToken(user.getId(), user.roleCodes(), familyId), refresh, familyId,
+                mfaAt != null);
     }
 
     private Role role(String code) {

@@ -19,7 +19,9 @@ public record SecurityProperties(
         @Min(3) int maxFailedLogins,
         @NotNull Duration lockoutBase,
         /** Shared with the storefront Worker. Empty only on a developer's machine and in tests. */
-        String edgeSecret) {
+        String edgeSecret,
+        /** Encrypts staff authenticator-app keys at rest. Optional: falls back to a key derived from jwtSecret. */
+        String mfaSecret) {
 
     public SecurityProperties {
         allowedOrigins = allowedOrigins == null ? List.of()

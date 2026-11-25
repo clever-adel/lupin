@@ -92,9 +92,13 @@ async function authorizeAdmin(request: Request, env: Env, { read = false } = {})
   try {
     const response = await fetch(new URL("/api/v1/auth/me", env.API_ORIGIN), { headers, redirect: "manual" });
     if (!response.ok) return Response.json({ message: "Please sign in again." }, { status: 401 });
-    const user = await response.json() as { roles?: string[] };
+    const user = await response.json() as { roles?: string[]; twoFactor?: string };
     if (!user.roles?.some((role) => role === "ADMIN" || role === "OWNER")) {
       return Response.json({ message: "You are not allowed to manage product photos." }, { status: 403 });
+    }
+    // Same rule as the dashboard API: staff sign-ins count only after the authenticator-app code.
+    if (user.twoFactor !== "ON") {
+      return Response.json({ message: "Confirm your sign-in with the code from your authenticator app." }, { status: 403 });
     }
     return null;
   } catch {

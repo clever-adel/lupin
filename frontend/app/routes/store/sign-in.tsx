@@ -1,12 +1,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/sign-in";
 import { LogoLockup } from "~/components/brand";
 import { Field } from "~/components/form";
 import { registerSchema, signInSchema, type RegisterValues, type SignInValues } from "~/features/auth/schemas";
-import { useMe, useRegister, useSignIn } from "~/features/auth/session";
+import { needsTwoStep, useMe, useRegister, useSignIn, useVerifyTwoStep } from "~/features/auth/session";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "~/lib/http";
 import { toLang, translate, useT, type MessageKey } from "~/lib/i18n";
@@ -41,6 +41,59 @@ function GoogleMark() {
       <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
       <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
     </svg>
+  );
+}
+
+/**
+ * Staff with two-step sign-in: the password was right, now the code from the authenticator app (or a
+ * recovery code). On success the signed-in profile is cached and the page's redirect takes over.
+ */
+function TwoStepForm({ onBack }: { onBack: () => void }) {
+  const { t } = useT();
+  const verify = useVerifyTwoStep();
+  const [code, setCode] = useState("");
+  const id = useId();
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => ref.current?.focus(), []);
+  const failure = verify.error instanceof ApiError ? verify.error.message || t("error.generic") : verify.isError ? t("error.generic") : null;
+  // The challenge lasts five minutes; after that only a fresh password helps.
+  const expired = verify.error instanceof ApiError && verify.error.code === "MFA_CHALLENGE_EXPIRED";
+
+  return (
+    <form
+      noValidate
+      className="mt-6 space-y-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (code.trim()) verify.mutate(code.trim());
+      }}
+    >
+      <h2 className="text-lg font-semibold">{t("auth.twoStep.title")}</h2>
+      <p className="text-sm text-stone">{t("auth.twoStep.intro")}</p>
+      {failure && <p role="alert" className="border border-danger px-3 py-2 text-sm text-danger">{failure}</p>}
+      <div>
+        <label htmlFor={id} className="mb-1.5 block text-sm font-medium">{t("auth.twoStep.code")}</label>
+        <input
+          ref={ref}
+          id={id}
+          dir="ltr"
+          autoComplete="one-time-code"
+          maxLength={20}
+          className="field text-center text-lg tracking-[0.3em]"
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+        />
+        <p className="mt-1 text-xs text-stone">{t("auth.twoStep.recovery")}</p>
+      </div>
+      {!expired && (
+        <button type="submit" className="btn btn-primary w-full" disabled={verify.isPending || !code.trim()}>
+          {verify.isPending ? t("auth.working") : t("auth.twoStep.submit")}
+        </button>
+      )}
+      <button type="button" className={`${expired ? "btn btn-primary" : "btn btn-outline"} w-full`} onClick={onBack}>
+        {t("auth.twoStep.back")}
+      </button>
+    </form>
   );
 }
 
@@ -145,7 +198,9 @@ export default function SignIn() {
             <p role="alert" className="mt-6 border border-danger px-3 py-2 text-sm text-danger">{formError}</p>
           )}
 
-          {mode === "signin" ? (
+          {mode === "signin" && needsTwoStep(signIn.data) ? (
+            <TwoStepForm onBack={() => { signIn.reset(); signInForm.setValue("password", ""); }} />
+          ) : mode === "signin" ? (
             <form noValidate className="mt-6 space-y-4" onSubmit={signInForm.handleSubmit((values) => signIn.mutate(values))}>
               <Field label={t("auth.email")} type="email" autoComplete="email" error={signInForm.formState.errors.email} registration={signInForm.register("email")} />
               <div>

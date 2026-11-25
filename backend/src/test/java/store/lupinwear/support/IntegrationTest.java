@@ -379,12 +379,63 @@ public abstract class IntegrationTest {
         return mvc.perform(jsonPost("/api/v1/auth/login", new LoginBody(email, password))).andReturn();
     }
 
-    /** Signs in a fresh staff member and returns their access cookie. */
+    /**
+     * Signs in a fresh staff member, switches on two-step sign-in for them (the dashboard API needs it),
+     * and returns their access cookie.
+     */
     protected Cookie staffCookie(String role) throws Exception {
         String email = uniqueEmail();
         authService.createStaff(email, "staff-" + PASSWORD_OK, "Test Staff", role);
         MvcResult result = login(email, "staff-" + PASSWORD_OK);
-        return cookie(result, AuthCookies.ACCESS);
+        Cookie access = cookie(result, AuthCookies.ACCESS);
+        enableTwoFactor(access);
+        return access;
+    }
+
+    /** Pairs an authenticator app for the signed-in staff member. Returns the app's key (raw bytes). */
+    protected byte[] enableTwoFactor(Cookie access) throws Exception {
+        MvcResult setup = mvc.perform(post("/api/v1/auth/mfa/setup").with(csrf()).cookie(access))
+                .andExpect(status().isOk()).andReturn();
+        byte[] secret = base32(body(setup).get("secret").asText());
+        mvc.perform(jsonPost("/api/v1/auth/mfa/enable", new CodeBody(appCode(secret))).cookie(access))
+                .andExpect(status().isOk());
+        return secret;
+    }
+
+    /**
+     * Both sign-in steps for staff who have two-step sign-in on. Moves the clock to the next 30-second
+     * step first, because a code that was already accepted is never accepted again.
+     */
+    protected MvcResult signInWithCode(String email, String password, byte[] secret) throws Exception {
+        MvcResult first = login(email, password);
+        if (!body(first).path("mfaRequired").asBoolean()) {
+            throw new AssertionError("Expected the app code to be asked for: " + first.getResponse().getContentAsString());
+        }
+        clock.advance(Duration.ofSeconds(store.lupinwear.auth.mfa.Totp.PERIOD_SECONDS));
+        return mvc.perform(jsonPost("/api/v1/auth/mfa/verify", new CodeBody(appCode(secret)))
+                        .cookie(cookie(first, AuthCookies.MFA)))
+                .andExpect(status().isOk()).andReturn();
+    }
+
+    /** The code the authenticator app shows right now (by the test clock). */
+    protected String appCode(byte[] secret) {
+        return store.lupinwear.auth.mfa.Totp.code(secret, store.lupinwear.auth.mfa.Totp.step(clock.instant()));
+    }
+
+    protected static byte[] base32(String text) {
+        String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        int buffer = 0;
+        int bits = 0;
+        for (char c : text.toCharArray()) {
+            buffer = (buffer << 5) | alphabet.indexOf(c);
+            bits += 5;
+            if (bits >= 8) {
+                out.write((buffer >> (bits - 8)) & 0xff);
+                bits -= 8;
+            }
+        }
+        return out.toByteArray();
     }
 
     protected Cookie ownerCookie() throws Exception {
@@ -405,5 +456,8 @@ public abstract class IntegrationTest {
     }
 
     public record LoginBody(String email, String password) {
+    }
+
+    public record CodeBody(String code) {
     }
 }

@@ -17,6 +17,9 @@ public class AuthCookies {
     public static final String REFRESH = "lw_rt";
     /** The refresh token is only ever sent to the auth endpoints. */
     private static final String REFRESH_PATH = "/api/v1/auth";
+    /** "Password was right; the app code comes next." Only sent to the two-step endpoints, for five minutes. */
+    public static final String MFA = "lw_mfa";
+    private static final String MFA_PATH = "/api/v1/auth/mfa";
 
     private final SecurityProperties props;
 
@@ -40,6 +43,14 @@ public class AuthCookies {
         add(response, ACCESS, "", "/", Duration.ZERO);
         add(response, REFRESH, "", REFRESH_PATH, Duration.ZERO);
         hint(response, "", Duration.ZERO);
+    }
+
+    public void writeMfaChallenge(HttpServletResponse response, String challenge) {
+        add(response, MFA, challenge, MFA_PATH, Duration.ofMinutes(5));
+    }
+
+    public void clearMfaChallenge(HttpServletResponse response) {
+        add(response, MFA, "", MFA_PATH, Duration.ZERO);
     }
 
     private void hint(HttpServletResponse response, String value, Duration maxAge) {

@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { Link, NavLink, Outlet } from "react-router";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useRequireSignIn, useSignOut } from "~/features/auth/session";
 import { NewOrderBanner, OrderAlertToggle, useNewOrderAlerts } from "~/features/admin/order-alerts";
 import type { Summary } from "~/features/admin/shared";
+import { TwoFactorSetup } from "~/features/admin/two-factor";
 import { api, ApiError } from "~/lib/http";
 
 export function meta() {
@@ -32,11 +33,14 @@ export default function AdminLayout() {
   const me = useRequireSignIn("/sign-in");
   const signOut = useSignOut();
   const isStaff = Boolean(me.data?.roles.some((r) => r === "ADMIN" || r === "OWNER"));
+  // Staff pages need two-step sign-in; the server refuses them (MFA_REQUIRED) until it is done.
+  const twoStepDone = isStaff && me.data?.twoFactor === "ON";
+  const navigate = useNavigate();
 
   const summary = useQuery({
     queryKey: ["admin", "summary"],
     queryFn: () => api<Summary>("GET", "/api/v1/admin/summary"),
-    enabled: isStaff,
+    enabled: twoStepDone,
     // Often enough that a new order rings within half a minute, also in a background tab.
     refetchInterval: 20_000,
     refetchIntervalInBackground: true,
@@ -47,10 +51,23 @@ export default function AdminLayout() {
   // The server ended this session (password reset, switched off, signed out elsewhere): the failed
   // refresh has already cleared the cookies, so asking "who am I" again sends the visitor to sign in.
   const client = useQueryClient();
-  const ended = summary.error instanceof ApiError && summary.error.status === 401;
+  // Same when the server says this sign-in has not passed the app code (for example, it was reset).
+  const ended = summary.error instanceof ApiError
+    && (summary.error.status === 401 || summary.error.code === "MFA_REQUIRED");
   useEffect(() => {
     if (ended) client.invalidateQueries({ queryKey: ["me"] });
   }, [ended, client]);
+
+  // This sign-in no longer counts for the dashboard (its sessions were ended, for example by a password
+  // reset, or it predates two-step sign-in): sign out and go to the sign-in page, as when a session ends.
+  const signInAgain = isStaff && me.data?.twoFactor === "SIGN_IN_AGAIN";
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (!signInAgain) return;
+    signOut.mutate(undefined, {
+      onSettled: () => navigate(`/sign-in?next=${encodeURIComponent(pathname)}`, { replace: true }),
+    });
+  }, [signInAgain]); // once, when it is noticed
 
   if (me.isError) {
     return <p className="p-10 text-danger" role="alert">Something went wrong. Reload the page.</p>;
@@ -67,6 +84,27 @@ export default function AdminLayout() {
           <Link to="/" className="btn btn-primary mt-6">Back to the store</Link>
         </div>
       </main>
+    );
+  }
+
+  if (me.data.twoFactor !== "ON") {
+    const again = me.data.twoFactor === "SIGN_IN_AGAIN";
+    return (
+      <div className="min-h-dvh bg-paper">
+        <header className="bg-ink text-bone">
+          <div className="shell flex items-center justify-between gap-6 py-3">
+            <img src="/brand/lupin-mark.png" alt="LUPIN." width={396} height={251} className="h-6 w-auto" />
+            <button type="button" className="cursor-pointer text-xs text-bone/70 underline" onClick={() => signOut.mutate()}>Sign out</button>
+          </div>
+        </header>
+        <main className="shell py-8">
+          {again ? (
+            <p className="text-sm text-stone" aria-busy="true">Your session has ended. Taking you to sign in…</p>
+          ) : (
+            <TwoFactorSetup />
+          )}
+        </main>
+      </div>
     );
   }
 
@@ -87,6 +125,7 @@ export default function AdminLayout() {
             <span>{me.data.fullName} · {me.data.roles.includes("OWNER") ? "Owner" : "Admin"}</span>
             <OrderAlertToggle on={alerts.on} enable={alerts.enable} disable={alerts.disable} />
             <Link to="/account" className="underline">My password</Link>
+            <Link to="/admin/security" className="underline">Two-step</Link>
             <Link to="/" className="underline">Store</Link>
             <button type="button" className="cursor-pointer underline" onClick={() => signOut.mutate()}>Sign out</button>
           </div>

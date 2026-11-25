@@ -20,6 +20,7 @@ export default [
     route("content", "routes/admin/content.tsx"),
     route("staff", "routes/admin/staff.tsx"),
     route("settings", "routes/admin/settings.tsx"),
+    route("security", "routes/admin/security.tsx"),
   ]),
   route(":lang?", "routes/store/layout.tsx", [
     index("routes/store/home.tsx"),
