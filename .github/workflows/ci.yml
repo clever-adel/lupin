@@ -27,7 +27,7 @@ jobs:
           cache: maven
       # Docker is available on the runner, so the integration tests use Testcontainers PostgreSQL.
       - run: ./mvnw -B -ntp verify
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: backend-test-reports
