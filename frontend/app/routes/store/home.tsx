@@ -6,7 +6,7 @@ import { LookLineup } from "~/components/look";
 import { ProductGrid, ProductPhoto } from "~/components/product";
 import { apiGet } from "~/lib/api.server";
 import { toLang, translate, useT } from "~/lib/i18n";
-import { absoluteUrl, DEFAULT_SHARE_IMAGE, layoutOrigin, seo } from "~/lib/seo";
+import { absoluteUrl, DEFAULT_SHARE_IMAGE, layoutOrigin, RETURN_POLICY, seo } from "~/lib/seo";
 import type { LookCard, LookDetail, Page, ProductCard, SiteContent } from "~/lib/types";
 
 export async function loader({ context }: Route.LoaderArgs) {
@@ -54,6 +54,18 @@ export function meta({ params, matches, location }: Route.MetaArgs) {
             url: `${origin}/`,
             logo: absoluteUrl(origin, DEFAULT_SHARE_IMAGE),
             ...(profiles.length ? { sameAs: profiles } : {}),
+            ...(site?.contact.email ? { email: site.contact.email } : {}),
+            ...(site?.contact.phone ? {
+              contactPoint: {
+                "@type": "ContactPoint",
+                contactType: "customer service",
+                telephone: site.contact.phone.startsWith("0") ? `+20${site.contact.phone.slice(1)}` : site.contact.phone,
+                ...(site.contact.email ? { email: site.contact.email } : {}),
+                areaServed: "EG",
+                availableLanguage: ["en", "ar"],
+              },
+            } : {}),
+            hasMerchantReturnPolicy: RETURN_POLICY,
           },
           {
             "@type": "WebSite",

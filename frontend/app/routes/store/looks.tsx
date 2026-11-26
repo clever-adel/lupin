@@ -15,7 +15,7 @@ export function meta({ params, matches, location }: Route.MetaArgs) {
   return seo({
     origin: layoutOrigin(matches),
     pathname: location.pathname,
-    title: translate(lang, "look.indexTitle"),
+    title: translate(lang, "seo.looks.title"),
     description: translate(lang, "look.indexText"),
   });
 }
