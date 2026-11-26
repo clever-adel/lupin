@@ -84,7 +84,10 @@ test("the WhatsApp button and the footer address come from the dashboard", async
 
   await page.setViewportSize({ width: 375, height: 800 });
   await expect(button).toBeInViewport();
-  // Not on checkout, where it would sit over the form.
+  // Not on the bag, checkout or an order, where it would sit over the totals.
+  await page.goto("/bag");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ask us on WhatsApp" })).toHaveCount(0);
   await page.goto("/checkout");
   await expect(page.getByRole("link", { name: "Ask us on WhatsApp" })).toHaveCount(0);
   await setContact(page, "", "");

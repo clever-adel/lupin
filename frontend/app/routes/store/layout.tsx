@@ -11,6 +11,7 @@ import { useBag, useBagSync } from "~/features/bag/useBag";
 import { apiGet, siteOrigin } from "~/lib/api.server";
 import { switchLangPath, useT } from "~/lib/i18n";
 import { startPixel, track } from "~/lib/pixel";
+import { whatsappLink } from "~/lib/whatsapp";
 import type { Department, SiteContent } from "~/lib/types";
 
 export async function loader({ params, context }: Route.LoaderArgs) {
@@ -224,14 +225,6 @@ function Footer({ departments, site }: { departments: Department[]; site: SiteCo
   );
 }
 
-/** An Egyptian mobile (01xxxxxxxxx, +201…, 00201…) as wa.me wants it: digits with the country code. */
-export function whatsappDigits(raw: string): string | null {
-  let digits = raw.replace(/\D/g, "");
-  if (digits.startsWith("00")) digits = digits.slice(2);
-  if (/^01[0125]\d{8}$/.test(digits)) digits = "2" + digits;
-  return /^201[0125]\d{8}$/.test(digits) ? digits : null;
-}
-
 function WhatsAppIcon() {
   return (
     <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" fill="currentColor">
@@ -240,22 +233,26 @@ function WhatsAppIcon() {
   );
 }
 
+/** Pages that show money totals at the bottom on phones, where the floating button would cover them. */
+const NO_FLOATING_WHATSAPP = /\/(checkout|bag|orders\/)/;
+
 /**
- * "Ask us on WhatsApp", on every store page: shoppers ask about sizes before they order. Uses the
- * WhatsApp number from the dashboard, or the contact phone when none is set; hidden when neither is a mobile.
+ * "Ask us on WhatsApp", on store pages: shoppers ask about sizes before they order. Uses the WhatsApp
+ * number from the dashboard, or the contact phone when none is set; hidden when neither is a mobile.
+ * Not on the bag, checkout or an order (the order page has its own WhatsApp line instead).
  */
 function WhatsAppButton({ site, origin }: { site: SiteContent; origin: string }) {
   const { t } = useT();
   const { pathname } = useLocation();
-  const digits = whatsappDigits(site.contact.whatsappNumber || site.contact.phone || "");
-  if (!digits || pathname.includes("/checkout")) return null;
   const onProduct = pathname.includes("/product/");
   const text = onProduct
     ? t("whatsapp.aboutProduct", { url: origin + pathname })
     : t("whatsapp.hello");
+  const link = whatsappLink(site, text);
+  if (!link || NO_FLOATING_WHATSAPP.test(pathname)) return null;
   return (
     <a
-      href={`https://wa.me/${digits}?text=${encodeURIComponent(text)}`}
+      href={link}
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => track("Contact")}

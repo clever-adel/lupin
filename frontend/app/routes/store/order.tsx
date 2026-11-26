@@ -6,9 +6,10 @@ import { ProductPhoto } from "~/components/product";
 import { useRequireSignIn } from "~/features/auth/session";
 import { api, ApiError } from "~/lib/http";
 import { toLang, translate, useT, type MessageKey } from "~/lib/i18n";
-import { trackPurchaseOnce } from "~/lib/pixel";
+import { track, trackPurchaseOnce } from "~/lib/pixel";
 import { layoutOrigin, seo } from "~/lib/seo";
 import type { Order, PaymentMethod, SiteContent } from "~/lib/types";
+import { whatsappLink } from "~/lib/whatsapp";
 
 export function meta({ params, matches, location }: Route.MetaArgs) {
   const title = translate(toLang(params.lang), "order.title", { reference: params.reference ?? "" });
@@ -339,6 +340,14 @@ export default function OrderPage() {
       returned && query.state.data?.status === "AWAITING_PAYMENT" && query.state.dataUpdateCount < 40 ? 3000 : false,
   });
 
+  // The floating WhatsApp button is hidden here (it covered the totals on phones); this line takes its place.
+  const site = useQuery({
+    queryKey: ["site"],
+    queryFn: () => api<SiteContent>("GET", "/api/v1/content/site"),
+    staleTime: 300_000,
+  });
+  const chat = whatsappLink(site.data, t("whatsapp.aboutOrder", { reference }));
+
   const placedNow = search.get("placed") === "1";
   const placed = order.data;
   useEffect(() => {
@@ -422,6 +431,14 @@ export default function OrderPage() {
               </button>
             ))}
         </div>
+      )}
+
+      {chat && (
+        <p className="mt-6 text-sm">
+          <a href={chat} target="_blank" rel="noopener noreferrer" onClick={() => track("Contact")} className="underline underline-offset-4">
+            {t("order.whatsappHelp")}
+          </a>
+        </p>
       )}
 
       <section className="mt-10" aria-labelledby="items-title">
