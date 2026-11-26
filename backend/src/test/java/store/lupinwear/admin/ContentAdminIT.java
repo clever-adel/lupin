@@ -94,6 +94,26 @@ class ContentAdminIT extends IntegrationTest {
     }
 
     @Test
+    void theAddressAndWhatsAppNumberReachTheStoreAndAWrongNumberIsRefused() throws Exception {
+        mvc.perform(put("/api/v1/admin/settings/contact").with(csrf()).cookie(admin)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"whatsappNumber\":\"12345\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_SETTING"));
+        mvc.perform(put("/api/v1/admin/settings/contact").with(csrf()).cookie(admin)
+                .contentType(MediaType.APPLICATION_JSON).content("""
+                        {"whatsappNumber":"+20 102 208 8004","addressEn":"12 Example St, Nasr City, Cairo",
+                         "addressAr":"١٢ شارع المثال، مدينة نصر، القاهرة"}"""))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/content/site"))
+                .andExpect(jsonPath("$.contact.whatsappNumber").value("+20 102 208 8004"))
+                .andExpect(jsonPath("$.contact.addressEn").value("12 Example St, Nasr City, Cairo"))
+                .andExpect(jsonPath("$.contact.addressAr").value("١٢ شارع المثال، مدينة نصر، القاهرة"));
+        mvc.perform(put("/api/v1/admin/settings/contact").with(csrf()).cookie(admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"whatsappNumber\":\"\",\"addressEn\":\"\",\"addressAr\":\"\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void staffCanSetAndClearTheBrand() throws Exception {
         Map<String, Object> body = productUpdate("1000.00", "900.00");
         body.put("brand", "  Bershka ");

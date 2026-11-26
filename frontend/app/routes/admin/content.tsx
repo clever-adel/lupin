@@ -336,6 +336,8 @@ export default function AdminContent() {
             value={settings.data.contact ?? {}}
             fields={[
               ["phone", "Phone"], ["email", "Email"],
+              ["whatsappNumber", "WhatsApp number for the chat button (empty = the phone above)"],
+              ["addressEn", "Address (English), opens in Google Maps"], ["addressAr", "Address (Arabic)", true],
               ["hoursEn", "Working hours (English)"], ["hoursAr", "Working hours (Arabic)", true],
               ["instagram", "Instagram link"], ["facebook", "Facebook link"], ["tiktok", "TikTok link"],
             ]}

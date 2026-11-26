@@ -132,7 +132,10 @@ function Footer({ departments, site }: { departments: Department[]; site: SiteCo
     ["Facebook", social(contact.facebook)],
     ["TikTok", social(contact.tiktok)],
   ].filter((entry): entry is [string, string] => entry[1] !== null);
-  const hasContact = Boolean(contact.email || contact.phone || pick(contact, "hours") || socials.length);
+  // The store's address from the dashboard (Content → Contact details), in the page's language when both
+  // are filled in. Nothing is shown while it is empty.
+  const address = (pick(contact, "address") || contact.addressEn || contact.addressAr || "").trim();
+  const hasContact = Boolean(contact.email || contact.phone || address || pick(contact, "hours") || socials.length);
   return (
     <footer className="mt-24 bg-ink text-bone">
       <div className="shell grid gap-10 py-14 md:grid-cols-[1fr_auto_auto_auto]">
@@ -184,6 +187,25 @@ function Footer({ departments, site }: { departments: Department[]; site: SiteCo
               )}
               {contact.email && (
                 <li><a href={`mailto:${contact.email}`} dir="ltr" className="hover:text-bone">{contact.email}</a></li>
+              )}
+              {address && (
+                <li>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                    className="flex items-start gap-2 hover:text-bone"
+                  >
+                    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 shrink-0">
+                      <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
+                      <circle cx="12" cy="10" r="2.5" />
+                    </svg>
+                    <span className="max-w-56">
+                      {address}
+                      <span className="sr-only"> ({t("footer.map")})</span>
+                    </span>
+                  </a>
+                </li>
               )}
               {pick(contact, "hours") && <li>{pick(contact, "hours")}</li>}
               {socials.map(([name, url]) => (

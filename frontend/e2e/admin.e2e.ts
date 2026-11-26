@@ -216,7 +216,7 @@ test.describe.serial("staff dashboard", () => {
     // Footer contact.
     await page.goto("/admin/content");
     const contact = section(page, "Contact details in the footer");
-    await contact.getByLabel("Phone").fill("01000000000");
+    await contact.getByLabel("Phone", { exact: true }).fill("01000000000");
     await contact.getByLabel("Instagram link").fill("javascript:alert(1)"); // not an https link: must never become a link
     await contact.getByRole("button", { name: "Save" }).click();
     await expect(contact.getByRole("status")).toContainText("Saved.");
@@ -224,7 +224,7 @@ test.describe.serial("staff dashboard", () => {
     await expect(page.locator("footer").getByRole("link", { name: "01000000000" })).toBeVisible();
     await expect(page.locator("footer").getByRole("link", { name: "Instagram" })).toHaveCount(0);
     await page.goto("/admin/content");
-    await contact.getByLabel("Phone").fill("");
+    await contact.getByLabel("Phone", { exact: true }).fill("");
     await contact.getByLabel("Instagram link").fill("");
     await contact.getByRole("button", { name: "Save" }).click();
     await expect(contact.getByRole("status")).toContainText("Saved.");
