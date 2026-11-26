@@ -14,7 +14,8 @@ import { track } from "~/lib/pixel";
 import { layoutOrigin, seo } from "~/lib/seo";
 import type { DeliveryOption, Governorate, Order, PaymentMethod, Quote, SiteContent } from "~/lib/types";
 
-const METHOD_ORDER: PaymentMethod[] = ["CARD", "WALLET", "FAWRY", "INSTAPAY_MANUAL", "VODAFONE_CASH_MANUAL", "COD"];
+// Cash on delivery first, so it is also the one chosen at the start: most shoppers in Egypt pay that way.
+const METHOD_ORDER: PaymentMethod[] = ["COD", "CARD", "WALLET", "FAWRY", "INSTAPAY_MANUAL", "VODAFONE_CASH_MANUAL"];
 
 export function meta({ params, matches, location }: Route.MetaArgs) {
   const title = translate(toLang(params.lang), "checkout.title");
