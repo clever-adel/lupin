@@ -14,6 +14,9 @@ interface SeoInput {
 
 const SITE_NAME = "LUPIN.";
 
+/** The store's Meta (Facebook) app: links shares on Facebook to its insights. Public by design. */
+const FACEBOOK_APP_ID = "1773021700473195";
+
 /** The logo itself (transparent PNG): what search engines show as the brand's logo. */
 export const DEFAULT_SHARE_IMAGE = "/brand/lupin-logo.png";
 
@@ -67,6 +70,7 @@ export function seo({ origin, pathname, title, description, image, type = "websi
     { tagName: "link", rel: "alternate", hrefLang: "en", href: english },
     { tagName: "link", rel: "alternate", hrefLang: "ar", href: arabic },
     { tagName: "link", rel: "alternate", hrefLang: "x-default", href: english },
+    { property: "fb:app_id", content: FACEBOOK_APP_ID },
     { property: "og:site_name", content: SITE_NAME },
     { property: "og:title", content: fullTitle },
     { property: "og:description", content: description },
