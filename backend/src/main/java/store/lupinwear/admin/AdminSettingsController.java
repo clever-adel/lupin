@@ -260,6 +260,19 @@ public class AdminSettingsController {
                 throw ApiException.badRequest("INVALID_SETTING", "Enter the wallet number before switching it on.");
             }
         }
+        if ("contact".equals(key)) {
+            // The number behind the store's WhatsApp button: an Egyptian mobile, with or without +20.
+            String whatsapp = value.path("whatsappNumber").asText("").replaceAll("[\\s()+-]", "");
+            if (whatsapp.startsWith("0020")) {
+                whatsapp = whatsapp.substring(3);
+            } else if (whatsapp.startsWith("20")) {
+                whatsapp = whatsapp.substring(1);
+            }
+            if (!whatsapp.isEmpty() && !whatsapp.matches("01[0125]\\d{8}")) {
+                throw ApiException.badRequest("INVALID_SETTING",
+                        "The WhatsApp number is an Egyptian mobile number of 11 digits, like 01012345678.");
+            }
+        }
         if ("notifications".equals(key)) {
             String email = value.path("orderEmail").asText("").trim();
             if (!email.isEmpty() && !email.matches("[^@\\s]{1,64}@[^@\\s]{1,190}\\.[A-Za-z]{2,24}")) {

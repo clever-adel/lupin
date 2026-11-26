@@ -43,39 +43,49 @@ test("a shopper checks out as a guest and is offered an account afterwards", asy
   await expect(page.getByLabel("Full name")).toBeVisible();
 });
 
-/** Sets the store's WhatsApp number as the owner would in the dashboard (Content → contact). */
-async function setWhatsApp(page: import("@playwright/test").Page, number: string) {
-  await signInAsOwner(page);
-  const status = await page.evaluate(async (value) => {
-    const xsrf = document.cookie.split("; ").find((c) => c.startsWith("XSRF-TOKEN="))?.split("=")[1] ?? "";
-    const res = await fetch("/api/v1/admin/settings/contact", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": decodeURIComponent(xsrf) },
-      body: JSON.stringify({ whatsappNumber: value }),
-    });
-    return res.status;
-  }, number);
-  expect(status).toBe(200);
+/** Fills the WhatsApp number and English address in the dashboard (Content → Contact details), as the owner does. */
+async function setContact(page: import("@playwright/test").Page, whatsapp: string, address: string) {
+  await signInAsOwner(page, "/admin/content");
+  const form = page.locator("form", { has: page.getByLabel("Phone", { exact: true }) });
+  await form.getByLabel("WhatsApp number for the chat button (empty = the phone above)").fill(whatsapp);
+  await form.getByLabel("Address (English), opens in Google Maps").fill(address);
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(form.getByRole("status")).toHaveText(/Saved/);
   await page.context().clearCookies();
 }
 
-test("a WhatsApp button on store pages opens a chat about the piece", async ({ page }) => {
+test("the WhatsApp button and the footer address come from the dashboard", async ({ page }) => {
   test.skip(!ownerPassword, "No local owner password (backend/.local-owner-password or E2E_OWNER_PASSWORD).");
   await skipIntro(page);
   await page.goto(PRODUCT);
-  // Hidden while the store has no mobile number to chat with.
+  // Hidden while the store has no mobile number to chat with, and no address in the footer.
   await expect(page.getByRole("link", { name: "Ask us on WhatsApp" })).toHaveCount(0);
-  await setWhatsApp(page, "01022088004");
+  await expect(page.locator("footer").getByRole("link", { name: /Google Maps/ })).toHaveCount(0);
+
+  // A wrong number is refused with a clear message.
+  await signInAsOwner(page, "/admin/content");
+  const form = page.locator("form", { has: page.getByLabel("Phone", { exact: true }) });
+  await form.getByLabel("WhatsApp number for the chat button (empty = the phone above)").fill("12345");
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(form.getByRole("alert")).toContainText("Egyptian mobile number");
+  await page.context().clearCookies();
+
+  await setContact(page, "+20 102 208 8004", "12 Example St, Nasr City, Cairo");
   await page.goto(PRODUCT);
   const button = page.getByRole("link", { name: "Ask us on WhatsApp" });
   await expect(button).toBeVisible();
   const href = (await button.getAttribute("href")) ?? "";
   expect(href).toMatch(/^https:\/\/wa\.me\/201022088004\?text=/);
   expect(decodeURIComponent(href)).toContain(PRODUCT);
+
+  const map = page.locator("footer").getByRole("link", { name: /12 Example St, Nasr City, Cairo/ });
+  await expect(map).toHaveAttribute("href", "https://www.google.com/maps/search/?api=1&query=12%20Example%20St%2C%20Nasr%20City%2C%20Cairo");
+  await expect(map).toHaveAttribute("target", "_blank");
+
   await page.setViewportSize({ width: 375, height: 800 });
   await expect(button).toBeInViewport();
   // Not on checkout, where it would sit over the form.
   await page.goto("/checkout");
   await expect(page.getByRole("link", { name: "Ask us on WhatsApp" })).toHaveCount(0);
-  await setWhatsApp(page, "");
+  await setContact(page, "", "");
 });
