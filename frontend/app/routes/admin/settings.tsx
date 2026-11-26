@@ -325,6 +325,7 @@ function CheckoutForm({ value, isOwner }: { value: Record<string, unknown>; isOw
   const [threshold, setThreshold] = useState(value.freeDeliveryThreshold == null ? "" : String(value.freeDeliveryThreshold));
   const [undo, setUndo] = useState(String(value.cancelUndoMinutes ?? 30));
   const [unpaid, setUnpaid] = useState(String(value.unpaidOrderMinutes ?? 60));
+  const [codMax, setCodMax] = useState(value.codMaxTotal == null ? "" : String(value.codMaxTotal));
   return (
     <form
       onSubmit={(e) => {
@@ -333,6 +334,7 @@ function CheckoutForm({ value, isOwner }: { value: Record<string, unknown>; isOw
           freeDeliveryThreshold: threshold.trim() === "" ? null : Number(threshold),
           cancelUndoMinutes: Number(undo),
           unpaidOrderMinutes: Number(unpaid),
+          codMaxTotal: codMax.trim() === "" ? null : Number(codMax),
         });
       }}
     >
@@ -348,6 +350,10 @@ function CheckoutForm({ value, isOwner }: { value: Record<string, unknown>; isOw
         <div>
           <label htmlFor="unpaid" className="mb-1 block text-xs font-medium">Minutes before an unpaid online order is cancelled</label>
           <input id="unpaid" className="field" inputMode="numeric" value={unpaid} onChange={(e) => setUnpaid(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor="cod-max" className="mb-1 block text-xs font-medium">Cash on delivery up to (EGP, empty = any amount)</label>
+          <input id="cod-max" className="field" inputMode="decimal" value={codMax} onChange={(e) => setCodMax(e.target.value)} />
         </div>
       </fieldset>
       {isOwner ? (

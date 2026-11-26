@@ -92,6 +92,15 @@ export function useRegister() {
   });
 }
 
+/** Checkout without an account: the server signs this browser in as a guest (bag and orders work as usual). */
+export function useGuestCheckout() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (lang: "en" | "ar") => api<Me>("POST", "/api/v1/auth/guest", { lang }),
+    onSuccess: (me) => client.setQueryData(ME_KEY, me),
+  });
+}
+
 export function useSignOut() {
   const client = useQueryClient();
   return useMutation({

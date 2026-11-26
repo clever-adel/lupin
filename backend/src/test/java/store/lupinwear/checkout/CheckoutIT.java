@@ -75,6 +75,7 @@ class CheckoutIT extends IntegrationTest {
         setting("payment_methods", "COD", "true");
         setting("payment_methods", "CARD", "false");
         setting("checkout", "freeDeliveryThreshold", "null");
+        setting("checkout", "codMaxTotal", "null");
 
         // Standard delivery: 60 in Cairo, 85 in Giza, not offered anywhere else.
         optionId = jdbc.sql("""
@@ -258,6 +259,83 @@ class CheckoutIT extends IntegrationTest {
         mvc.perform(get("/api/v1/orders/" + reference).cookie(customer.cookie))
                 .andExpect(jsonPath("$.items[0].unitPrice").value(1000.00));
         mvc.perform(get("/api/v1/orders/" + reference).cookie(customer().cookie)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aGuestChecksOutWithoutAnAccountAndKeepsTheOrdersWhenMakingOne() throws Exception {
+        long variant = product("Guest Hoodie", "1000.00", null, 5);
+        MvcResult started = mvc.perform(jsonPost("/api/v1/auth/guest", Map.of("lang", "ar")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.guest").value(true))
+                .andExpect(jsonPath("$.email").doesNotExist())
+                .andExpect(jsonPath("$.roles[0]").value("CUSTOMER"))
+                .andReturn();
+        UUID guestId = UUID.fromString(body(started).get("id").asText());
+        Customer guest = new Customer(guestId, null, cookie(started, AuthCookies.ACCESS));
+        mvc.perform(get("/api/v1/auth/me").cookie(guest.cookie))
+                .andExpect(jsonPath("$.guest").value(true)).andExpect(jsonPath("$.preferredLang").value("ar"));
+
+        setQuantity(guest, variant, 1).andExpect(status().isOk());
+        String reference = body(place(guest, request(null, "1060.00", "key-" + UUID.randomUUID()))
+                .andExpect(status().isCreated()).andReturn()).get("reference").asText();
+        mvc.perform(get("/api/v1/orders/" + reference).cookie(guest.cookie))
+                .andExpect(jsonPath("$.customerName").value("Test Customer"));
+
+        // The dashboard lists the guest under the name on their order; a guest with no order is not listed.
+        mvc.perform(jsonPost("/api/v1/auth/guest", Map.of())).andExpect(status().isCreated());
+        JsonNode listed = body(mvc.perform(get("/api/v1/admin/customers?pageSize=100").cookie(owner)).andReturn());
+        List<String> guests = new ArrayList<>();
+        listed.get("items").forEach(row -> {
+            if ("GUEST".equals(row.get("signUp").asText())) {
+                guests.add(row.get("id").asText() + "|" + row.get("fullName").asText());
+            }
+        });
+        assertThat(guests).contains(guestId + "|Test Customer");
+        assertThat(guests).allMatch(g -> !g.endsWith("|Guest"));
+
+        // Making an account while signed in as the guest turns the guest into that account.
+        String email = uniqueEmail();
+        MvcResult member = mvc.perform(jsonPost("/api/v1/auth/register", Map.of("fullName", "Guest Turned Member",
+                        "email", email, "password", "a-long-password-1", "lang", "ar")).cookie(guest.cookie))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.guest").value(false))
+                .andExpect(jsonPath("$.id").value(guestId.toString()))
+                .andReturn();
+        Cookie memberCookie = cookie(member, AuthCookies.ACCESS);
+        mvc.perform(get("/api/v1/orders").cookie(memberCookie))
+                .andExpect(jsonPath("$.total").value(1)).andExpect(jsonPath("$.items[0].reference").value(reference));
+        // The guest's old sign-in has ended.
+        Cookie guestRefresh = cookie(started, AuthCookies.REFRESH);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/auth/refresh")
+                .with(csrf()).cookie(guestRefresh)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void cashOnDeliveryCanBeLimitedToSmallerOrders() throws Exception {
+        long variant = product("Limit Jacket", "1000.00", null, 5);
+        Customer customer = customer();
+        setQuantity(customer, variant, 2).andExpect(status().isOk());
+
+        mvc.perform(put("/api/v1/admin/settings/checkout").with(csrf()).cookie(owner)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"codMaxTotal\":-5}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/v1/admin/settings/checkout").with(csrf()).cookie(owner)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"codMaxTotal\":1500}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/content/site")).andExpect(jsonPath("$.codMaxTotal").value(1500));
+
+        place(customer, request(null, "2060.00", "key-" + UUID.randomUUID()))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("COD_OVER_LIMIT"));
+        assertThat(reserved(variant)).isZero();
+
+        setQuantity(customer, variant, 1).andExpect(status().isOk());
+        place(customer, request(null, "1060.00", "key-" + UUID.randomUUID())).andExpect(status().isCreated());
+
+        // Empty in the dashboard = no limit again.
+        mvc.perform(put("/api/v1/admin/settings/checkout").with(csrf()).cookie(owner)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"codMaxTotal\":null}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/content/site")).andExpect(jsonPath("$.codMaxTotal").doesNotExist());
     }
 
     @Test

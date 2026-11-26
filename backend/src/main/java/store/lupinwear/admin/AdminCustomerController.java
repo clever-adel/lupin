@@ -46,9 +46,10 @@ public class AdminCustomerController {
                        max(o.placed_at) as last_at
                 from orders o where o.user_id = u.id) agg on true
             left join lateral (
-                select o.customer_phone, o.governorate_name
+                select o.customer_name, o.customer_phone, o.governorate_name
                 from orders o where o.user_id = u.id order by o.placed_at desc limit 1) lo on true
             where u.deleted_at is null
+              and (not u.is_guest or agg.n > 0)
               and not exists (select 1 from user_roles ur join roles r on r.id = ur.role_id
                               where ur.user_id = u.id and r.code in ('ADMIN', 'OWNER'))
             """.formatted(COUNTED);
@@ -76,7 +77,8 @@ public class AdminCustomerController {
         String query = q == null ? "" : q.trim();
         if (!query.isEmpty()) {
             query = query.substring(0, Math.min(query.length(), 80));
-            where.append(" and (u.full_name ilike :q escape '\\' or u.email ilike :q escape '\\'"
+            where.append(" and (u.full_name ilike :q escape '\\' or lo.customer_name ilike :q escape '\\'"
+                    + " or u.email ilike :q escape '\\'"
                     + " or u.phone like :q escape '\\' or lo.customer_phone like :q escape '\\')");
             params.put("q", "%" + like(query) + "%");
         }
@@ -85,15 +87,16 @@ public class AdminCustomerController {
         params.put("offset", (long) index * size);
         String order = SORTS.getOrDefault(sort, SORTS.get("newest"));
         List<CustomerRow> rows = jdbc.sql("""
-                select u.id, u.full_name, u.email, coalesce(u.phone, lo.customer_phone) as phone,
+                select u.id, case when u.is_guest then coalesce(lo.customer_name, u.full_name) else u.full_name end
+                           as full_name, u.email, coalesce(u.phone, lo.customer_phone) as phone,
                        exists (select 1 from oauth_identities oi where oi.user_id = u.id and oi.provider = 'GOOGLE')
                            as google,
-                       u.status, u.created_at, u.last_login_at, agg.n, agg.spent, agg.last_at, lo.governorate_name,
+                       u.is_guest, u.status, u.created_at, u.last_login_at, agg.n, agg.spent, agg.last_at, lo.governorate_name,
                        coalesce(cp.marketing_opt_in, false) as opt_in
                 """ + CUSTOMERS + where + " order by " + order + ", u.id limit :limit offset :offset")
                 .params(params)
                 .query((rs, n) -> new CustomerRow(rs.getObject("id", UUID.class), rs.getString("full_name"),
-                        rs.getString("email"), rs.getString("phone"), rs.getBoolean("google") ? "GOOGLE" : "EMAIL",
+                        rs.getString("email"), rs.getString("phone"), rs.getBoolean("is_guest") ? "GUEST" : rs.getBoolean("google") ? "GOOGLE" : "EMAIL",
                         rs.getString("status"), instant(rs.getObject("created_at", OffsetDateTime.class)),
                         instant(rs.getObject("last_login_at", OffsetDateTime.class)), rs.getInt("n"),
                         rs.getBigDecimal("spent"), instant(rs.getObject("last_at", OffsetDateTime.class)),

@@ -6,7 +6,7 @@ import type { Route } from "./+types/sign-in";
 import { LogoLockup } from "~/components/brand";
 import { Field } from "~/components/form";
 import { registerSchema, signInSchema, type RegisterValues, type SignInValues } from "~/features/auth/schemas";
-import { needsTwoStep, useMe, useRegister, useSignIn, useVerifyTwoStep } from "~/features/auth/session";
+import { needsTwoStep, useGuestCheckout, useMe, useRegister, useSignIn, useVerifyTwoStep } from "~/features/auth/session";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "~/lib/http";
 import { useHydrated } from "~/lib/hydrated";
@@ -101,8 +101,9 @@ function TwoStepForm({ onBack }: { onBack: () => void }) {
 
 export default function SignIn() {
   const { t, href, lang } = useT();
-  const [mode, setMode] = useState<"signin" | "register">("signin");
   const [params] = useSearchParams();
+  // ?mode=register opens "Create account" (a guest's account page links here).
+  const [mode, setMode] = useState<"signin" | "register">(params.get("mode") === "register" ? "register" : "signin");
   const navigate = useNavigate();
   const me = useMe().data;
   // Staff who sign in without a specific destination go to the dashboard, customers to their account.
@@ -112,8 +113,9 @@ export default function SignIn() {
   // Once only: `navigate` changes identity while a navigation is in flight, and redirecting again on
   // every change loops until the next page has loaded.
   const redirected = useRef(false);
+  // A guest is signed in too, but comes here to make a real account (or sign in to one): no redirect.
   useEffect(() => {
-    if (me && !redirected.current) {
+    if (me && !me.guest && !redirected.current) {
       redirected.current = true;
       navigate(next, { replace: true });
     }
@@ -125,6 +127,17 @@ export default function SignIn() {
     staleTime: 5 * 60_000,
   });
   const googleFailure = GOOGLE_FAILURES[params.get("google") ?? ""];
+
+  // Offered on the way to checkout only: shoppers from an ad should not have to make an account.
+  const toCheckout = /\/checkout$/.test(next) && !me?.guest;
+  const guest = useGuestCheckout();
+  const startGuest = () =>
+    guest.mutate(lang, {
+      onSuccess: () => {
+        redirected.current = true;
+        navigate(next, { replace: true });
+      },
+    });
 
   const signIn = useSignIn();
   const register = useRegister();
@@ -143,7 +156,7 @@ export default function SignIn() {
 
   return (
     <div className="grid md:min-h-[38rem] md:grid-cols-2">
-      <section className="bg-ink px-8 py-12 text-bone md:flex md:flex-col md:justify-center md:px-16">
+      <section className={`bg-ink px-8 py-12 text-bone md:flex md:flex-col md:justify-center md:px-16 ${toCheckout ? "hidden" : ""}`}>
         <LogoLockup className="h-auto w-48" />
         <h1 className="display mt-10 text-2xl md:text-3xl">{t("auth.title")}</h1>
         <ul className="mt-6 space-y-2 text-sm text-bone/75">
@@ -155,6 +168,23 @@ export default function SignIn() {
 
       <section className="px-6 py-12 md:px-16">
         <div className="mx-auto max-w-sm">
+          {toCheckout && (
+            <div className="mb-8 border border-ink bg-card p-5">
+              <h2 className="text-base font-semibold">{t("auth.guest.title")}</h2>
+              <p className="mt-1 text-sm text-stone">{t("auth.guest.text")}</p>
+              {guest.isError && (
+                <p role="alert" className="mt-3 text-sm text-danger">
+                  {(guest.error instanceof ApiError && guest.error.message) || t("error.generic")}
+                </p>
+              )}
+              <button type="button" className="btn btn-primary mt-4 w-full" disabled={!hydrated || guest.isPending} onClick={startGuest}>
+                {guest.isPending ? t("auth.working") : t("auth.guest.button")}
+              </button>
+              <p className="mt-6 -mb-2 flex items-center gap-3 text-xs text-stone before:h-px before:flex-1 before:bg-line after:h-px after:flex-1 after:bg-line">
+                {t("auth.guest.or")}
+              </p>
+            </div>
+          )}
           {/* Standard tabs: one tab stop, arrow keys switch, the panel below is labelled by its tab. */}
           <div
             role="tablist"

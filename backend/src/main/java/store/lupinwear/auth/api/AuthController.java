@@ -54,8 +54,17 @@ public class AuthController {
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    MeResponse register(@Valid @RequestBody RegisterRequest body, HttpServletRequest req, HttpServletResponse res) {
-        return signedIn(auth.register(body, client(req)), res);
+    MeResponse register(@AuthenticationPrincipal CurrentUser user, @Valid @RequestBody RegisterRequest body,
+            HttpServletRequest req, HttpServletResponse res) {
+        return signedIn(auth.register(body, client(req), user == null ? null : user.id()), res);
+    }
+
+    /** Checkout without an account: signs this browser in as a new guest. */
+    @PostMapping("/guest")
+    @ResponseStatus(HttpStatus.CREATED)
+    MeResponse guest(@RequestBody(required = false) AuthDtos.GuestRequest body, HttpServletRequest req,
+            HttpServletResponse res) {
+        return signedIn(auth.startGuest(body == null ? null : body.lang(), client(req)), res);
     }
 
     /** A session, or for staff with two-step sign-in on: {"mfaRequired": true} and a five-minute challenge cookie. */

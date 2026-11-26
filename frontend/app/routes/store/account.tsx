@@ -44,7 +44,7 @@ export default function Account() {
       )}
       <p className="label text-stone">{t("account.label")}</p>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
-        <h1 className="display text-3xl">{t("account.hi", { name: user.fullName.split(" ")[0] ?? user.fullName })}</h1>
+        <h1 className="display text-3xl">{user.guest ? t("account.hiGuest") : t("account.hi", { name: user.fullName.split(" ")[0] ?? user.fullName })}</h1>
         <button type="button" className="btn btn-outline" disabled={signOut.isPending} onClick={() => signOut.mutate()}>
           {t("account.signOut")}
         </button>
@@ -80,6 +80,16 @@ export default function Account() {
         )}
       </section>
 
+      {user.guest ? (
+        <section aria-labelledby="guest-title" className="border border-ink bg-card p-5">
+          <h2 id="guest-title" className="text-sm font-semibold">{t("account.guestTitle")}</h2>
+          <p className="mt-1 text-sm text-stone">{t("account.guestText")}</p>
+          <Link to={`${href("/sign-in")}?mode=register&next=${encodeURIComponent(href("/account"))}`} className="btn btn-primary mt-4">
+            {t("account.guestCreate")}
+          </Link>
+        </section>
+      ) : (
+      <>
       <section aria-labelledby="details-title">
         <h2 id="details-title" className="border-b border-line pb-3 text-sm font-semibold">{t("account.details")}</h2>
         <dl className="grid gap-3 py-5 text-sm sm:grid-cols-2">
@@ -95,6 +105,8 @@ export default function Account() {
       </section>
 
       <ChangePassword staff={isStaff} />
+      </>
+      )}
     </div>
   );
 }

@@ -252,6 +252,8 @@ export interface SiteContent {
   };
   /** Present only while manual Vodafone Cash is usable. */
   vodafoneCash?: { number: string; instructionsEn: string; instructionsAr: string };
+  /** Cash on delivery only up to this order total (EGP); absent or null = no limit. */
+  codMaxTotal?: number | null;
   /** Meta Pixel ID set in the dashboard; absent while ads tracking is off. */
   metaPixelId?: string | null;
 }
@@ -328,6 +330,8 @@ export interface Me {
   roles: string[];
   emailVerified: boolean;
   preferredLang: Lang;
+  /** Checked out without an account: no email or password; only this browser's session leads back to it. */
+  guest?: boolean;
   /**
    * Staff only: two-step sign-in. ON = this sign-in passed the app code; SETUP = not switched on yet
    * (the dashboard asks for it); SIGN_IN_AGAIN = switched on, but this sign-in is older than that.

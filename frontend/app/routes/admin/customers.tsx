@@ -9,7 +9,7 @@ export interface AdminCustomerRow {
   fullName: string;
   email: string | null;
   phone: string | null;
-  signUp: "GOOGLE" | "EMAIL";
+  signUp: "GOOGLE" | "EMAIL" | "GUEST";
   status: "ACTIVE" | "DISABLED";
   joinedAt: string;
   lastLoginAt: string | null;
@@ -125,7 +125,7 @@ export default function AdminCustomers() {
                   <th scope="row" className="px-3 py-3 text-start font-semibold">
                     {c.fullName}
                     <span className="block text-xs font-normal text-stone">
-                      {c.signUp === "GOOGLE" ? "Google" : "Email"}
+                      {c.signUp === "GOOGLE" ? "Google" : c.signUp === "GUEST" ? "Guest (no account)" : "Email"}
                       {c.governorate ? ` · ${c.governorate}` : ""}
                       {c.status === "DISABLED" ? " · Disabled" : ""}
                     </span>

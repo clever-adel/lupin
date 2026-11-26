@@ -202,6 +202,49 @@ function Footer({ departments, site }: { departments: Department[]; site: SiteCo
   );
 }
 
+/** An Egyptian mobile (01xxxxxxxxx, +201…, 00201…) as wa.me wants it: digits with the country code. */
+export function whatsappDigits(raw: string): string | null {
+  let digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (/^01[0125]\d{8}$/.test(digits)) digits = "2" + digits;
+  return /^201[0125]\d{8}$/.test(digits) ? digits : null;
+}
+
+function WhatsAppIcon() {
+  return (
+    <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" fill="currentColor">
+      <path d="M16 3C9 3 3.3 8.6 3.3 15.6c0 2.2.6 4.4 1.7 6.3L3.2 28.8l7.1-1.9c1.8 1 3.8 1.5 5.8 1.5 7 0 12.7-5.7 12.7-12.7C28.8 8.6 23 3 16 3zm0 23.1c-1.9 0-3.7-.5-5.3-1.5l-.4-.2-4.2 1.1 1.1-4.1-.3-.4c-1.1-1.7-1.6-3.6-1.6-5.5C5.3 9.8 10.1 5.2 16 5.2s10.6 4.7 10.6 10.5S21.9 26.1 16 26.1zm5.8-7.8c-.3-.2-1.9-.9-2.2-1s-.5-.2-.7.2-.8 1-1 1.2-.4.2-.7.1c-.3-.2-1.4-.5-2.6-1.6-1-.9-1.6-1.9-1.8-2.2s0-.5.1-.6l.5-.6c.2-.2.2-.4.3-.6.1-.2 0-.4 0-.6s-.7-1.7-1-2.3c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4s-1.2 1.1-1.2 2.7 1.2 3.1 1.3 3.4c.2.2 2.3 3.5 5.6 4.9.8.3 1.4.5 1.9.7.8.2 1.5.2 2.1.1.6-.1 1.9-.8 2.2-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.3-.6-.4z" />
+    </svg>
+  );
+}
+
+/**
+ * "Ask us on WhatsApp", on every store page: shoppers ask about sizes before they order. Uses the
+ * WhatsApp number from the dashboard, or the contact phone when none is set; hidden when neither is a mobile.
+ */
+function WhatsAppButton({ site, origin }: { site: SiteContent; origin: string }) {
+  const { t } = useT();
+  const { pathname } = useLocation();
+  const digits = whatsappDigits(site.contact.whatsappNumber || site.contact.phone || "");
+  if (!digits || pathname.includes("/checkout")) return null;
+  const onProduct = pathname.includes("/product/");
+  const text = onProduct
+    ? t("whatsapp.aboutProduct", { url: origin + pathname })
+    : t("whatsapp.hello");
+  return (
+    <a
+      href={`https://wa.me/${digits}?text=${encodeURIComponent(text)}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={() => track("Contact")}
+      className="fixed end-4 bottom-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-[#25D366] text-white shadow-lg hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink md:end-6 md:bottom-6"
+    >
+      <WhatsAppIcon />
+      <span className="sr-only">{t("whatsapp.label")}</span>
+    </a>
+  );
+}
+
 export default function StoreLayout({ loaderData }: Route.ComponentProps) {
   useScrollReveal();
   // After moving to another page, put keyboard and screen-reader focus at the start of the new
@@ -231,6 +274,7 @@ export default function StoreLayout({ loaderData }: Route.ComponentProps) {
         <Outlet />
       </main>
       <Footer departments={loaderData.departments} site={loaderData.site} />
+      <WhatsAppButton site={loaderData.site} origin={loaderData.origin} />
     </>
   );
 }
