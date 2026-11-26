@@ -11,7 +11,7 @@ import { api } from "~/lib/http";
 import { apiGet } from "~/lib/api.server";
 import { localePath, pick, toLang, translate, useT } from "~/lib/i18n";
 import { track } from "~/lib/pixel";
-import { absoluteUrl, layoutOrigin, seo } from "~/lib/seo";
+import { absoluteUrl, layoutOrigin, RETURN_POLICY, seo } from "~/lib/seo";
 import type { LookCard, ProductDetail } from "~/lib/types";
 
 export async function loader({ params, context }: Route.LoaderArgs) {
@@ -55,6 +55,9 @@ export function meta({ params, matches, location, data }: Route.MetaArgs) {
           priceCurrency: "EGP",
           price: (product.salePrice ?? product.price).toFixed(2),
           availability: inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+          itemCondition: "https://schema.org/NewCondition",
+          seller: { "@type": "Organization", "@id": `${origin}/#organization`, name: "LUPIN." },
+          hasMerchantReturnPolicy: RETURN_POLICY,
         },
       },
     },

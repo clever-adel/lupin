@@ -3,7 +3,7 @@ import { Form, Link, useSubmit } from "react-router";
 import type { Route } from "./+types/shop";
 import { ProductGrid } from "~/components/product";
 import { apiGet } from "~/lib/api.server";
-import { pick, toLang, translate, useT } from "~/lib/i18n";
+import { localePath, pick, toLang, translate, useT } from "~/lib/i18n";
 import { layoutOrigin, seo } from "~/lib/seo";
 import type { Department, Facets, Page, ProductCard } from "~/lib/types";
 
@@ -58,15 +58,46 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 
 export function meta({ params, matches, location, data }: Route.MetaArgs) {
   const lang = toLang(params.lang);
+  const origin = layoutOrigin(matches);
   const name = data?.department ? pick(lang, data.department, "name") : translate(lang, "shop.label");
-  return seo({
-    origin: layoutOrigin(matches),
+  // Filtered and paginated views are not separate pages for search engines.
+  const filtered = location.search.length > 1;
+  const tags = seo({
+    origin,
     pathname: location.pathname,
     title: translate(lang, "seo.shop.title", { name }),
     description: translate(lang, "seo.shop.description", { name }),
-    // Filtered and paginated views are not separate pages for search engines.
-    noindex: location.search.length > 1,
+    noindex: filtered,
   });
+  if (filtered || !data) return tags;
+  const crumbs = [
+    { name: translate(lang, "product.home"), path: "/" },
+    { name: translate(lang, "shop.label"), path: "/shop" },
+    ...(data.department ? [{ name, path: `/shop/${data.department.slug}` }] : []),
+  ];
+  return [
+    ...tags,
+    {
+      "script:ld+json": {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: crumbs.map((c, i) => ({
+          "@type": "ListItem", position: i + 1, name: c.name, item: origin + localePath(lang, c.path),
+        })),
+      },
+    },
+    // The products shown on this page, in order: helps search engines find and group them.
+    ...(data.products?.items.length ? [{
+      "script:ld+json": {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name,
+        itemListElement: (data.products?.items ?? []).map((p, i) => ({
+          "@type": "ListItem", position: i + 1, url: origin + localePath(lang, `/product/${p.slug}`), name: pick(lang, p, "name"),
+        })),
+      },
+    }] : []),
+  ];
 }
 
 export default function Shop({ loaderData }: Route.ComponentProps) {

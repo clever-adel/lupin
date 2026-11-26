@@ -38,8 +38,14 @@ describe("seo", () => {
     expect(find(own, (t) => t.name === "twitter:card")?.content).toBe("summary_large_image");
 
     const none = seo({ origin, pathname: "/faq", title: "FAQ", description: "d" });
-    expect(find(none, (t) => t.property === "og:image")?.content).toBe("https://lupinwear.store/brand/lupin-logo.png");
+    expect(find(none, (t) => t.property === "og:image")?.content).toBe("https://lupinwear.store/brand/share-image.png");
+    expect(find(none, (t) => t.property === "og:image:width")?.content).toBe("1200");
+    expect(find(none, (t) => t.property === "og:image:height")?.content).toBe("630");
+    expect(find(none, (t) => t.name === "twitter:image")?.content).toBe("https://lupinwear.store/brand/share-image.png");
     expect(find(none, (t) => t.property === "og:type")?.content).toBe("website");
+    // A product photo's size is not guessed.
+    expect(find(own, (t) => t.property === "og:image:width")).toBeUndefined();
+    expect(find(own, (t) => t.name === "twitter:image")?.content).toBe("https://lupinwear.store/media/a.jpg");
   });
 
   it("leaves addresses that are already full alone", () => {
