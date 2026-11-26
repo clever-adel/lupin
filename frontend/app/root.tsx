@@ -57,6 +57,11 @@ export default function App() {
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false } } }),
   );
+  // Marks the moment React has taken over the page; browser tests wait for it before pressing buttons
+  // (a press on the server-rendered HTML before that does nothing).
+  useEffect(() => {
+    document.documentElement.dataset.hydrated = "true";
+  }, []);
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />

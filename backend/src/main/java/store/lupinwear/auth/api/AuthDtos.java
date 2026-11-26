@@ -23,6 +23,9 @@ public final class AuthDtos {
             @Pattern(regexp = "en|ar") String lang) {
     }
 
+    public record GuestRequest(@Pattern(regexp = "en|ar") String lang) {
+    }
+
     public record LoginRequest(
             @NotBlank @Email @Size(max = 254) String email,
             @NotBlank @Size(max = 128) String password) {
@@ -45,11 +48,12 @@ public final class AuthDtos {
 
     /** {@code twoFactor}: staff only (ON, SETUP or SIGN_IN_AGAIN, see TwoFactorService.State); null for customers. */
     public record MeResponse(UUID id, String email, String phone, String fullName, Set<String> roles,
-            boolean emailVerified, String preferredLang, String twoFactor) {
+            boolean emailVerified, String preferredLang, String twoFactor, boolean guest) {
 
         public static MeResponse of(User u, TwoFactorService.State twoFactor) {
             return new MeResponse(u.getId(), u.getEmail(), u.getPhone(), u.getFullName(), u.roleCodes(),
-                    u.getEmailVerifiedAt() != null, u.getPreferredLang(), twoFactor == null ? null : twoFactor.name());
+                    u.getEmailVerifiedAt() != null, u.getPreferredLang(), twoFactor == null ? null : twoFactor.name(),
+                    u.isGuest());
         }
     }
 

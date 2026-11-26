@@ -143,6 +143,11 @@ public class OrderService {
         if (priced.total().compareTo(req.expectedTotal()) != 0) {
             throw ApiException.conflict("PRICE_CHANGED", "The total has changed. Please review your order.");
         }
+        BigDecimal codMax = settings.codMaxTotal();
+        if (cash && codMax != null && priced.total().compareTo(codMax) > 0) {
+            throw ApiException.badRequest("COD_OVER_LIMIT", "Cash on delivery is for orders up to EGP "
+                    + codMax.stripTrailingZeros().toPlainString() + ". Please choose another way to pay.");
+        }
 
         // Fixed lock order (variant id) so two orders with the same items cannot deadlock.
         List<Line> lines = quote.lines().stream().sorted(Comparator.comparingLong(Line::variantId)).toList();

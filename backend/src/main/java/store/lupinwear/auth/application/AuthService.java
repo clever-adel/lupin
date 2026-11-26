@@ -77,6 +77,15 @@ public class AuthService {
 
     @Transactional
     public Tokens register(RegisterRequest req, ClientInfo client) {
+        return register(req, client, null);
+    }
+
+    /**
+     * {@code signedInAs}: whoever this browser is signed in as. A guest who makes an account keeps the
+     * same account, so the orders they placed as a guest stay theirs.
+     */
+    @Transactional
+    public Tokens register(RegisterRequest req, ClientInfo client, UUID signedInAs) {
         rateLimiter.check("register:ip:" + client.ip(), 10);
         String email = normalizeEmail(req.email());
         if (req.password().toLowerCase(Locale.ROOT).contains(email.substring(0, email.indexOf('@')))
@@ -89,8 +98,30 @@ public class AuthService {
         if (req.phone() != null && users.existsByPhone(req.phone())) {
             throw ApiException.conflict("PHONE_TAKEN", "An account with this mobile number already exists.");
         }
-        User user = new User(email, req.phone(), passwords.encode(req.password()), req.fullName().trim(),
-                req.lang() == null ? "en" : req.lang());
+        String lang = req.lang() == null ? "en" : req.lang();
+        User guest = signedInAs == null ? null
+                : users.findById(signedInAs).filter(u -> u.isGuest() && u.canSignIn()).orElse(null);
+        if (guest != null) {
+            guest.becomeMember(email, req.phone(), passwords.encode(req.password()), req.fullName().trim(), lang);
+            users.saveAndFlush(guest);
+            // The guest sign-in ends; the new one belongs to the real account.
+            sessions.revokeAllForUser(guest.getId(), clock.instant());
+            return startSession(guest, UUID.randomUUID(), client, null);
+        }
+        User user = new User(email, req.phone(), passwords.encode(req.password()), req.fullName().trim(), lang);
+        user.grant(role(Role.CUSTOMER));
+        users.save(user);
+        return startSession(user, UUID.randomUUID(), client, null);
+    }
+
+    /**
+     * Checkout without an account: a guest account for this browser and a normal session for it. The
+     * name, phone and address the order needs are asked for on the checkout page, as for members.
+     */
+    @Transactional
+    public Tokens startGuest(String lang, ClientInfo client) {
+        rateLimiter.check("guest:ip:" + client.ip(), 20);
+        User user = User.guest("ar".equals(lang) ? "ar" : "en");
         user.grant(role(Role.CUSTOMER));
         users.save(user);
         return startSession(user, UUID.randomUUID(), client, null);

@@ -45,6 +45,12 @@ public class SiteSettings {
         return node.isNumber() && node.decimalValue().signum() > 0 ? node.decimalValue() : null;
     }
 
+    /** Cash on delivery only for orders up to this total; null means no limit. */
+    public BigDecimal codMaxTotal() {
+        JsonNode node = get("checkout").path("codMaxTotal");
+        return node.isNumber() && node.decimalValue().signum() > 0 ? node.decimalValue() : null;
+    }
+
     /** The Meta Pixel ID set in the dashboard, or null when tracking is off. */
     public String metaPixelId() {
         String id = get("tracking").path("metaPixelId").asText("").trim();

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addToBag, CUSTOMER_PASSWORD, registerCustomer, skipIntro, unique } from "./helpers";
+import { addToBag, CUSTOMER_PASSWORD, gotoReady, registerCustomer, skipIntro, unique } from "./helpers";
 
 /**
  * The customer-facing buttons and forms not already covered by store.e2e.ts: shop filters, the
@@ -68,7 +68,7 @@ test("shop: search, sort, filters and clearing them", async ({ page }) => {
 });
 
 test("product page: sizes, colours, quantity, favourites and the size reminder", async ({ page }) => {
-  await page.goto("/product/demo-nightfall-bomber");
+  await gotoReady(page, "/product/demo-nightfall-bomber");
 
   // Adding without a size asks for one instead of failing silently.
   await page.getByRole("button", { name: /Add to bag/ }).click();
@@ -223,11 +223,11 @@ test("sign in and sign up: every error a customer can hit, and no redirect to ot
 
 test("checkout: validation, delivery choices per governorate, promo errors, and an empty bag", async ({ page }) => {
   await registerCustomer(page);
-  await page.goto("/checkout");
+  await gotoReady(page, "/checkout");
   await expect(page.getByText("Your bag is empty.")).toBeVisible();
 
   await addToBag(page, "/product/demo-slate-shell-jacket", "L"); // EGP 2,040
-  await page.goto("/checkout");
+  await gotoReady(page, "/checkout");
 
   // Pressing the button with nothing filled says exactly what is missing.
   await page.getByRole("button", { name: "Place order" }).click();

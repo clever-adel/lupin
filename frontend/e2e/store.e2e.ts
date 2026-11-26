@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { signInStaff } from "./helpers";
+import { gotoReady, signInStaff } from "./helpers";
 
 const PRODUCT = "/product/demo-harbour-stand-collar-jacket"; // local demo data: EGP 2,450
 const OWNER_EMAIL = process.env.E2E_OWNER_EMAIL ?? "owner@lupin.local";
@@ -20,7 +20,7 @@ test.describe.serial("buying and fulfilling an order", () => {
     await skipIntro(page);
     const email = `e2e-${Date.now()}@example.test`;
 
-    await page.goto(PRODUCT);
+    await gotoReady(page, PRODUCT);
     await page.getByRole("button", { name: "M", exact: true }).click();
     await page.getByRole("button", { name: /Add to bag/ }).click();
     await expect(page.getByText("Added to your bag.")).toBeVisible();
@@ -84,7 +84,7 @@ test.describe.serial("buying and fulfilling an order", () => {
 
 test("a customer account cannot open the staff dashboard", async ({ page }) => {
   await skipIntro(page);
-  await page.goto("/sign-in?next=/admin");
+  await gotoReady(page, "/sign-in?next=/admin");
   await page.getByRole("tab", { name: "Create account" }).click();
   await page.getByLabel("Full name").fill("E2E Visitor");
   await page.getByLabel("Email").fill(`e2e-visitor-${Date.now()}@example.test`);

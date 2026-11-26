@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { OWNER_EMAIL, signInStaff } from "./helpers";
+import { gotoReady, OWNER_EMAIL, signInStaff } from "./helpers";
 
 const PASSWORD_FILE = "../backend/.local-owner-password";
 const ownerPassword =
@@ -87,7 +87,7 @@ test("the store can be used with the keyboard alone", async ({ page }) => {
   await expect(page.getByRole("link", { name: /^Bag\s*1$/ })).toBeVisible();
 
   // Sign-in tabs: arrow keys switch, focus follows.
-  await page.goto("/sign-in");
+  await gotoReady(page, "/sign-in");
   await page.getByRole("tab", { name: "Sign in" }).focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("tab", { name: "Create account" })).toBeFocused();
@@ -104,13 +104,13 @@ test("the store can be used with the keyboard alone", async ({ page }) => {
 test("signed-in customer pages have no automatic accessibility violations", async ({ page }) => {
   await skipIntro(page);
   const problems: string[] = [];
-  await page.goto("/product/demo-field-utility-jacket");
+  await gotoReady(page, "/product/demo-field-utility-jacket");
   await page.getByRole("button", { name: "L", exact: true }).click();
   await page.getByRole("button", { name: /Add to bag/ }).click();
   await expect(page.getByText("Added to your bag.")).toBeVisible();
   problems.push(...(await scan(page, "product after add")));
 
-  await page.goto("/sign-in?next=/checkout");
+  await gotoReady(page, "/sign-in?next=/checkout");
   await page.getByRole("tab", { name: "Create account" }).click();
   await page.getByLabel("Full name").fill("A11y Customer");
   await page.getByLabel("Email").fill(`e2e-a11y-${Date.now()}@example.test`);

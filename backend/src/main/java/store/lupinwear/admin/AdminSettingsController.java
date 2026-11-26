@@ -72,7 +72,7 @@ public class AdminSettingsController {
     /** Settings a staff member may edit, and extra fields allowed beyond those already stored. */
     private static final Map<String, Set<String>> EDITABLE = Map.of(
             "hero", Set.of("imageUrl", "imagePublicId"), "announcement", Set.of(), "contact", Set.of(), "home_sections", Set.of(),
-            "checkout", Set.of("unpaidOrderMinutes"), "payment_methods", Set.of(), "notifications", Set.of(),
+            "checkout", Set.of("unpaidOrderMinutes", "codMaxTotal"), "payment_methods", Set.of(), "notifications", Set.of(),
             "tracking", Set.of("metaPixelId"));
     /**
      * "notifications" decides where customers' order details are sent, and "tracking" which ad account
@@ -235,6 +235,7 @@ public class AdminSettingsController {
             requireRange(value, "cancelUndoMinutes", 0, 24 * 60, false);
             requireRange(value, "unpaidOrderMinutes", 10, 7 * 24 * 60, true);
             requireRange(value, "freeDeliveryThreshold", 1, 1_000_000, true);
+            requireRange(value, "codMaxTotal", 1, 1_000_000, true);
             if (!value.path("orderReferencePrefix").asText().matches("[A-Z]{1,6}")) {
                 throw ApiException.badRequest("INVALID_SETTING", "The order prefix is 1 to 6 capital letters.");
             }
@@ -308,7 +309,7 @@ public class AdminSettingsController {
             throw ApiException.badRequest("INVALID_SETTING", field + " is required.");
         }
         BigInteger whole = node.isIntegralNumber() ? node.bigIntegerValue() : null;
-        boolean decimalOk = "freeDeliveryThreshold".equals(field) && node.isNumber();
+        boolean decimalOk = ("freeDeliveryThreshold".equals(field) || "codMaxTotal".equals(field)) && node.isNumber();
         long v = whole != null ? whole.longValue() : decimalOk ? node.decimalValue().longValue() : Long.MIN_VALUE;
         if (v < min || v > max) {
             throw ApiException.badRequest("INVALID_SETTING", field + " must be between " + min + " and " + max + ".");

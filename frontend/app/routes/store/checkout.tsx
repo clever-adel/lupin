@@ -41,7 +41,7 @@ export default function Checkout() {
   }, [bag.items]);
   useEffect(() => {
     if (!me.data) return;
-    if (!form.getValues("recipientName")) form.setValue("recipientName", me.data.fullName);
+    if (!form.getValues("recipientName") && !me.data.guest) form.setValue("recipientName", me.data.fullName);
     if (!form.getValues("phone") && me.data.phone) form.setValue("phone", me.data.phone);
   }, [me.data, form]);
 
@@ -73,11 +73,6 @@ export default function Checkout() {
     setOptionId((current) => (options.data.some((o) => o.id === current) ? current : (options.data[0]?.id ?? null)));
   }, [options.data]);
 
-  // Only methods the server says are usable right now; the server checks again when the order is placed.
-  const methods = METHOD_ORDER.filter((m) => site.data?.paymentMethods[m] === true);
-  const [chosenMethod, setChosenMethod] = useState<PaymentMethod | null>(null);
-  const method = chosenMethod && methods.includes(chosenMethod) ? chosenMethod : methods[0];
-
   const signature = bag.items.map((i) => `${i.variantId}:${i.quantity}`).join(",");
   const quote = useQuery({
     queryKey: ["quote", signature, governorateId, optionId, promoCode],
@@ -90,6 +85,15 @@ export default function Checkout() {
     enabled: bag.signedIn && bag.items.length > 0,
     placeholderData: keepPreviousData,
   });
+
+  // Only methods the server says are usable right now; the server checks again when the order is placed.
+  // Cash on delivery may have an upper limit set by the owner.
+  const codMax = site.data?.codMaxTotal ?? null;
+  const codOverLimit = codMax !== null && quote.data !== undefined && quote.data.total > codMax;
+  const methods = METHOD_ORDER.filter((m) => site.data?.paymentMethods[m] === true && !(m === "COD" && codOverLimit));
+  const codHidden = codOverLimit && site.data?.paymentMethods.COD === true;
+  const [chosenMethod, setChosenMethod] = useState<PaymentMethod | null>(null);
+  const method = chosenMethod && methods.includes(chosenMethod) ? chosenMethod : methods[0];
 
   const place = useMutation({
     mutationFn: (values: CheckoutValues) => {
@@ -228,6 +232,9 @@ export default function Checkout() {
               </fieldset>
             ) : (
               <p className="py-5 text-sm text-danger" role="alert">{t("checkout.noPayment")}</p>
+            )}
+            {codHidden && codMax !== null && (
+              <p className="mt-3 text-xs text-stone">{t("checkout.codLimit", { amount: money(codMax) })}</p>
             )}
           </section>
         </div>

@@ -61,6 +61,10 @@ public class User {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    /** Made for someone who checked out without an account: no email, phone or password to sign in with. */
+    @Column(name = "is_guest", nullable = false)
+    private boolean guest;
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id"))
@@ -70,6 +74,23 @@ public class User {
     }
 
     public User(String email, String phone, String passwordHash, String fullName, String preferredLang) {
+        this.email = email;
+        this.phone = phone;
+        this.passwordHash = passwordHash;
+        this.fullName = fullName;
+        this.preferredLang = preferredLang;
+    }
+
+    /** A shopper buying without an account; only the session cookies in their browser lead back to it. */
+    public static User guest(String preferredLang) {
+        User user = new User(null, null, null, "Guest", preferredLang);
+        user.guest = true;
+        return user;
+    }
+
+    /** The guest makes a real account: their bag and orders stay with it. */
+    public void becomeMember(String email, String phone, String passwordHash, String fullName, String preferredLang) {
+        this.guest = false;
         this.email = email;
         this.phone = phone;
         this.passwordHash = passwordHash;
@@ -124,6 +145,10 @@ public class User {
 
     public UUID getId() {
         return id;
+    }
+
+    public boolean isGuest() {
+        return guest;
     }
 
     public String getEmail() {

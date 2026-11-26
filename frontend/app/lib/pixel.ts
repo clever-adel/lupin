@@ -39,7 +39,7 @@ export function startPixel(pixelId: string | null | undefined): boolean {
   return true;
 }
 
-export type PixelEvent = "PageView" | "ViewContent" | "AddToCart" | "InitiateCheckout" | "Purchase";
+export type PixelEvent = "PageView" | "ViewContent" | "AddToCart" | "InitiateCheckout" | "Purchase" | "Contact";
 
 /** Does nothing while the Pixel is off. */
 export function track(event: PixelEvent, params?: Record<string, unknown>, eventId?: string): void {
