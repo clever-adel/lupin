@@ -1,7 +1,8 @@
 # LUPIN. — Social media kit
 
 Everything here matches the live store on 2026-11-19: 5 pieces, prices and discounts as shown on lupinwear.store,
-payment by **InstaPay or Vodafone Cash** (cash on delivery is off), **free delivery over EGP 2,000**,
+payment by **cash on delivery, InstaPay or a wallet transfer** (cash on delivery on since 2026-11-26), **no free delivery**
+(EGP 100 delivery on every order; the free-delivery offer was dropped on 2026-11-26),
 exchange or return **within 24 hours of delivery**. If any of these change, change the posts too.
 
 Folders: `profile/` (profile pictures, Facebook cover) · `highlights/` (Instagram Highlight covers) ·
@@ -45,16 +46,16 @@ Curated streetwear from original brands, in limited drops. Delivery across Egypt
 **Facebook — About / Details**
 ```
 LUPIN. picks the strongest streetwear from original brands and releases it in limited drops. Every piece has an operation name.
-Order on lupinwear.store · Pay with InstaPay or Vodafone Cash · Delivery across Egypt, free over EGP 2,000.
+Order on lupinwear.store · Pay cash on delivery, or by InstaPay or wallet · Delivery across Egypt.
 
 LUPIN. بتنقي أقوى قطع الستريت وير من براندات أصلية وبتنزلها بكميات محدودة. كل قطعة ليها اسم عملية.
-اطلب من lupinwear.store · ادفع بإنستاباي أو فودافون كاش · توصيل لكل مصر، ومجاني فوق ٢٠٠٠ جنيه.
+اطلب من lupinwear.store · ادفع كاش عند الاستلام أو بإنستاباي أو المحفظة · توصيل لكل مصر.
 ```
 Contact on all three: lupin.wear.eg@gmail.com · 01022088004 (same as the site footer).
 
 ### Instagram Highlights
 Add these covers in this order. Put the matching stories in each one.
-`highlights/highlight-new-in.png` · `highlight-hoodies.png` · `highlight-jackets.png` · `highlight-how-to-order.png` (the 3 how-to slides) · `highlight-delivery.png` (the free-delivery post) · `highlight-reviews.png` (screenshots of customer messages, with their permission).
+`highlights/highlight-new-in.png` · `highlight-hoodies.png` · `highlight-jackets.png` · `highlight-how-to-order.png` (the 3 how-to slides) · `highlight-delivery.png` (delivery and cash-on-delivery stories; **not** the old free-delivery post) · `highlight-reviews.png` (screenshots of customer messages, with their permission).
 
 ---
 
@@ -80,20 +81,21 @@ LUPIN. بقت لايف: ستريت وير منقّي من براندات أصل�
 ```
 How to order from LUPIN. in 3 steps 👇
 1. Pick your piece and size on lupinwear.store
-2. Pay with InstaPay or Vodafone Cash and send the screenshot
+2. Pay cash when it arrives, or by InstaPay or wallet
 3. We confirm and deliver anywhere in Egypt
 
 تطلب من LUPIN. إزاي؟ ٣ خطوات بس 👇
 ١. اختار القطعة والمقاس من lupinwear.store
-٢. ادفع بإنستاباي أو فودافون كاش وابعت صورة التحويل
+٢. ادفع كاش وإنت بتستلم، أو بإنستاباي أو المحفظة
 ٣. بنأكد ونوصلك لأي مكان في مصر
 #LUPIN #StreetwearEgypt #ستريت_وير #موضة_مصر
 ```
 
-**post-03-free-delivery.png**
+**post-03-free-delivery.png** — **retired 2026-11-26: there is no free delivery any more.** Do not post it;
+delete it (and its story in the "Delivery" Highlight) wherever it was posted. Use this text post instead:
 ```
-Free delivery on orders over EGP 2,000 🚚 Anywhere in Egypt.
-توصيل مجاني للطلبات فوق ٢٠٠٠ جنيه 🚚 لأي مكان في مصر.
+Cash on delivery 💵 Pay when your order arrives. Delivery anywhere in Egypt.
+الدفع عند الاستلام 💵 ادفع لما طلبك يوصلك. توصيل لأي مكان في مصر.
 #LUPIN #StealTheLook #EgyptFashion #موضة_مصر
 ```
 
@@ -181,7 +183,7 @@ TikTok gets the video posts. Stories every day, even when there is no feed post.
 | 3 | The Stealth | Site reel (repost in Reels if not done) | story-the-stealth |
 | 4 | — | Try-on / unboxing video (film it on your phone) | Poll: "Hoodie or jacket?" |
 | 5 | The Alibi | — | story-the-alibi |
-| 6 | Free delivery | Try-on video #2 | Free delivery post → Highlight "Delivery" |
+| 6 | Cash on delivery (text post above) | Try-on video #2 | Cash-on-delivery story → Highlight "Delivery" |
 | 7 | The Getaway Driver | — | story-the-getaway-driver |
 | 8 | — | "Pack an order with me" video | Behind the scenes |
 | 9 | The Master Key | — | story-the-master-key |
