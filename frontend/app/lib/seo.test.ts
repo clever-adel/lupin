@@ -43,6 +43,7 @@ describe("seo", () => {
     expect(find(none, (t) => t.property === "og:image:height")?.content).toBe("630");
     expect(find(none, (t) => t.name === "twitter:image")?.content).toBe("https://lupinwear.store/brand/share-image.png");
     expect(find(none, (t) => t.property === "og:type")?.content).toBe("website");
+    expect(find(none, (t) => t.property === "fb:app_id")?.content).toBe("1773021700473195");
     // A product photo's size is not guessed.
     expect(find(own, (t) => t.property === "og:image:width")).toBeUndefined();
     expect(find(own, (t) => t.name === "twitter:image")?.content).toBe("https://lupinwear.store/media/a.jpg");
