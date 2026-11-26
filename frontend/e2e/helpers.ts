@@ -17,6 +17,15 @@ export async function skipIntro(page: Page) {
   await page.addInitScript(() => window.sessionStorage.setItem("lupin.intro", "1"));
 }
 
+/**
+ * Opens a page and waits until React has taken over it. Buttons pressed before that do nothing, which
+ * made tests fail now and then on a slow machine ("Choose a size first." after a size was clicked).
+ */
+export async function gotoReady(page: Page, path: string) {
+  await page.goto(path);
+  await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
+}
+
 /** A fresh browser (no cookies), e.g. to act as a second person in the same test. */
 export async function newVisitor(browser: Browser): Promise<Page> {
   const context = await browser.newContext();
@@ -26,7 +35,7 @@ export async function newVisitor(browser: Browser): Promise<Page> {
 }
 
 export async function signIn(page: Page, email: string, password: string, next?: string) {
-  await page.goto(next ? `/sign-in?next=${encodeURIComponent(next)}` : "/sign-in");
+  await gotoReady(page, next ? `/sign-in?next=${encodeURIComponent(next)}` : "/sign-in");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.locator("form button[type=submit]").click();
@@ -130,7 +139,7 @@ export async function signInAsOwner(page: Page, next = "/admin") {
 /** Creates a customer through the sign-up form and returns their email. */
 export async function registerCustomer(page: Page, next = "/account"): Promise<string> {
   const email = `${unique("e2e")}@example.test`;
-  await page.goto(`/sign-in?next=${encodeURIComponent(next)}`);
+  await gotoReady(page, `/sign-in?next=${encodeURIComponent(next)}`);
   await page.getByRole("tab", { name: "Create account" }).click();
   await page.getByLabel("Full name").fill("E2E Customer");
   await page.getByLabel("Email").fill(email);
@@ -141,7 +150,7 @@ export async function registerCustomer(page: Page, next = "/account"): Promise<s
 }
 
 export async function addToBag(page: Page, productPath: string, size: string) {
-  await page.goto(productPath);
+  await gotoReady(page, productPath);
   await page.getByRole("button", { name: size, exact: true }).click();
   await page.getByRole("button", { name: /Add to bag/ }).click();
   await expect(page.getByText("Added to your bag.")).toBeVisible();
@@ -149,7 +158,7 @@ export async function addToBag(page: Page, productPath: string, size: string) {
 
 /** Fills checkout for Cairo and places the order with the given payment method. Returns the order reference. */
 export async function placeOrder(page: Page, payment: RegExp, promoCode?: string): Promise<string> {
-  await page.goto("/checkout");
+  await gotoReady(page, "/checkout");
   await page.getByLabel("Mobile number").fill("01012345678");
   await page.getByLabel("Governorate").selectOption({ label: "Cairo" });
   await page.getByLabel("City / area").fill("Nasr City");
