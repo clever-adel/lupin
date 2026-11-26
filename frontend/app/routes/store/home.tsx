@@ -123,6 +123,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 {pick(campaign, "text")}
               </p>
             )}
+            {/* On phones the photo fills the first screen, so the way into the shop comes before it. */}
+            <Link to={href("/shop")} className="btn btn-primary mt-6 md:hidden">
+              {t("home.heroCta")}
+            </Link>
           </div>
           {(campaign?.imageUrl || hero) && (
             <Link
@@ -142,7 +146,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           )}
           <div data-enter className="md:text-end" style={{ "--reveal-delay": "1100ms" } as CSSProperties}>
             <p className="label text-stone">{t("brand.supporting")}</p>
-            <Link to={href("/shop")} className="btn btn-outline mt-5">
+            <Link to={href("/shop")} className="btn btn-outline mt-5 max-md:hidden">
               {t("home.heroCta")}
             </Link>
           </div>
