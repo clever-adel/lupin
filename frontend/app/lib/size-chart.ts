@@ -58,7 +58,7 @@ function men(values: [string][]): Record<string, string> {
 }
 
 /** Standard body measurements in cm, by size, that a product's chart can start from. */
-export const STANDARD_CHARTS: Record<"WOMEN_TOPS" | "MEN_TOPS", { title: string; rows: Standard }> = {
+export const STANDARD_CHARTS: Record<"WOMEN_TOPS" | "MEN_TOPS" | "BERSHKA_MEN_HOODIES", { title: string; rows: Standard }> = {
   WOMEN_TOPS: {
     title: "Women's tops & T-shirts",
     rows: [
@@ -73,6 +73,16 @@ export const STANDARD_CHARTS: Record<"WOMEN_TOPS" | "MEN_TOPS", { title: string;
       { labelEn: "Waist", labelAr: "الوسط", values: men([["62-66"], ["66-74"], ["74-78"], ["82-86"], ["90-94"], ["98.5-103"], ["107.5-112"], ["116.5-121"]]) },
       { labelEn: "Arm length", labelAr: "طول الذراع", values: men([["59"], ["59"], ["59-60"], ["60-61"], ["61-62"], ["62-62.5"], ["62.5-63"], ["63"]]) },
       { labelEn: "Neck", labelAr: "الرقبة", values: men([["33"], ["34-35"], ["36"], ["38"], ["40"], ["42"], ["44"], ["46"]]) },
+    ],
+  },
+  // Bershka men's sweat tops: chest bands as Bershka publishes them (XS 78-86 … XXL 118-126); waist and
+  // neck from the matching Inditex men's chart, whose chest bands are the same.
+  BERSHKA_MEN_HOODIES: {
+    title: "Bershka men's hoodies & sweatshirts",
+    rows: [
+      { labelEn: "Chest", labelAr: "الصدر", values: { XS: "78-86", S: "86-94", M: "94-102", L: "102-110", XL: "110-118", XXL: "118-126" } },
+      { labelEn: "Waist", labelAr: "الوسط", values: { XS: "66-74", S: "74-82", M: "82-90", L: "90-98.5", XL: "98.5-107.5", XXL: "107.5-116.5" } },
+      { labelEn: "Neck", labelAr: "الرقبة", values: { XS: "34-35", S: "36-37", M: "38-39", L: "40-41", XL: "42-43", XXL: "44-45" } },
     ],
   },
 };
