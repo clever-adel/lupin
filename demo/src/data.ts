@@ -165,8 +165,8 @@ export const PRODUCTS: Product[] = [
     category: "hoodies",
     price: 490,
     compareAt: 700,
-    sizes: ["XS", "S", "M", "L", "XL"],
-    stock: { XS: 2, S: 4, M: 5, L: 3, XL: 1 },
+    sizes: ["S", "M", "L"],
+    stock: { S: 1, M: 2, L: 1 },
     colour: "Dark brown",
     description:
       "Where you lie low after the job. A dark brown loose fit sweatshirt by H&M in soft cotton-blend French terry with a brushed inside. Dropped shoulders, long sleeves and a ribbed neckline, cuffs and hem. No logo, no print — just a clean, warm piece you'll reach for every day.",
