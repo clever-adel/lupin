@@ -7,6 +7,8 @@ const HOW_TO: { match: RegExp; key: MessageKey }[] = [
   { match: /chest|bust/i, key: "product.sizeGuideHowChest" },
   { match: /waist/i, key: "product.sizeGuideHowWaist" },
   { match: /hip/i, key: "product.sizeGuideHowHips" },
+  { match: /arm|sleeve/i, key: "product.sizeGuideHowArm" },
+  { match: /neck/i, key: "product.sizeGuideHowNeck" },
 ];
 
 const tab = (active: boolean) =>

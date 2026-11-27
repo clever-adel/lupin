@@ -29,7 +29,7 @@ describe("size guide panel", () => {
     expect(screen.getByText("35½-38½")).toBeTruthy();
     expect(screen.getByText(/measure around the fullest part, keeping/)).toBeTruthy();
     expect(screen.getByText("International sizes")).toBeTruthy();
-    expect(screen.getByRole("columnheader", { name: "IT" })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "EUR" })).toBeTruthy();
   });
 
   it("has no international conversion for kids", () => {

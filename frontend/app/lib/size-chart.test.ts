@@ -26,14 +26,21 @@ describe("size chart", () => {
     expect(rows[1]?.values).toEqual({ S: "65-71", M: "71-79", L: "79-91.5" });
   });
 
+  it("fills the men's chart with chest, waist, arm length and neck, 3XL also as XXXL", () => {
+    const rows = standardRows("MEN_TOPS", ["S", "M", "XXXL"]);
+    expect(rows.map((r) => r.labelEn)).toEqual(["Chest", "Waist", "Arm length", "Neck"]);
+    expect(rows[0]?.values).toEqual({ S: "86-90", M: "94-98", XXXL: "126-130" });
+    expect(rows[3]?.values).toEqual({ S: "36", M: "38", XXXL: "46" });
+  });
+
   it("lists the international rows for the product's sizes, two UK sizes per women's letter size", () => {
     expect(internationalTable("women", ["S", "M"])?.rows.map((r) => r.values[0])).toEqual([8, 10, 12, 14]);
   });
 
   it("has a men's conversion and none for other departments", () => {
     const men = internationalTable("men", ["S", "M", "L"]);
-    expect(men?.columns).toEqual(["EU", "IT", "UK", "US"]);
-    expect(men?.rows.map((r) => r.values[0])).toEqual([46, 48, 50]);
+    expect(men?.columns).toEqual(["UK", "EUR"]);
+    expect(men?.rows.map((r) => r.values[1])).toEqual(["44-46", "48-50", "52-54"]);
     expect(internationalTable("kids", ["S"])).toBeNull();
     expect(internationalTable("men", ["One size"])).toBeNull();
   });

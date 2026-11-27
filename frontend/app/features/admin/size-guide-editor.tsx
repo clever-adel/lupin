@@ -10,6 +10,8 @@ const PRESETS: { labelEn: string; labelAr: string }[] = [
   { labelEn: "Bust", labelAr: "الصدر" },
   { labelEn: "Waist", labelAr: "الوسط" },
   { labelEn: "Hips", labelAr: "الأرداف" },
+  { labelEn: "Arm length", labelAr: "طول الذراع" },
+  { labelEn: "Neck", labelAr: "الرقبة" },
   { labelEn: "Chest width (flat)", labelAr: "عرض الصدر (مفرود)" },
   { labelEn: "Length", labelAr: "الطول" },
   { labelEn: "Sleeve", labelAr: "الكم" },
