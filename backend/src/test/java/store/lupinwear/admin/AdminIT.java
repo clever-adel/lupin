@@ -329,7 +329,7 @@ class AdminIT extends IntegrationTest {
     void staffCanOpenAnOrderFromACustomerWithoutAnEmail() throws Exception {
         String reference = place("COD", 1);
         // Like a guest who checked out with a phone number only.
-        jdbc.sql("update users set email = null where id = (select user_id from orders where reference = :r)")
+        jdbc.sql("update users set email = null, is_guest = true where id = (select user_id from orders where reference = :r)")
                 .param("r", reference).update();
         mvc.perform(get("/api/v1/admin/orders/" + reference).cookie(admin))
                 .andExpect(status().isOk())
