@@ -23,8 +23,9 @@ public final class CatalogDtos {
     public record CategoryView(String slug, String nameEn, String nameAr, String parentSlug) {
     }
 
+    /** {@code imageUrl}: the main photo of the department's first piece in the store order; null if none. */
     public record DepartmentView(String slug, String nameEn, String nameAr, String status, long productCount,
-            List<CategoryView> categories) {
+            List<CategoryView> categories, String imageUrl) {
     }
 
     /** {@code hoverImageUrl} is the colour's second photo, shown when a shopper points at the card; null if there is one. */

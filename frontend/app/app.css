@@ -464,3 +464,10 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* On phones the product page's buy bar sits at the bottom: lift the WhatsApp button above it. */
+@media (max-width: 47.99rem) {
+  html[data-sticky-buy] .whatsapp-float {
+    bottom: 5.5rem;
+  }
+}

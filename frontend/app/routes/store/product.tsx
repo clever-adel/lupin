@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState, type CSSProperties } from "react";
-import { Link, useSearchParams } from "react-router";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/product";
 import { announceBagAdded } from "~/components/bag-added";
 import { ShareIcon } from "~/components/icons";
@@ -96,6 +96,36 @@ function ProductView({ product }: { product: ProductDetail }) {
   const [variantId, setVariantId] = useState<number | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [notice, setNotice] = useState<"added" | "size" | "copied" | null>(null);
+  const navigate = useNavigate();
+  const [buying, setBuying] = useState(false);
+  // On phones a bar with the price and "Add to bag" stays at the bottom once the main button scrolls away.
+  const buyRef = useRef<HTMLDivElement>(null);
+  const [showBar, setShowBar] = useState(false);
+  // A scroll listener, not an IntersectionObserver: a fast fling can jump past the button without it ever
+  // being on screen, and the observer then never reports a change.
+  useEffect(() => {
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      const el = buyRef.current;
+      if (el) setShowBar(el.getBoundingClientRect().bottom < 0);
+    };
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(check); };
+    check();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, []);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (showBar) root.dataset.stickyBuy = "";
+    else delete root.dataset.stickyBuy;
+    return () => { delete root.dataset.stickyBuy; };
+  }, [showBar]);
   const bag = useBag();
   const viewPrice = product.salePrice ?? product.price;
   useEffect(() => {
@@ -131,9 +161,33 @@ function ProductView({ product }: { product: ProductDetail }) {
     setNotice(null);
   };
 
+  /** No size chosen yet: say so where the sizes are. */
+  const askForSize = () => {
+    setNotice("size");
+    document.getElementById("sizes")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  /** Puts the piece in the bag and goes straight to checkout (via sign-in or guest, as from the bag). */
+  const buyNow = async () => {
+    if (!variant) {
+      askForSize();
+      return;
+    }
+    const qty = Math.min(quantity, max);
+    setBuying(true);
+    try {
+      await bag.addAndWait(variant.id, qty);
+      track("AddToCart", { content_ids: [String(product.id)], content_type: "product", value: unit * qty, currency: "EGP", num_items: qty });
+      navigate(bag.signedIn ? href("/checkout") : `${href("/sign-in")}?next=${encodeURIComponent(href("/checkout"))}`);
+    } finally {
+      setBuying(false);
+    }
+  };
+
   const addToBag = () => {
     if (!variant) {
-      setNotice("size");
+      if (showBar) askForSize();
+      else setNotice("size");
       return;
     }
     const qty = Math.min(quantity, max);
@@ -280,7 +334,7 @@ function ProductView({ product }: { product: ProductDetail }) {
             </div>
           </fieldset>
 
-          <fieldset className="mt-7">
+          <fieldset id="sizes" className="mt-7 scroll-mt-24">
             <legend className="text-sm">
               <span className="font-semibold">{t("product.size")}:</span>{" "}
               <span dir="ltr">{variant?.sizeCode ?? t("product.selectSize")}</span>
@@ -329,7 +383,7 @@ function ProductView({ product }: { product: ProductDetail }) {
             {product.sizeGuide && <SizeGuidePanel guide={product.sizeGuide} sizes={color.variants.map((v) => v.sizeCode)} department={product.department.slug} />}
           </fieldset>
 
-          <div className="mt-7 flex flex-wrap gap-2">
+          <div ref={buyRef} className="mt-7 flex flex-wrap gap-2">
             <div className="flex h-12 flex-1 items-center justify-between border border-ink" role="group" aria-label={t("product.quantity")}>
               <button
                 type="button"
@@ -353,6 +407,9 @@ function ProductView({ product }: { product: ProductDetail }) {
             </div>
             <button type="button" onClick={addToBag} disabled={!anyAvailable} className="btn btn-primary order-last h-14 basis-full whitespace-nowrap">
               {t("product.addToBag")} · <span dir="ltr">{money(unit * quantity)}</span>
+            </button>
+            <button type="button" onClick={buyNow} disabled={!anyAvailable || buying} className="btn btn-outline order-last h-12 basis-full whitespace-nowrap">
+              {t("product.buyNow")}
             </button>
             <FavouriteButton slug={product.slug} className={`${square} h-12 w-12`} />
             <button type="button" onClick={share} aria-label={t("product.share")} className={`${square} cursor-pointer`}>
@@ -398,12 +455,6 @@ function ProductView({ product }: { product: ProductDetail }) {
           )}
 
           <div className="mt-6 border-t border-line">
-            {p(product, "description") && (
-              <details open className="border-b border-line py-4">
-                <summary className="cursor-pointer text-sm font-semibold">{t("product.description")}</summary>
-                <p className="mt-3 text-sm leading-relaxed text-stone">{p(product, "description")}</p>
-              </details>
-            )}
             {(p(product, "fabric") || p(product, "fit")) && (
               <details className="border-b border-line py-4">
                 <summary className="cursor-pointer text-sm font-semibold">{t("product.fabricFit")}</summary>
@@ -426,6 +477,23 @@ function ProductView({ product }: { product: ProductDetail }) {
           </div>
         </div>
       </div>
+
+      {showBar && anyAvailable && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bone/95 px-4 py-3 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] backdrop-blur md:hidden">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs text-stone">{name}{variant && <> · <span dir="ltr">{variant.sizeCode}</span></>}</p>
+              <p className="text-sm font-bold" dir="ltr">{money(unit * quantity)}</p>
+            </div>
+            <button type="button" onClick={addToBag} className="btn btn-primary h-11 whitespace-nowrap px-4">
+              {t("product.stickyAdd")}
+            </button>
+            <button type="button" onClick={buyNow} disabled={buying} className="btn btn-outline h-11 whitespace-nowrap px-4">
+              {t("product.buyNow")}
+            </button>
+          </div>
+        </div>
+      )}
 
       <ProductReviews slug={product.slug} />
 

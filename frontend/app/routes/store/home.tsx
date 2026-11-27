@@ -4,6 +4,7 @@ import type { Route } from "./+types/home";
 import type { loader as layoutLoader } from "./layout";
 import { LookLineup } from "~/components/look";
 import { ProductGrid, ProductPhoto } from "~/components/product";
+import { HomeReviews } from "~/components/reviews";
 import { apiGet } from "~/lib/api.server";
 import { toLang, translate, useT } from "~/lib/i18n";
 import { absoluteUrl, DEFAULT_SHARE_IMAGE, layoutOrigin, RETURN_POLICY, seo } from "~/lib/seo";
@@ -167,14 +168,21 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             const live = d.status === "ACTIVE";
             const body = (
               <div className="relative flex aspect-[3/2] flex-col justify-end md:aspect-auto md:h-64 overflow-hidden bg-ink p-5 text-bone">
+                {live && d.imageUrl && (
+                  <>
+                    <ProductPhoto url={d.imageUrl} alt="" sizes="(min-width: 768px) 50vw, 100vw"
+                      className="absolute inset-0 h-full w-full object-cover object-[50%_25%] opacity-80" />
+                    <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent" />
+                  </>
+                )}
                 <span
                   aria-hidden="true"
                   className="display pointer-events-none absolute -top-2 start-3 text-6xl text-transparent opacity-40 [-webkit-text-stroke:1px_var(--color-bone)]"
                 >
                   {name}
                 </span>
-                <span className="display text-lg">{name}</span>
-                <span className="mt-1 flex items-center justify-between text-xs text-bone/70">
+                <span className="display relative text-lg">{name}</span>
+                <span className="relative mt-1 flex items-center justify-between text-xs text-bone/70">
                   <span>{live ? t("home.styles", { count: d.productCount }) : t("home.comingSoon")}</span>
                   <span className="label border-b border-bone/60 pb-0.5 text-bone">
                     {live ? t("home.shop", { name }) : t("home.comingSoon")}
@@ -215,6 +223,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </div>
         {products.length > 0 ? <ProductGrid products={products} /> : <p className="text-stone">{t("home.empty")}</p>}
       </section>
+
+      <HomeReviews />
     </>
   );
 }

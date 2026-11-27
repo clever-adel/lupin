@@ -16,6 +16,8 @@ export interface Department {
   status: "ACTIVE" | "COMING_SOON";
   productCount: number;
   categories: Category[];
+  /** The main photo of the department's first piece in the store order. */
+  imageUrl?: string;
 }
 
 export interface ColorDot {

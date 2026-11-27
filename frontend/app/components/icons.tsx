@@ -45,3 +45,10 @@ export const ShareIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="M8 11l7-4M8 13l7 4" />
   </Icon>
 );
+
+export const SearchIcon = (p: SVGProps<SVGSVGElement>) => (
+  <Icon {...p}>
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="m20 20-4.2-4.2" />
+  </Icon>
+);

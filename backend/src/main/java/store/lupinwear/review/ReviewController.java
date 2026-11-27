@@ -142,6 +142,27 @@ public class ReviewController {
         return new ProductReviews(stats.count(), stats.average(), reviews);
     }
 
+    public record LatestReview(long id, int rating, String body, String name, String productSlug, String productNameEn,
+            String productNameAr, Instant createdAt) {
+    }
+
+    /** The newest published reviews that have words, across the store, for the home page. */
+    @GetMapping("/api/v1/catalog/reviews/latest")
+    @Transactional(readOnly = true)
+    public List<LatestReview> latest(@RequestParam(defaultValue = "6") int limit) {
+        return jdbc.sql("""
+                select r.id, r.rating, r.body, o.customer_name, p.slug, p.name_en, p.name_ar, r.created_at
+                from reviews r join products p on p.id = r.product_id
+                join order_items i on i.id = r.order_item_id join orders o on o.id = i.order_id
+                where r.status = 'APPROVED' and r.body <> '' and p.status = 'ACTIVE' and p.deleted_at is null
+                order by r.created_at desc limit :limit
+                """).param("limit", Math.clamp(limit, 1, 12))
+                .query((rs, n) -> new LatestReview(rs.getLong(1), rs.getInt(2), rs.getString(3), shortName(rs.getString(4)),
+                        rs.getString(5), rs.getString(6), rs.getString(7),
+                        rs.getObject(8, OffsetDateTime.class).toInstant()))
+                .list();
+    }
+
     @GetMapping("/api/v1/admin/reviews")
     @PreAuthorize("hasAnyRole('ADMIN','OWNER')")
     @Transactional(readOnly = true)

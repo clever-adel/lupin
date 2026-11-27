@@ -108,12 +108,19 @@ public class CatalogQueryService {
         return jdbc.sql("""
                 select d.id, d.slug, d.name_en, d.name_ar, d.status,
                        (select count(*) from products p join categories c on c.id = p.category_id
-                         where p.department_id = d.id and p.status = 'ACTIVE' and p.deleted_at is null and c.active) as product_count
+                         where p.department_id = d.id and p.status = 'ACTIVE' and p.deleted_at is null and c.active) as product_count,
+                       (select pi.url from products p join categories c on c.id = p.category_id
+                          join product_colors pc on pc.product_id = p.id and pc.is_main
+                          join product_images pi on pi.color_id = pc.id
+                         where p.department_id = d.id and p.status = 'ACTIVE' and p.deleted_at is null and c.active
+                         order by p.display_order asc nulls first, p.featured desc, p.published_at desc nulls last,
+                                  pi.position limit 1) as image_url
                 from departments d where :all or d.status in ('ACTIVE', 'COMING_SOON') order by d.sort_order, d.id
                 """).param("all", includeHidden).query((rs, n) -> new DepartmentView(rs.getString("slug"), rs.getString("name_en"),
                         rs.getString("name_ar"), rs.getString("status"),
                         "ACTIVE".equals(rs.getString("status")) ? rs.getLong("product_count") : 0,
-                        categories.getOrDefault(rs.getInt("id"), List.of())))
+                        categories.getOrDefault(rs.getInt("id"), List.of()),
+                        "ACTIVE".equals(rs.getString("status")) ? rs.getString("image_url") : null))
                 .list();
     }
 

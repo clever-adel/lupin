@@ -1,6 +1,8 @@
 import { useQueries } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { Link } from "react-router";
+import { Link, useRouteLoaderData } from "react-router";
+import type { loader as layoutLoader } from "./layout";
+import { freeDeliveryProgress } from "~/lib/free-delivery";
 import type { Route } from "./+types/bag";
 import { ProductPhoto } from "~/components/product";
 import { useBagState } from "~/features/bag/store";
@@ -21,6 +23,8 @@ export default function Bag() {
   // Names, prices and availability always come from the server, signed in or not.
   const bag = useBag();
   const { items, signedIn, setQuantity } = bag;
+  const threshold = useRouteLoaderData<typeof layoutLoader>("routes/store/layout")?.site?.freeDeliveryThreshold;
+  const freeDelivery = freeDeliveryProgress(bag.subtotal, threshold);
 
   // If stock dropped since the item was added, lower the quantity to what can still be bought.
   useEffect(() => {
@@ -130,6 +134,18 @@ export default function Bag() {
               <span>{t("bag.subtotal")}</span>
               <span className="text-base font-bold" aria-live="polite">{bag.isPending ? "…" : money(bag.subtotal)}</span>
             </p>
+            {freeDelivery && !bag.isPending && (
+              <div className="mt-3" aria-live="polite">
+                <p className="text-sm">
+                  {freeDelivery.left > 0
+                    ? t("bag.freeDeliveryLeft", { amount: money(freeDelivery.left) })
+                    : t("bag.freeDeliveryReached")}
+                </p>
+                <div className="mt-2 h-1.5 bg-line" aria-hidden="true">
+                  <div className="h-full bg-gold" style={{ width: `${Math.round(freeDelivery.share * 100)}%` }} />
+                </div>
+              </div>
+            )}
             <p className="mt-3 text-xs text-stone">{t("bag.note")}</p>
             {canCheckout ? (
               <Link to={checkoutHref} className="btn btn-primary mt-5 w-full">{t("bag.checkout")}</Link>

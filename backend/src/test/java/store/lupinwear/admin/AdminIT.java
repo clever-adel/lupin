@@ -320,6 +320,8 @@ class AdminIT extends IntegrationTest {
                 .andExpect(jsonPath("$.average").value(4.0))
                 .andExpect(jsonPath("$.reviews[0].body").value("Fits well"))
                 .andExpect(jsonPath("$.reviews[0].name").isNotEmpty());
+        mvc.perform(get("/api/v1/catalog/reviews/latest"))
+                .andExpect(jsonPath("$[?(@.id==" + review + ")].productSlug").value(productSlug));
         mvc.perform(get("/api/v1/orders/" + reference + "/reviews").cookie(customer))
                 .andExpect(jsonPath("$[0].rating").value(4))
                 .andExpect(jsonPath("$[0].status").value("APPROVED"));

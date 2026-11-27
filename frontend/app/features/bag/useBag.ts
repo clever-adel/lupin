@@ -88,6 +88,11 @@ export function useBag() {
       if (signedIn) change.mutate({ type: "add", variantId, quantity });
       else bagActions.add(variantId, quantity);
     },
+    /** Like add, but resolves once the piece is really in the bag (for "Buy now", which leaves the page). */
+    async addAndWait(variantId: number, quantity: number) {
+      if (signedIn) await change.mutateAsync({ type: "add", variantId, quantity });
+      else bagActions.add(variantId, quantity);
+    },
     setQuantity(variantId: number, quantity: number) {
       if (signedIn) change.mutate({ type: "set", variantId, quantity });
       else bagActions.setQuantity(variantId, quantity);
