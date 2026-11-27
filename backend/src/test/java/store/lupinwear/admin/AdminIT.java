@@ -42,6 +42,7 @@ class AdminIT extends IntegrationTest {
     int optionId;
     long variant;
     String customerEmail;
+    String productSlug;
 
     @Autowired
     store.lupinwear.support.IntegrationTest.FakeMailer mailer;
@@ -74,6 +75,7 @@ class AdminIT extends IntegrationTest {
                 .cookie(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"ACTIVE\"}"))
                 .andExpect(status().isNoContent());
         variant = created.get("variantIds").get(0).asLong();
+        productSlug = created.get("slug").asText();
         customerEmail = uniqueEmail();
         customer = cookie(register(customerEmail), AuthCookies.ACCESS);
     }
@@ -276,6 +278,51 @@ class AdminIT extends IntegrationTest {
         var shipped = mailTo(customerEmail, reference);
         assertThat(shipped.subject()).contains("Your order is on its way");
         assertThat(shipped.html()).contains("Mylerz", "MZ-77", "https://track.example.com/MZ-77");
+    }
+
+    @Test
+    void aCustomerReviewsADeliveredPieceAndItShowsOnceApproved() throws Exception {
+        String reference = place("COD", 1);
+        mvc.perform(get("/api/v1/orders/" + reference + "/reviews").cookie(customer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));   // not delivered yet
+        long item = jdbc.sql("select i.id from order_items i join orders o on o.id = i.order_id where o.reference = :r")
+                .param("r", reference).query(Long.class).single();
+        mvc.perform(jsonPost("/api/v1/reviews", Map.of("orderItemId", item, "rating", 5, "body", "Great")).cookie(customer))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_DELIVERED"));
+
+        for (String step : List.of("CONFIRMED", "PROCESSING", "SHIPPED", "DELIVERED")) {
+            move(reference, step, admin).andExpect(status().isOk());
+        }
+        mvc.perform(get("/api/v1/orders/" + reference + "/reviews").cookie(customer))
+                .andExpect(jsonPath("$[0].orderItemId").value(item))
+                .andExpect(jsonPath("$[0].rating").doesNotExist());
+        mvc.perform(jsonPost("/api/v1/reviews", Map.of("orderItemId", item, "rating", 6)).cookie(customer))
+                .andExpect(status().isBadRequest());
+        long review = body(mvc.perform(jsonPost("/api/v1/reviews",
+                        Map.of("orderItemId", item, "rating", 4, "body", "  Fits well  ")).cookie(customer))
+                .andExpect(status().isCreated()).andReturn()).get("id").asLong();
+        mvc.perform(jsonPost("/api/v1/reviews", Map.of("orderItemId", item, "rating", 5)).cookie(customer))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("ALREADY_REVIEWED"));
+        // Another customer cannot review someone else's piece.
+        Cookie stranger = cookie(register(uniqueEmail()), AuthCookies.ACCESS);
+        mvc.perform(jsonPost("/api/v1/reviews", Map.of("orderItemId", item, "rating", 1)).cookie(stranger))
+                .andExpect(status().isNotFound());
+
+        // Hidden until staff approve it.
+        mvc.perform(get("/api/v1/catalog/products/" + productSlug + "/reviews"))
+                .andExpect(jsonPath("$.count").value(0));
+        mvc.perform(get("/api/v1/admin/reviews").cookie(admin))
+                .andExpect(jsonPath("$[?(@.id==" + review + ")].body").value("Fits well"));
+        mvc.perform(jsonPost("/api/v1/admin/reviews/" + review + "/status", Map.of("status", "APPROVED")).cookie(admin))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/catalog/products/" + productSlug + "/reviews"))
+                .andExpect(jsonPath("$.count").value(1))
+                .andExpect(jsonPath("$.average").value(4.0))
+                .andExpect(jsonPath("$.reviews[0].body").value("Fits well"))
+                .andExpect(jsonPath("$.reviews[0].name").isNotEmpty());
+        mvc.perform(get("/api/v1/orders/" + reference + "/reviews").cookie(customer))
+                .andExpect(jsonPath("$[0].rating").value(4))
+                .andExpect(jsonPath("$[0].status").value("APPROVED"));
     }
 
     /** The next email to this address about this order, waiting up to five seconds. */

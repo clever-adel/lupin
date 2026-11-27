@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import type { Route } from "./+types/order";
 import { ProductPhoto } from "~/components/product";
+import { RateYourPieces } from "~/components/reviews";
 import { useRequireSignIn } from "~/features/auth/session";
 import { api, ApiError } from "~/lib/http";
 import { toLang, translate, useT, type MessageKey } from "~/lib/i18n";
@@ -523,6 +524,8 @@ export default function OrderPage() {
           </ol>
         </section>
       </div>
+
+      {o.status === "DELIVERED" && <RateYourPieces reference={o.reference} />}
 
       <Link to={href("/account")} className="mt-6 inline-block text-sm underline">{t("order.back")}</Link>
     </div>
