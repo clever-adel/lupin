@@ -393,6 +393,21 @@ public class CatalogAdminService {
                 product.sizeGuide(), variantRows(id));
     }
 
+    /**
+     * Saves the store order from "Display order": the listed products get 10, 20, 30… in that order.
+     * Products not listed keep their place.
+     */
+    public void setDisplayOrder(UUID actor, List<Long> productIds) {
+        if (new java.util.HashSet<>(productIds).size() != productIds.size()) {
+            throw ApiException.badRequest("DUPLICATE_PRODUCT", "A product is listed twice.");
+        }
+        for (int i = 0; i < productIds.size(); i++) {
+            jdbc.sql("update products set display_order = :o where id = :id and deleted_at is null")
+                    .param("o", (i + 1) * 10).param("id", productIds.get(i)).update();
+        }
+        audit.record(actor, "PRODUCT_ORDER", "product", null, Map.of("count", productIds.size()));
+    }
+
     /** Every active variant of a product with its stock, in colour then size order. */
     private List<AdminVariantRow> variantRows(long productId) {
         return jdbc.sql("""

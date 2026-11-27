@@ -206,6 +206,26 @@ test.describe.serial("shop features", () => {
     await expect(person).toContainText("Admin: daily work");
   });
 
+  test("staff arrange the shop and the store follows that order", async ({ page }) => {
+    await signInAsOwner(page, "/admin/arrange");
+    const rows = page.locator("main ol > li");
+    await expect(rows.first()).toBeVisible();
+    const count = await rows.count();
+    expect(count).toBeGreaterThan(2);
+    const last = (await rows.nth(count - 1).locator("span.truncate").textContent()) ?? "";
+    await page.getByRole("button", { name: `Move ${last} to the top` }).click();
+    await expect(rows.first()).toContainText(last);
+    await page.getByRole("button", { name: "Save order" }).click();
+    await expect(page.getByText("Saved. The store shows this order now.")).toBeVisible();
+
+    // The store lists it first, unless it is sold out (sold-out pieces always come last).
+    const shop = await (await page.request.get("/api/v1/catalog/products?pageSize=48")).json();
+    const first = shop.items.find((c: { inStock: boolean }) => c.inStock);
+    const moved = shop.items.find((c: { nameEn: string }) => c.nameEn === last);
+    if (moved.inStock) expect(first.nameEn).toBe(last);
+    else expect(shop.items[shop.items.length - 1].inStock).toBe(false);
+  });
+
   test("FAQ answers show headings, lists, bold and safe links", async ({ page }) => {
     await signInAsOwner(page, "/admin/content");
     const question = `E2E rich ${stamp}`;

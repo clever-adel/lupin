@@ -251,6 +251,33 @@ class CatalogIT extends IntegrationTest {
     }
 
     @Test
+    void staffArrangeTheShopAndSoldOutPiecesComeLast() throws Exception {
+        long first = create(request("Arrange A", "900.00", null, 2)).get("id").asLong();
+        long second = create(request("Arrange B", "900.00", null, 2)).get("id").asLong();
+        long soldOut = create(request("Arrange C", "900.00", null, 0)).get("id").asLong();
+        long fresh = create(request("Arrange D", "900.00", null, 2)).get("id").asLong();
+        for (long id : List.of(first, second, soldOut, fresh)) {
+            publish(id);
+        }
+
+        // Staff put C first, then B, then A; D is new and not arranged yet.
+        mvc.perform(put("/api/v1/admin/products/order").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"productIds\":[" + soldOut + "," + second + "," + first + "]}"))
+                .andExpect(status().isNoContent());
+
+        // New pieces come first, then the arranged order; the sold-out piece drops to the end anyway.
+        mvc.perform(get("/api/v1/catalog/products").param("department", "men").param("category", category))
+                .andExpect(jsonPath("$.items[*].nameEn").value(org.hamcrest.Matchers.contains(
+                        "Arrange D", "Arrange B", "Arrange A", "Arrange C")));
+
+        mvc.perform(put("/api/v1/admin/products/order").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"productIds\":[" + first + "," + first + "]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void aCategoryCanBeRenamedAndDeletedOnlyOnceItIsEmpty() throws Exception {
         String path = "/api/v1/admin/departments/men/categories/" + category;
         mvc.perform(put(path).with(csrf()).cookie(owner).contentType(MediaType.APPLICATION_JSON)

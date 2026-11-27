@@ -214,6 +214,11 @@ public final class CatalogDtos {
     public record SizeAdded(List<Long> variantIds) {
     }
 
+    /** Product ids in the order they should appear on the store, first to last. */
+    public record DisplayOrderRequest(@jakarta.validation.constraints.NotEmpty
+            @Size(max = 500) List<@NotNull Long> productIds) {
+    }
+
     /** A colour added to a product that already exists: same sizes as the others, its own stock and photos. */
     public record AddColorRequest(
             @NotBlank @Size(max = 60) String nameEn,

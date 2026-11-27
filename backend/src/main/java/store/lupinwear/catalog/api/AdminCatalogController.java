@@ -123,6 +123,13 @@ public class AdminCatalogController {
         return catalog.addColor(user.id(), id, body);
     }
 
+    @org.springframework.web.bind.annotation.PutMapping("/products/order")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void setDisplayOrder(@AuthenticationPrincipal CurrentUser user,
+            @Valid @RequestBody CatalogDtos.DisplayOrderRequest body) {
+        catalog.setDisplayOrder(user.id(), body.productIds());
+    }
+
     @PostMapping("/products/{id}/sizes")
     @ResponseStatus(HttpStatus.CREATED)
     CatalogDtos.SizeAdded addSize(@AuthenticationPrincipal CurrentUser user, @PathVariable long id,
