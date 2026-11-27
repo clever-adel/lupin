@@ -123,6 +123,13 @@ public class AdminCatalogController {
         return catalog.addColor(user.id(), id, body);
     }
 
+    @PostMapping("/products/{id}/sizes")
+    @ResponseStatus(HttpStatus.CREATED)
+    CatalogDtos.SizeAdded addSize(@AuthenticationPrincipal CurrentUser user, @PathVariable long id,
+            @Valid @RequestBody CatalogDtos.AddSizeRequest body) {
+        return catalog.addSize(user.id(), id, body);
+    }
+
     @GetMapping("/products/{id}")
     CatalogDtos.AdminProductDetail product(@PathVariable long id) {
         return catalog.productForEdit(id);

@@ -208,6 +208,49 @@ class CatalogIT extends IntegrationTest {
     }
 
     @Test
+    void aSizeCanBeAddedToAProductAlreadyOnSaleAndStockIsShownWhileEditing() throws Exception {
+        JsonNode created = create(request("Size Later Hoodie", "900.00", null, 2));
+        long id = created.get("id").asLong();
+        String slug = created.get("slug").asText();
+        publish(id);
+        JsonNode detail = body(mvc.perform(get("/api/v1/admin/products/" + id).cookie(owner))
+                .andExpect(jsonPath("$.variants.length()").value(6))
+                .andExpect(jsonPath("$.variants[0].color").value("Black"))
+                .andExpect(jsonPath("$.variants[0].sizeCode").value("S"))
+                .andExpect(jsonPath("$.variants[0].onHand").value(2))
+                .andReturn());
+        long navy = detail.get("colors").get(1).get("id").asLong();
+
+        mvc.perform(post("/api/v1/admin/products/" + id + "/sizes").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sizeCode\":\"xl\",\"stockByColor\":{\"" + navy + "\":3}}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.variantIds.length()").value(2));
+
+        assertThat(stockFor(id, "Navy", "XL")).isEqualTo(3);
+        assertThat(stockFor(id, "Black", "XL")).isZero();
+        mvc.perform(get("/api/v1/admin/products/" + id).cookie(owner))
+                .andExpect(jsonPath("$.sizes.length()").value(4))
+                .andExpect(jsonPath("$.sizes[3]").value("XL"))
+                .andExpect(jsonPath("$.variants.length()").value(8));
+        // Shoppers see the new size straight away, available only where there is stock.
+        mvc.perform(get("/api/v1/catalog/products/" + slug))
+                .andExpect(jsonPath("$.colors[1].variants[?(@.sizeCode=='XL')].available").value(true))
+                .andExpect(jsonPath("$.colors[0].variants[?(@.sizeCode=='XL')].available").value(false));
+
+        mvc.perform(post("/api/v1/admin/products/" + id + "/sizes").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"sizeCode\":\"XL\"}"))
+                .andExpect(status().isConflict());
+        mvc.perform(post("/api/v1/admin/products/" + id + "/sizes").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"sizeCode\":\"8-9Y\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/api/v1/admin/products/" + id + "/sizes").with(csrf()).cookie(owner)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sizeCode\":\"XXL\",\"stockByColor\":{\"999999\":1}}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void aCategoryCanBeRenamedAndDeletedOnlyOnceItIsEmpty() throws Exception {
         String path = "/api/v1/admin/departments/men/categories/" + category;
         mvc.perform(put(path).with(csrf()).cookie(owner).contentType(MediaType.APPLICATION_JSON)
