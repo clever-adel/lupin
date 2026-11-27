@@ -19,6 +19,7 @@ export default [
     route("promotions", "routes/admin/promotions.tsx"),
     route("content", "routes/admin/content.tsx"),
     route("staff", "routes/admin/staff.tsx"),
+    route("reports", "routes/admin/reports.tsx"),
     route("settings", "routes/admin/settings.tsx"),
     route("security", "routes/admin/security.tsx"),
   ]),

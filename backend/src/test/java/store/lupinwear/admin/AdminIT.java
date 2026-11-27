@@ -225,6 +225,35 @@ class AdminIT extends IntegrationTest {
                 .andExpect(jsonPath("$.items[?(@.variants[0].variantId==" + variant + ")].variants[0].available").value(4));
     }
 
+    @Test
+    void theOwnerSeesSalesAndCanExportOrders() throws Exception {
+        JsonNode before = body(mvc.perform(get("/api/v1/admin/reports").cookie(owner))
+                .andExpect(status().isOk()).andReturn());
+        String kept = place("COD", 2);
+        String cancelled = place("COD", 1);
+        move(cancelled, "CANCELLED", admin).andExpect(status().isOk());
+
+        JsonNode after = body(mvc.perform(get("/api/v1/admin/reports").cookie(owner))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(after.at("/online/orders").asLong() - before.at("/online/orders").asLong()).isEqualTo(1);
+        assertThat(after.at("/online/items").asLong() - before.at("/online/items").asLong()).isEqualTo(2);
+        assertThat(after.at("/online/cancelled").asLong() - before.at("/online/cancelled").asLong()).isEqualTo(1);
+        assertThat(after.at("/online/revenue").decimalValue().subtract(before.at("/online/revenue").decimalValue()))
+                .isEqualByComparingTo("2060.00");
+        assertThat(after.at("/online/deliveryFees").decimalValue().subtract(before.at("/online/deliveryFees").decimalValue()))
+                .isEqualByComparingTo("60.00");
+        assertThat(after.get("days")).hasSize(30);
+
+        String csv = mvc.perform(get("/api/v1/admin/reports/orders.csv").cookie(owner))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(csv).startsWith("\uFEFF\"Reference\"").contains("\"" + kept + "\"", "\"" + cancelled + "\"", "\"CANCELLED\"");
+
+        // Only the owner sees the money.
+        mvc.perform(get("/api/v1/admin/reports").cookie(admin)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/admin/reports").param("from", "2026-02-01").param("to", "2026-01-01").cookie(owner))
+                .andExpect(status().isBadRequest());
+    }
+
     // ── helpers ──
 
     private String place(String method, int quantity) throws Exception {

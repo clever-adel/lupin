@@ -140,6 +140,7 @@ export default function AdminLayout() {
           <NavLink to="/admin/promotions" className={link}>Offers</NavLink>
           <NavLink to="/admin/content" className={link}>Content</NavLink>
           <NavLink to="/admin/settings" className={link}>Settings</NavLink>
+          {me.data.roles.includes("OWNER") && <NavLink to="/admin/reports" className={link}>Reports</NavLink>}
           {me.data.roles.includes("OWNER") && <NavLink to="/admin/staff" className={link}>Staff</NavLink>}
         </nav>
       </header>
