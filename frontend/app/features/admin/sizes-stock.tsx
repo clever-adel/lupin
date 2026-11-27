@@ -67,18 +67,13 @@ export function SizesAndStock({ productId, sizes, colours, variants, sizeOptions
       )}
 
       {missing.length > 0 && colours.length > 0 && (
-        <form
-          className="mt-5 border-t border-line pt-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (size) add.mutate();
-          }}
-        >
+        // Not a <form>: this section sits inside the product edit form, and forms cannot nest.
+        <div className="mt-5 border-t border-line pt-4">
           <h3 className="text-sm font-semibold">Add a size</h3>
           <div className="mt-2 flex flex-wrap items-end gap-3 text-sm">
             <label>
               <span className="mb-1 block text-xs font-medium">Size</span>
-              <select className="field h-10 w-28" value={size} onChange={(e) => setSize(e.target.value)} required>
+              <select className="field h-10 w-28" value={size} onChange={(e) => setSize(e.target.value)}>
                 <option value="">Choose…</option>
                 {missing.map((s) => <option key={s} value={s}>{s === "ONE" ? "One size" : s}</option>)}
               </select>
@@ -86,11 +81,11 @@ export function SizesAndStock({ productId, sizes, colours, variants, sizeOptions
             {colours.map((c) => (
               <label key={c.id}>
                 <span className="mb-1 block text-xs font-medium">Stock · {c.nameEn}</span>
-                <input className="field h-10 w-24" type="number" min={0} max={100000} inputMode="numeric" placeholder="0"
+                <input className="field h-10 w-24" type="number" inputMode="numeric" placeholder="0"
                   value={stock[c.id] ?? ""} onChange={(e) => setStock((m) => ({ ...m, [c.id]: e.target.value }))} />
               </label>
             ))}
-            <button type="submit" className="btn btn-primary h-10" disabled={!size || add.isPending}>
+            <button type="button" className="btn btn-primary h-10" disabled={!size || add.isPending} onClick={() => add.mutate()}>
               {add.isPending ? "Adding…" : size ? `Add size ${size}` : "Add size"}
             </button>
           </div>
@@ -99,7 +94,7 @@ export function SizesAndStock({ productId, sizes, colours, variants, sizeOptions
           </p>
           {add.isError && <p role="alert" className="mt-2 text-sm text-danger">{errorText(add.error)}</p>}
           {add.isSuccess && <p role="status" className="mt-2 text-sm">Size added.</p>}
-        </form>
+        </div>
       )}
     </section>
   );
