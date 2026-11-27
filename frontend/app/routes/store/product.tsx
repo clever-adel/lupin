@@ -4,15 +4,16 @@ import { Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/product";
 import { announceBagAdded } from "~/components/bag-added";
 import { ShareIcon } from "~/components/icons";
-import { FavouriteButton, Price, ProductPhoto } from "~/components/product";
+import { FavouriteButton, Price, ProductGrid, ProductPhoto } from "~/components/product";
 import { SizeGuidePanel } from "~/components/size-guide";
 import { useBag } from "~/features/bag/useBag";
 import { api } from "~/lib/http";
 import { apiGet } from "~/lib/api.server";
 import { localePath, pick, toLang, translate, useT } from "~/lib/i18n";
 import { track } from "~/lib/pixel";
+import { relatedPieces } from "~/lib/related";
 import { absoluteUrl, layoutOrigin, RETURN_POLICY, seo } from "~/lib/seo";
-import type { LookCard, ProductDetail } from "~/lib/types";
+import type { LookCard, Page, ProductCard, ProductDetail } from "~/lib/types";
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const product = await apiGet<ProductDetail>(context, `/api/v1/catalog/products/${encodeURIComponent(params.slug)}`);
@@ -104,6 +105,13 @@ function ProductView({ product }: { product: ProductDetail }) {
     staleTime: 60_000,
   });
   const seenIn = looks.data?.[0];
+  // "You may also steal": other pieces from the same department, same category first, at most four.
+  const related = useQuery({
+    queryKey: ["related", product.slug],
+    queryFn: () => api<Page<ProductCard>>("GET", `/api/v1/catalog/products?department=${encodeURIComponent(product.department.slug)}&pageSize=12`),
+    staleTime: 60_000,
+  });
+  const alsoSteal = relatedPieces(product, related.data?.items ?? []);
 
   const color = product.colors.find((c) => c.id === colorId) ?? product.colors[0];
   if (!color) return null;
@@ -401,6 +409,16 @@ function ProductView({ product }: { product: ProductDetail }) {
           </div>
         </div>
       </div>
+
+      {alsoSteal.length > 0 && (
+        <section className="pt-20" aria-labelledby="also-steal-title">
+          <div data-reveal className="mb-8">
+            <p className="label text-stone">{t("product.completeLook")}</p>
+            <h2 id="also-steal-title" className="display mt-2 text-2xl md:text-3xl">{t("product.alsoSteal")}</h2>
+          </div>
+          <ProductGrid products={alsoSteal} />
+        </section>
+      )}
     </div>
   );
 }
