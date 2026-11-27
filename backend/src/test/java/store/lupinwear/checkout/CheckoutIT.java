@@ -681,6 +681,28 @@ class CheckoutIT extends IntegrationTest {
     }
 
     /** Publishes a one-colour, one-size product in this test's category and returns its variant id. */
+    @Test
+    void anOfferOnACategoryAlsoCoversItsSubCategories() throws Exception {
+        String sub = body(mvc.perform(jsonPost("/api/v1/admin/categories",
+                new CategoryRequest("men", category, "Sub " + UUID.randomUUID().toString().substring(0, 8), "فرعية"))
+                .cookie(owner)).andExpect(status().isCreated()).andReturn()).get("slug").asText();
+        ProductRequest request = new ProductRequest("Sub Hoodie " + UUID.randomUUID().toString().substring(0, 6), "هودي",
+                "men", sub, "", "", "", "", "", "", null, null, new BigDecimal("1000.00"), null, "ADULT",
+                List.of("M"), List.of(new ColorRequest("Black", "أسود", "#0B0B0C", true, List.of())), 5);
+        JsonNode created = body(mvc.perform(jsonPost("/api/v1/admin/products", request).cookie(owner))
+                .andExpect(status().isCreated()).andReturn());
+        mvc.perform(patch("/api/v1/admin/products/" + created.get("id").asLong() + "/status").with(csrf())
+                .cookie(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"ACTIVE\"}"))
+                .andExpect(status().isNoContent());
+        Customer customer = customer();
+        setQuantity(customer, created.get("variantIds").get(0).asLong(), 1).andExpect(status().isOk());
+
+        promotion("Parent ten percent", true, "PERCENT", "10", null);   // on the parent category only
+        quote(customer, CAIRO, null)
+                .andExpect(jsonPath("$.discount").value(100.00))
+                .andExpect(jsonPath("$.discountLabelEn").value("Parent ten percent"));
+    }
+
     private long product(String name, String price, String salePrice, int stock) throws Exception {
         ProductRequest request = new ProductRequest(name, "منتج تجريبي", "men", category, "", "", "", "", "", "",
                 null, null, new BigDecimal(price), salePrice == null ? null : new BigDecimal(salePrice), "ADULT",

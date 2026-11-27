@@ -18,6 +18,9 @@ const ACTION_LABEL: Record<string, string> = {
   CANCELLED: "Cancel order",
 };
 
+/** Suggestions only: staff can type any courier. */
+const COURIERS = ["Bosta", "Aramex", "J&T Express", "Mylerz", "R2S", "Sprint", "Egypt Post", "DHL", "FedEx", "Own delivery"];
+
 export default function AdminOrder() {
   const reference = useParams().reference ?? "";
   const client = useQueryClient();
@@ -26,6 +29,7 @@ export default function AdminOrder() {
   const [note, setNote] = useState("");
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
+  const [trackingUrl, setTrackingUrl] = useState("");
   const [confirmRefund, setConfirmRefund] = useState(false);
   const { isOwner } = useOutletContext<AdminContext>();
 
@@ -41,6 +45,7 @@ export default function AdminOrder() {
         note: note || null,
         carrier: carrier || null,
         trackingReference: tracking || null,
+        trackingUrl: trackingUrl.trim() || null,
       }),
     onSuccess: (updated) => {
       client.setQueryData(key, updated);
@@ -140,11 +145,22 @@ export default function AdminOrder() {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label htmlFor="carrier" className="mb-1.5 block text-sm font-medium">Courier (optional)</label>
-                  <input id="carrier" className="field" maxLength={60} value={carrier} onChange={(e) => setCarrier(e.target.value)} />
+                  <input id="carrier" className="field" maxLength={60} list="couriers" placeholder="Any company"
+                    value={carrier} onChange={(e) => setCarrier(e.target.value)} />
+                  <datalist id="couriers">
+                    {COURIERS.map((c) => <option key={c} value={c} />)}
+                  </datalist>
                 </div>
                 <div>
                   <label htmlFor="tracking" className="mb-1.5 block text-sm font-medium">Tracking number (optional)</label>
                   <input id="tracking" className="field" maxLength={100} value={tracking} onChange={(e) => setTracking(e.target.value)} />
+                </div>
+                <div className="sm:col-span-2">
+                  <label htmlFor="tracking-url" className="mb-1.5 block text-sm font-medium">Tracking link (optional)</label>
+                  <input id="tracking-url" className="field" type="url" maxLength={300} dir="ltr"
+                    placeholder="https://… the courier's page for this parcel"
+                    value={trackingUrl} onChange={(e) => setTrackingUrl(e.target.value)} />
+                  <p className="mt-1 text-xs text-stone">The customer gets a “Track your parcel” button on their order page.</p>
                 </div>
               </div>
             )}
@@ -246,6 +262,9 @@ export default function AdminOrder() {
               {shipment && (
                 <p className="text-stone">
                   {shipment.carrier ?? "Courier not recorded"}{shipment.trackingReference && ` · ${shipment.trackingReference}`}
+                  {shipment.trackingUrl && (
+                    <> · <a href={shipment.trackingUrl} target="_blank" rel="noopener noreferrer" className="underline">tracking page</a></>
+                  )}
                 </p>
               )}
             </address>

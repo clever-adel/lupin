@@ -47,6 +47,7 @@ export interface AdminOrder {
     courierStateLabel?: string;
     lastException?: string;
     codAmount?: number;
+    trackingUrl?: string;
   };
   history: { fromStatus?: string; toStatus: OrderStatus; actor?: string; note?: string; at: string }[];
 }

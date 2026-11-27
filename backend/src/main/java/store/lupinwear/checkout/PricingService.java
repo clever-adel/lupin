@@ -76,7 +76,12 @@ public class PricingService {
     private static final String PROMOTION = """
             select p.id, p.name_en, p.name_ar, p.type, p.value, p.scope, p.min_order_value, p.active,
                    p.starts_at, p.ends_at,
-                   array(select t.target_id from promotion_targets t where t.promotion_id = p.id) as targets,
+                   -- An offer on a category also covers every category under it.
+                   array(with recursive tree(id) as (
+                             select t.target_id from promotion_targets t where t.promotion_id = p.id
+                             union
+                             select c.id from categories c join tree on c.parent_id = tree.id where p.scope = 'CATEGORY')
+                         select id from tree) as targets,
                    pc.id as code_id, pc.code, pc.max_redemptions, pc.per_customer_limit, pc.redeemed_count
             from promotions p left join promo_codes pc on pc.promotion_id = p.id
             """;

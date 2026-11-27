@@ -54,6 +54,9 @@ public class AdminStaffController {
     public record StatusRequest(@NotNull @Pattern(regexp = "ACTIVE|DISABLED") String status) {
     }
 
+    public record RoleRequest(@NotNull @Pattern(regexp = "ADMIN|OWNER") String role) {
+    }
+
     public record PasswordRequest(
             @NotBlank @Size(min = 12, max = 128, message = "Use at least 12 characters") String password) {
     }
@@ -113,6 +116,26 @@ public class AdminStaffController {
                     .param("id", id).update();
         }
         audit.record(user.id(), "STAFF_STATUS", "user", id, Map.of("status", body.status()));
+    }
+
+    /**
+     * Makes another staff member an admin or an owner. Their sessions end so the new role applies at their
+     * next sign-in. The owner doing it can never change their own role, so a shop always keeps an owner.
+     */
+    @PostMapping("/{id}/role")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void setRole(@AuthenticationPrincipal CurrentUser user, @PathVariable UUID id,
+            @Valid @RequestBody RoleRequest body) {
+        requireOtherStaff(user, id);
+        jdbc.sql("""
+                delete from user_roles where user_id = :id
+                and role_id in (select r.id from roles r where r.code in ('ADMIN', 'OWNER'))
+                """).param("id", id).update();
+        jdbc.sql("insert into user_roles (user_id, role_id) select :id, r.id from roles r where r.code = :role")
+                .param("id", id).param("role", body.role()).update();
+        jdbc.sql("update auth_sessions set revoked_at = now() where user_id = :id and revoked_at is null")
+                .param("id", id).update();
+        audit.record(user.id(), "STAFF_ROLE", "user", id, Map.of("role", body.role()));
     }
 
     @PostMapping("/{id}/password")

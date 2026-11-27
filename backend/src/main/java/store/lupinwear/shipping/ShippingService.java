@@ -256,7 +256,7 @@ public class ShippingService {
                 return tx.execute(s -> {
                     String note = "Sent with Bosta (" + district.name() + ")";
                     orders.changeStatus(actor, reference, new StatusChange("SHIPPED", note, CARRIER,
-                            created.trackingNumber()));
+                            created.trackingNumber(), null));
                     // provider_state_at is the time of Bosta's last status message, on Bosta's clock. It
                     // stays empty here: our own clock must not be compared with Bosta's, or Bosta's first
                     // message could look older than this and be dropped.
@@ -400,7 +400,7 @@ public class ShippingService {
 
             if (state == DELIVERED && "SHIPPED".equals(ship.orderStatus())) {
                 orders.changeStatus(null, ship.reference(),
-                        new StatusChange("DELIVERED", "Bosta reported the parcel delivered", null, null));
+                        new StatusChange("DELIVERED", "Bosta reported the parcel delivered", null, null, null));
             } else if (state == RETURNED) {
                 jdbc.sql("update shipments set status = 'RETURNED' where id = :id").param("id", ship.id()).update();
                 audit.record(null, "SHIPMENT_RETURNED", "order", ship.reference(), Map.of("tracking", tracking));

@@ -7,6 +7,7 @@ import { ShareIcon } from "~/components/icons";
 import { FavouriteButton, Price, ProductGrid, ProductPhoto } from "~/components/product";
 import { SizeGuidePanel } from "~/components/size-guide";
 import { SizeFinder } from "~/components/size-finder";
+import { ProductReviews } from "~/components/reviews";
 import { useBag } from "~/features/bag/useBag";
 import { api } from "~/lib/http";
 import { apiGet } from "~/lib/api.server";
@@ -425,6 +426,8 @@ function ProductView({ product }: { product: ProductDetail }) {
           </div>
         </div>
       </div>
+
+      <ProductReviews slug={product.slug} />
 
       {alsoSteal.length > 0 && (
         <section className="pt-20" aria-labelledby="also-steal-title">

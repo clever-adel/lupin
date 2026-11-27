@@ -81,6 +81,7 @@ function PolicyEditor({ policy, isOwner }: { policy: Policy; isOwner: boolean })
           <div>
             <label htmlFor={`bar-${policy.slug}`} className={label}>Text (Arabic)</label>
             <textarea id={`bar-${policy.slug}`} className="field h-56 py-2" dir="rtl" value={bodyAr} onChange={(e) => setBodyAr(e.target.value)} />
+            <p className="text-xs text-stone">Formatting: <code>## Heading</code> · <code>- list item</code> · <code>1. numbered</code> · <code>**bold**</code> · <code>[text](https://link)</code> · blank line = new paragraph.</p>
           </div>
         </fieldset>
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -160,6 +161,7 @@ function FaqEditor({ item }: { item: Faq | null }) {
         <div>
           <label htmlFor={`aar-${uid}`} className={label}>Answer (Arabic)</label>
           <textarea id={`aar-${uid}`} className="field h-24 py-2" dir="rtl" value={answerAr} onChange={(e) => setAnswerAr(e.target.value)} />
+          <p className="text-xs text-stone">Formatting: <code>## Heading</code> · <code>- list item</code> · <code>1. numbered</code> · <code>**bold**</code> · <code>[text](https://link)</code> · blank line = new paragraph.</p>
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-4">
