@@ -123,7 +123,9 @@ public class ReviewController {
     @GetMapping("/api/v1/catalog/products/{slug}/reviews")
     @Transactional(readOnly = true)
     public ProductReviews forProduct(@PathVariable String slug, @RequestParam(defaultValue = "20") int limit) {
-        String where = " from reviews r join products p on p.id = r.product_id join users u on u.id = r.user_id"
+        // The name the customer gave on the order (guests have no real account name).
+        String where = " from reviews r join products p on p.id = r.product_id"
+                + " join order_items i on i.id = r.order_item_id join orders o on o.id = i.order_id"
                 + " where p.slug = :s and p.deleted_at is null and r.status = 'APPROVED'";
         record Stats(int count, BigDecimal average) {
         }
@@ -131,7 +133,7 @@ public class ReviewController {
                 .query((rs, n) -> new Stats(rs.getInt(1), rs.getBigDecimal(2) == null ? BigDecimal.ZERO
                         : rs.getBigDecimal(2).setScale(1, RoundingMode.HALF_UP)))
                 .single();
-        List<PublicReview> reviews = jdbc.sql("select r.id, r.rating, r.body, u.full_name, r.created_at" + where
+        List<PublicReview> reviews = jdbc.sql("select r.id, r.rating, r.body, o.customer_name, r.created_at" + where
                         + " order by r.created_at desc limit :limit")
                 .param("s", slug).param("limit", Math.clamp(limit, 1, 50))
                 .query((rs, n) -> new PublicReview(rs.getLong(1), rs.getInt(2), rs.getString(3),
@@ -148,7 +150,7 @@ public class ReviewController {
             throw ApiException.badRequest("BAD_STATUS", "Unknown review status.");
         }
         return jdbc.sql("""
-                select r.id, p.slug, p.name_en, u.full_name, u.email, o.reference, r.rating, r.body, r.status, r.created_at
+                select r.id, p.slug, p.name_en, o.customer_name, u.email, o.reference, r.rating, r.body, r.status, r.created_at
                 from reviews r join products p on p.id = r.product_id join users u on u.id = r.user_id
                 join order_items i on i.id = r.order_item_id join orders o on o.id = i.order_id
                 where r.status = :s order by r.created_at desc limit 200

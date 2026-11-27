@@ -64,14 +64,18 @@ export function Price({ price, salePrice, large }: { price: number; salePrice?: 
   );
 }
 
-export function FavouriteButton({ slug, className = "" }: { slug: string; className?: string }) {
+/** `name` is given on product cards, so each heart in a grid says which piece it saves. */
+export function FavouriteButton({ slug, name, className = "" }: { slug: string; name?: string; className?: string }) {
   const { t } = useT();
   const saved = useBagState().favourites.includes(slug);
+  const label = name
+    ? t(saved ? "product.unsaveNamed" : "product.saveNamed", { name })
+    : t(saved ? "product.unsave" : "product.save");
   return (
     <button
       type="button"
       aria-pressed={saved}
-      aria-label={t(saved ? "product.unsave" : "product.save")}
+      aria-label={label}
       onClick={() => bagActions.toggleFavourite(slug)}
       className={`grid h-11 w-11 cursor-pointer place-items-center ${className}`}
     >
@@ -165,7 +169,7 @@ export function ProductCard({ product, eager, heading: Heading = "h3" }: { produ
           <span className="ms-auto text-xs text-stone">{colour ? pick(colour, "name") : ""}</span>
         </div>
       )}
-      <FavouriteButton slug={product.slug} className="absolute end-0 top-0" />
+      <FavouriteButton slug={product.slug} name={name} className="absolute end-0 top-0" />
     </article>
   );
 }

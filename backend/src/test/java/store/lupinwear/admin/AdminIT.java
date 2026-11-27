@@ -325,6 +325,17 @@ class AdminIT extends IntegrationTest {
                 .andExpect(jsonPath("$[0].status").value("APPROVED"));
     }
 
+    @Test
+    void staffCanOpenAnOrderFromACustomerWithoutAnEmail() throws Exception {
+        String reference = place("COD", 1);
+        // Like a guest who checked out with a phone number only.
+        jdbc.sql("update users set email = null where id = (select user_id from orders where reference = :r)")
+                .param("r", reference).update();
+        mvc.perform(get("/api/v1/admin/orders/" + reference).cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.order.reference").value(reference));
+    }
+
     /** The next email to this address about this order, waiting up to five seconds. */
     private store.lupinwear.mail.Mailer.Message mailTo(String to, String reference) throws InterruptedException {
         long until = System.currentTimeMillis() + 5000;

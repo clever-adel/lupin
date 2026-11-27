@@ -51,13 +51,13 @@ function DayBars({ days }: { days: Report["days"] }) {
   const max = Math.max(1, ...days.map((d) => d.onlineRevenue + Math.max(0, d.shopRevenue)));
   return (
     <div>
-      <div className="flex h-40 items-end gap-px border-b border-line" role="img"
+      <div className="flex h-40 items-end justify-center gap-px border-b border-line" role="img"
         aria-label={`Daily sales from ${days[0]?.date} to ${days[days.length - 1]?.date}`}>
         {days.map((d) => {
           const online = (d.onlineRevenue / max) * 100;
           const shop = (Math.max(0, d.shopRevenue) / max) * 100;
           return (
-            <div key={d.date} className="flex h-full flex-1 flex-col justify-end" title={`${d.date}: ${money(d.onlineRevenue + d.shopRevenue)} (${d.orders} online orders)`}>
+            <div key={d.date} className="flex h-full max-w-16 flex-1 flex-col justify-end" title={`${d.date}: ${money(d.onlineRevenue + d.shopRevenue)} (${d.orders} online orders)`}>
               <div className="bg-gold" style={{ height: `${shop}%` }} />
               <div className="bg-ink" style={{ height: `${online}%` }} />
             </div>

@@ -134,8 +134,9 @@ public class OrderAdminService {
         Ids ids = jdbc.sql("select id, user_id, status from orders where reference = :r").param("r", reference)
                 .query((rs, n) -> new Ids(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class), rs.getString(3)))
                 .optional().orElseThrow(() -> ApiException.notFound("Order"));
+        // A guest who checked out with a phone number only has no email.
         String email = jdbc.sql("select email from users where id = :u").param("u", ids.user())
-                .query((rs, n) -> rs.getString(1)).single();
+                .query((rs, n) -> rs.getString(1)).optional().orElse(null);
         List<PaymentRow> payments = jdbc.sql("""
                 select id, provider, method, status, amount, manual_reference, provider_transaction_id, created_at,
                        exists (select 1 from transfer_receipts r where r.payment_id = payments.id)

@@ -28,13 +28,8 @@ export function StockCell({ variant, onDone }: { variant: AdminVariant; onDone: 
       <td className="px-3 py-2">{variant.reserved}</td>
       <td className={`px-3 py-2 font-semibold ${variant.available <= 2 ? "text-danger" : ""}`}>{variant.available}</td>
       <td className="py-2 ps-3">
-        <form
-          className="flex flex-wrap items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (valid) adjust.mutate(amount);
-          }}
-        >
+        {/* Not a <form>: this row also sits inside the product edit form, and forms cannot nest. */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             className="btn btn-outline h-9 w-11 px-0 text-base"
@@ -56,9 +51,15 @@ export function StockCell({ variant, onDone }: { variant: AdminVariant; onDone: 
             +1
           </button>
           <label htmlFor={id} className="sr-only">Add or remove stock for {variant.color} {variant.sizeCode}</label>
-          <input id={id} className="field h-9 w-20" inputMode="numeric" placeholder="+10" value={delta} onChange={(e) => setDelta(e.target.value)} />
-          <button type="submit" className="btn btn-outline h-9" disabled={!valid || adjust.isPending}>Apply</button>
-        </form>
+          <input id={id} className="field h-9 w-20" inputMode="numeric" placeholder="+10" value={delta} onChange={(e) => setDelta(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (valid) adjust.mutate(amount);
+              }
+            }} />
+          <button type="button" className="btn btn-outline h-9" disabled={!valid || adjust.isPending} onClick={() => adjust.mutate(amount)}>Apply</button>
+        </div>
         {adjust.isError && <p role="alert" className="mt-1 text-xs text-danger">{errorText(adjust.error)}</p>}
       </td>
     </tr>
