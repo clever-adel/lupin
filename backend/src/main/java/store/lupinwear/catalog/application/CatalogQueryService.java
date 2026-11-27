@@ -48,7 +48,11 @@ public class CatalogQueryService {
                     where v.product_id = p.id and v.active and i.on_hand - i.reserved > 0)""";
 
     public enum Sort {
-        FEATURED("p.featured desc, p.published_at desc nulls last, p.id desc"),
+        /**
+         * The shop's own order: pieces that can be bought first, then the order staff set in "Display
+         * order" (a piece not arranged yet, i.e. new, comes first), then featured, then newest.
+         */
+        FEATURED(IN_STOCK + " desc, p.display_order asc nulls first, p.featured desc, p.published_at desc nulls last, p.id desc"),
         NEWEST("p.published_at desc nulls last, p.id desc"),
         PRICE_ASC("coalesce(p.sale_price, p.price) asc, p.id"),
         PRICE_DESC("coalesce(p.sale_price, p.price) desc, p.id");

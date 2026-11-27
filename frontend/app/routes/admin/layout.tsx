@@ -136,6 +136,7 @@ export default function AdminLayout() {
           <NavLink to="/admin/shop" className={link}>Shop</NavLink>
           <NavLink to="/admin/customers" className={link}>Customers</NavLink>
           <NavLink to="/admin/products" className={link}>Products &amp; stock {badge(summary.data?.lowStockVariants)}</NavLink>
+          <NavLink to="/admin/arrange" className={link}>Display order</NavLink>
           <NavLink to="/admin/looks" className={link}>Looks</NavLink>
           <NavLink to="/admin/promotions" className={link}>Offers</NavLink>
           <NavLink to="/admin/reviews" className={link}>Reviews</NavLink>
