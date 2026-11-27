@@ -1,5 +1,6 @@
 import type { Route } from "./+types/policy";
 import { apiGet } from "~/lib/api.server";
+import { RichText } from "~/components/rich-text";
 import { pick, toLang, useT } from "~/lib/i18n";
 import { layoutOrigin, seo } from "~/lib/seo";
 import type { Policy } from "~/lib/types";
@@ -25,15 +26,9 @@ function summary(body: string | undefined, fallback: string): string {
   return cut.slice(0, cut.lastIndexOf(" ")).replace(/[,.;:]$/, "") + "…";
 }
 
-/** Plain text split into paragraphs. The text is never treated as HTML. */
+/** Staff-written text with simple marks (headings, lists, bold, links); never treated as HTML. */
 export function Paragraphs({ text }: { text: string }) {
-  return (
-    <>
-      {text.split(/\n\s*\n/).map((block, i) => (
-        <p key={i} className="whitespace-pre-line">{block.trim()}</p>
-      ))}
-    </>
-  );
+  return <RichText text={text} />;
 }
 
 export default function PolicyPage({ loaderData }: Route.ComponentProps) {
