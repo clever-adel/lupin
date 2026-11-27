@@ -1,5 +1,5 @@
-import type { CSSProperties } from "react";
-import { Form, Link, useSubmit } from "react-router";
+import { useEffect, type CSSProperties } from "react";
+import { Form, Link, useLocation, useSubmit } from "react-router";
 import type { Route } from "./+types/shop";
 import { ProductGrid } from "~/components/product";
 import { apiGet } from "~/lib/api.server";
@@ -103,6 +103,11 @@ export function meta({ params, matches, location, data }: Route.MetaArgs) {
 export default function Shop({ loaderData }: Route.ComponentProps) {
   const { t, href, pick: p } = useT();
   const submit = useSubmit();
+  const location = useLocation();
+  // The header's search icon opens the shop at #search: put the cursor in the box.
+  useEffect(() => {
+    if (location.hash === "#search") document.getElementById("search")?.focus();
+  }, [location.hash]);
   const { department, departments, products, facets } = loaderData;
   const query = new URLSearchParams(loaderData.query);
   const base = href(department ? `/shop/${department.slug}` : "/shop");
@@ -180,6 +185,7 @@ export default function Shop({ loaderData }: Route.ComponentProps) {
                 <label className="min-w-40 flex-1 md:max-w-xs">
                   <span className="sr-only">{t("shop.search")}</span>
                   <input
+                    id="search"
                     type="search"
                     name="q"
                     defaultValue={query.get("q") ?? ""}

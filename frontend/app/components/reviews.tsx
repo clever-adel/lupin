@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "react-router";
 import { useT } from "~/lib/i18n";
 import { api, ApiError } from "~/lib/http";
 
@@ -139,6 +140,48 @@ export function RateYourPieces({ reference }: { reference: string }) {
       <h2 id="rate-title" className="pt-4 text-sm font-semibold">{t("reviews.rateTitle")}</h2>
       <p className="text-xs text-stone">{t("reviews.rateIntro")}</p>
       <ul>{items.map((item) => <RateItem key={item.orderItemId} item={item} reference={reference} />)}</ul>
+    </section>
+  );
+}
+
+interface LatestReview {
+  id: number;
+  rating: number;
+  body: string;
+  name: string;
+  productSlug: string;
+  productNameEn: string;
+  productNameAr: string;
+  createdAt: string;
+}
+
+/** The newest published reviews with words, on the home page. Hidden until there is one. */
+export function HomeReviews() {
+  const { t, href, pick } = useT();
+  const query = useQuery({
+    queryKey: ["reviews", "latest"],
+    queryFn: () => api<LatestReview[]>("GET", "/api/v1/catalog/reviews/latest?limit=6"),
+    staleTime: 5 * 60_000,
+  });
+  const reviews = query.data ?? [];
+  if (reviews.length === 0) return null;
+  return (
+    <section className="shell pt-20" aria-labelledby="home-reviews-title">
+      <p className="label text-stone">{t("home.reviewsKicker")}</p>
+      <h2 id="home-reviews-title" className="display mt-2 text-2xl md:text-3xl">{t("home.reviewsTitle")}</h2>
+      <ul className="mt-8 grid gap-4 md:grid-cols-3">
+        {reviews.map((r) => (
+          <li key={r.id} className="flex flex-col border border-line bg-card p-5">
+            <Stars value={r.rating} label={t("reviews.rating", { rating: r.rating })} />
+            <p className="mt-3 flex-1 text-sm leading-relaxed">“{r.body}”</p>
+            <p className="mt-4 text-xs">
+              <span className="font-semibold">{r.name}</span>
+              {" · "}
+              <Link to={href(`/product/${r.productSlug}`)} className="text-stone underline hover:text-ink">{pick(r, "productName")}</Link>
+            </p>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

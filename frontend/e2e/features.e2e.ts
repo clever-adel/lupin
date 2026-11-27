@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { addToBag, newVisitor, ownerPassword, signInAsOwner, skipIntro } from "./helpers";
+import { addToBag, gotoReady, newVisitor, ownerPassword, signInAsOwner, skipIntro } from "./helpers";
 
 /**
  * The size guide, size finder, sizes and stock while editing, duplicating, "You may also steal",
@@ -224,6 +224,40 @@ test.describe.serial("shop features", () => {
     const moved = shop.items.find((c: { nameEn: string }) => c.nameEn === last);
     if (moved.inStock) expect(first.nameEn).toBe(last);
     else expect(shop.items[shop.items.length - 1].inStock).toBe(false);
+  });
+
+  test("home shows department photos and the newest reviews; the header search opens the shop search", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "What they say" })).toBeVisible();
+    await expect(page.getByText("“Boxy and warm, L fits well.”")).toBeVisible();
+
+    await page.getByRole("link", { name: "Find a piece" }).click();
+    await expect(page).toHaveURL(/\/shop#search$/);
+    await expect(page.locator("#search")).toBeFocused();
+  });
+
+  test("on a phone the buy bar follows the shopper, and Buy now goes straight to checkout", async ({ browser }) => {
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    const page = await phone.newPage();
+    await skipIntro(page);
+    await gotoReady(page, productPath);
+    await expect(page.getByRole("heading", { name: productName })).toBeVisible();
+    const bar = page.locator("div.fixed.bottom-0", { has: page.getByRole("button", { name: "Add to bag", exact: true }) });
+    await expect(bar).toHaveCount(0);
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect(bar).toBeVisible();
+    await expect(bar).toContainText("EGP 900");
+
+    // No size yet: the bar takes the shopper back to the sizes.
+    await bar.getByRole("button", { name: "Buy now" }).click();
+    await expect(page.getByText("Choose a size first.").or(page.getByRole("alert"))).toBeVisible();
+    await page.getByRole("button", { name: "M", exact: true }).click();
+    await page.getByRole("button", { name: "Buy now" }).first().click();
+    await expect(page).toHaveURL(/\/sign-in\?next=%2Fcheckout/);
+    await page.getByRole("button", { name: "Continue as guest" }).click();
+    await expect(page).toHaveURL(/\/checkout$/);
+    await expect(page.getByText(productName).first()).toBeVisible();
+    await phone.close();
   });
 
   test("FAQ answers show headings, lists, bold and safe links", async ({ page }) => {

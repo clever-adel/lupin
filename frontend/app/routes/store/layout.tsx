@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router";
 import type { Route } from "./+types/layout";
 import { HeaderLogo, Intro, LogoLockup, replayIntro } from "~/components/brand";
 import { BagAddedFeedback } from "~/components/bag-added";
-import { BagIcon, HeartIcon, UserIcon } from "~/components/icons";
+import { BagIcon, HeartIcon, SearchIcon, UserIcon } from "~/components/icons";
 import { useScrollReveal } from "~/components/reveal";
 import { useMe } from "~/features/auth/session";
 import { useBagState } from "~/features/bag/store";
@@ -83,6 +83,9 @@ function Header({ departments }: { departments: Department[] }) {
             lang={t("nav.switchLang") === "English" ? "en" : "ar"}
           >
             {t("nav.switchLang")}
+          </Link>
+          <Link to={href("/shop") + "#search"} className={iconLink} aria-label={t("nav.searchShop")}>
+            <SearchIcon />
           </Link>
           <Link to={href(me ? "/account" : "/sign-in")} className={iconLink} aria-label={t(me ? "nav.account" : "nav.signIn")}>
             <UserIcon />
@@ -256,7 +259,7 @@ function WhatsAppButton({ site, origin }: { site: SiteContent; origin: string })
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => track("Contact")}
-      className="fixed end-4 bottom-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-[#25D366] text-white shadow-lg hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink md:end-6 md:bottom-6"
+      className="whatsapp-float fixed end-4 bottom-4 z-30 grid h-14 w-14 transition-[bottom] place-items-center rounded-full bg-[#25D366] text-white shadow-lg hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink md:end-6 md:bottom-6"
     >
       <WhatsAppIcon />
       <span className="sr-only">{t("whatsapp.label")}</span>
