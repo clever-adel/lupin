@@ -312,6 +312,8 @@ export interface Order {
   /** Set once the order has been handed to a courier. */
   carrier?: string;
   trackingNumber?: string;
+  /** The courier's own tracking page, when staff added one. */
+  trackingUrl?: string;
 }
 
 export interface OrderSummary {

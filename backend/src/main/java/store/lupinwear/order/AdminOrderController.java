@@ -30,7 +30,10 @@ public class AdminOrderController {
             @NotNull @Pattern(regexp = "CONFIRMED|PROCESSING|SHIPPED|DELIVERED|CANCELLED") String status,
             @Size(max = 300) String note,
             @Size(max = 60) String carrier,
-            @Size(max = 100) String trackingReference) {
+            @Size(max = 100) String trackingReference,
+            /** The courier's own tracking page for this parcel, shown to the customer. */
+            @Size(max = 300) @Pattern(regexp = "^(https?://\\S+)?$", message = "The tracking link must start with https://")
+            String trackingUrl) {
     }
 
     private final OrderAdminService orders;
@@ -72,6 +75,7 @@ public class AdminOrderController {
     AdminOrderView changeStatus(@AuthenticationPrincipal CurrentUser user, @PathVariable String reference,
             @Valid @RequestBody StatusRequest body) {
         return orders.changeStatus(user.id(),
-                reference, new StatusChange(body.status(), body.note(), body.carrier(), body.trackingReference()));
+                reference, new StatusChange(body.status(), body.note(), body.carrier(), body.trackingReference(),
+                        body.trackingUrl()));
     }
 }

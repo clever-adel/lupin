@@ -101,11 +101,17 @@ class AdminIT extends IntegrationTest {
         mvc.perform(jsonPost("/api/v1/orders/" + reference + "/cancel", Map.of()).cookie(customer))
                 .andExpect(status().isConflict());
 
+        // Only a web link can be shown to the customer as the tracking page.
         mvc.perform(jsonPost("/api/v1/admin/orders/" + reference + "/status",
-                        Map.of("status", "SHIPPED", "carrier", "Test Courier", "trackingReference", "TRK-1"))
+                        Map.of("status", "SHIPPED", "trackingUrl", "javascript:alert(1)")).cookie(admin))
+                .andExpect(status().isBadRequest());
+        mvc.perform(jsonPost("/api/v1/admin/orders/" + reference + "/status",
+                        Map.of("status", "SHIPPED", "carrier", "Aramex", "trackingReference", "TRK-1",
+                                "trackingUrl", "https://track.example.com/TRK-1"))
                         .cookie(admin))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.shipment.trackingReference").value("TRK-1"))
+                .andExpect(jsonPath("$.shipment.trackingUrl").value("https://track.example.com/TRK-1"))
                 .andExpect(jsonPath("$.nextStatuses[0]").value("DELIVERED"));
         assertThat(stock()).containsExactly(3, 0);
         move(reference, "CANCELLED", admin).andExpect(status().isConflict());
@@ -120,6 +126,8 @@ class AdminIT extends IntegrationTest {
         // The customer sees the same journey.
         mvc.perform(get("/api/v1/orders/" + reference).cookie(customer))
                 .andExpect(jsonPath("$.status").value("DELIVERED"))
+                .andExpect(jsonPath("$.carrier").value("Aramex"))
+                .andExpect(jsonPath("$.trackingUrl").value("https://track.example.com/TRK-1"))
                 .andExpect(jsonPath("$.history.length()").value(5));
         long audits = jdbc.sql("select count(*) from audit_logs where action = 'ORDER_STATUS' and entity_id = :r")
                 .param("r", reference).query(Long.class).single();

@@ -54,7 +54,7 @@ public class OrderAdminService {
 
     public record ShipmentRow(String carrier, String trackingReference, String status, Instant shippedAt,
             Instant deliveredAt, Integer courierState, String courierStateLabel, String lastException,
-            BigDecimal codAmount) {
+            BigDecimal codAmount, String trackingUrl) {
     }
 
     public record HistoryRow(String fromStatus, String toStatus, String actor, String note, Instant at) {
@@ -71,7 +71,8 @@ public class OrderAdminService {
     /** Courier states that need a person: returned, exception, cancelled, terminated, lost, damaged, awaiting action. */
     static final List<Integer> COURIER_PROBLEM_STATES = List.of(46, 47, 48, 49, 100, 101, 103);
 
-    public record StatusChange(String status, String note, String carrier, String trackingReference) {
+    public record StatusChange(String status, String note, String carrier, String trackingReference,
+            String trackingUrl) {
     }
 
     private final JdbcClient jdbc;
@@ -138,12 +139,12 @@ public class OrderAdminService {
                         rs.getObject(8, OffsetDateTime.class).toInstant(), rs.getBoolean(9)))
                 .list();
         ShipmentRow shipment = jdbc.sql("select carrier, tracking_reference, status, shipped_at, delivered_at,"
-                + " provider_state, provider_state_label, last_exception, cod_amount"
+                + " provider_state, provider_state_label, last_exception, cod_amount, tracking_url"
                 + " from shipments where order_id = :o order by id desc limit 1").param("o", ids.id())
                 .query((rs, n) -> new ShipmentRow(rs.getString(1), rs.getString(2), rs.getString(3),
                         instant(rs.getObject(4, OffsetDateTime.class)), instant(rs.getObject(5, OffsetDateTime.class)),
                         rs.getObject(6) == null ? null : ((Number) rs.getObject(6)).intValue(),
-                        rs.getString(7), rs.getString(8), rs.getBigDecimal(9)))
+                        rs.getString(7), rs.getString(8), rs.getBigDecimal(9), rs.getString(10)))
                 .optional().orElse(null);
         List<HistoryRow> history = jdbc.sql("""
                 select h.from_status, h.to_status, u.full_name, h.note, h.created_at
@@ -249,10 +250,11 @@ public class OrderAdminService {
             orders.movement(item.variantId(), "SHIP", -item.quantity(), reference, actor);
         }
         jdbc.sql("""
-                insert into shipments (order_id, carrier, tracking_reference, status, shipped_at)
-                values (:o, :carrier, :tracking, 'SHIPPED', :now)
+                insert into shipments (order_id, carrier, tracking_reference, tracking_url, status, shipped_at)
+                values (:o, :carrier, :tracking, :url, 'SHIPPED', :now)
                 """).param("o", orderId).param("carrier", blankToNull(change.carrier()))
-                .param("tracking", blankToNull(change.trackingReference())).param("now", now).update();
+                .param("tracking", blankToNull(change.trackingReference()))
+                .param("url", blankToNull(change.trackingUrl())).param("now", now).update();
     }
 
     private void deliver(UUID orderId, UUID actor, OffsetDateTime now) {

@@ -503,6 +503,11 @@ export default function OrderPage() {
                 {t("order.trackingNumber", { tracking: "" })}<span dir="ltr">{o.trackingNumber}</span>
               </p>
             )}
+            {o.trackingUrl && /^https?:\/\//.test(o.trackingUrl) && (
+              <a href={o.trackingUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline mt-2">
+                {t("order.trackParcel")}
+              </a>
+            )}
           </address>
         </section>
 
