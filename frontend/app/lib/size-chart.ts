@@ -58,7 +58,10 @@ function men(values: [string][]): Record<string, string> {
 }
 
 /** Standard body measurements in cm, by size, that a product's chart can start from. */
-export const STANDARD_CHARTS: Record<"WOMEN_TOPS" | "MEN_TOPS" | "BERSHKA_MEN_HOODIES", { title: string; rows: Standard }> = {
+export const STANDARD_CHARTS: Record<
+  "WOMEN_TOPS" | "MEN_TOPS" | "BERSHKA_MEN_HOODIES" | "LCW_MEN_JACKETS",
+  { title: string; kind?: "BODY" | "GARMENT"; rows: Standard }
+> = {
   WOMEN_TOPS: {
     title: "Women's tops & T-shirts",
     rows: [
@@ -83,6 +86,17 @@ export const STANDARD_CHARTS: Record<"WOMEN_TOPS" | "MEN_TOPS" | "BERSHKA_MEN_HO
       { labelEn: "Chest", labelAr: "الصدر", values: { XS: "78-86", S: "86-94", M: "94-102", L: "102-110", XL: "110-118", XXL: "118-126" } },
       { labelEn: "Waist", labelAr: "الوسط", values: { XS: "66-74", S: "74-82", M: "82-90", L: "90-98.5", XL: "98.5-107.5", XXL: "107.5-116.5" } },
       { labelEn: "Neck", labelAr: "الرقبة", values: { XS: "34-35", S: "36-37", M: "38-39", L: "40-41", XL: "42-43", XXL: "44-45" } },
+    ],
+  },
+  // LC Waikiki men's regular-fit jackets (denim and lined): measurements of the jacket itself, as LC Waikiki
+  // publishes them. Their 2XL is filed as XXL, the way the shop writes it.
+  LCW_MEN_JACKETS: {
+    title: "LC Waikiki men's jackets (piece)",
+    kind: "GARMENT",
+    rows: [
+      { labelEn: "Back width", labelAr: "عرض الظهر", values: { XS: "46.5", S: "48.5", M: "50.5", L: "52.5", XL: "54", XXL: "55.5" } },
+      { labelEn: "Chest width", labelAr: "عرض الصدر", values: { XS: "110", S: "116", M: "122", L: "128", XL: "134", XXL: "142" } },
+      { labelEn: "Sleeve length", labelAr: "طول الكم", values: { XS: "61.4", S: "63.4", M: "64.7", L: "66", XL: "66.5", XXL: "67" } },
     ],
   },
 };

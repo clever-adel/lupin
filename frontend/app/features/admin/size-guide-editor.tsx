@@ -82,11 +82,11 @@ export function SizeGuideEditor({ productId, sizes, initial }: {
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-        <span className="font-medium">Start from a standard body chart:</span>
+        <span className="font-medium">Start from a standard chart:</span>
         {(Object.keys(STANDARD_CHARTS) as (keyof typeof STANDARD_CHARTS)[]).map((key) => (
           <button key={key} type="button" className="btn btn-outline"
             onClick={() => {
-              setKind("BODY");
+              setKind(STANDARD_CHARTS[key].kind ?? "BODY");
               setRows(standardRows(key, sizes));
             }}>
             {STANDARD_CHARTS[key].title}

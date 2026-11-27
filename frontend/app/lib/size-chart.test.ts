@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cmToInches, internationalTable, sizeGroups, standardRows } from "./size-chart";
+import { cmToInches, internationalTable, sizeGroups, STANDARD_CHARTS, standardRows } from "./size-chart";
 
 describe("size chart", () => {
   it("converts cm cells to inches to the nearest quarter", () => {
@@ -37,6 +37,13 @@ describe("size chart", () => {
     const rows = standardRows("BERSHKA_MEN_HOODIES", ["XS", "S", "M", "L"]);
     expect(rows.map((r) => r.labelEn)).toEqual(["Chest", "Waist", "Neck"]);
     expect(rows[0]?.values).toEqual({ XS: "78-86", S: "86-94", M: "94-102", L: "102-110" });
+  });
+
+  it("fills the LC Waikiki jacket chart as piece measurements, 2XL filed as XXL", () => {
+    expect(STANDARD_CHARTS.LCW_MEN_JACKETS.kind).toBe("GARMENT");
+    const rows = standardRows("LCW_MEN_JACKETS", ["S", "M", "XXL"]);
+    expect(rows.map((r) => r.labelEn)).toEqual(["Back width", "Chest width", "Sleeve length"]);
+    expect(rows[1]?.values).toEqual({ S: "116", M: "122", XXL: "142" });
   });
 
   it("lists the international rows for the product's sizes, two UK sizes per women's letter size", () => {
