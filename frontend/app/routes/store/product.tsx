@@ -6,6 +6,7 @@ import { announceBagAdded } from "~/components/bag-added";
 import { ShareIcon } from "~/components/icons";
 import { FavouriteButton, Price, ProductGrid, ProductPhoto } from "~/components/product";
 import { SizeGuidePanel } from "~/components/size-guide";
+import { SizeFinder } from "~/components/size-finder";
 import { useBag } from "~/features/bag/useBag";
 import { api } from "~/lib/http";
 import { apiGet } from "~/lib/api.server";
@@ -309,6 +310,21 @@ function ProductView({ product }: { product: ProductDetail }) {
                 </button>
               ))}
             </div>
+            {product.sizeGuide && (
+              <SizeFinder
+                guide={product.sizeGuide}
+                sizes={color.variants.map((v) => v.sizeCode)}
+                department={product.department.slug}
+                available={(size) => color.variants.some((v) => v.sizeCode === size && v.available)}
+                onPick={(size) => {
+                  const v = color.variants.find((x) => x.sizeCode === size && x.available);
+                  if (!v) return;
+                  setVariantId(v.id);
+                  setQuantity((q) => Math.min(q, v.maxQuantity));
+                  setNotice(null);
+                }}
+              />
+            )}
             {product.sizeGuide && <SizeGuidePanel guide={product.sizeGuide} sizes={color.variants.map((v) => v.sizeCode)} department={product.department.slug} />}
           </fieldset>
 
