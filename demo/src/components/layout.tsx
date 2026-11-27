@@ -300,7 +300,7 @@ export function Footer() {
       </div>
       <div className="footer-legal">
         <p>© 2026 LUPIN WEAR · Demo build for presentation — no real transactions.</p>
-        <p>All heist scenarios are fictional, staged advertising. LUPIN. is an independent reseller, not affiliated with or endorsed by Bershka, Inditex, LC Waikiki or Team 365. Pieces marked “Demo item” are illustrated samples, not real products.</p>
+        <p>All heist scenarios are fictional, staged advertising. LUPIN. is an independent reseller, not affiliated with or endorsed by Bershka, Inditex, LC Waikiki, H&M or Team 365. Pieces marked “Demo item” are illustrated samples, not real products.</p>
       </div>
     </footer>
   );
