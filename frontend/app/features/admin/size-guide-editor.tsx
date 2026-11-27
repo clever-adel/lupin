@@ -2,10 +2,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { errorText } from "~/features/admin/shared";
 import { api } from "~/lib/http";
+import { STANDARD_CHARTS, standardRows } from "~/lib/size-chart";
 import type { SizeGuide, SizeGuideRow } from "~/lib/types";
 
 const PRESETS: { labelEn: string; labelAr: string }[] = [
   { labelEn: "Chest", labelAr: "الصدر" },
+  { labelEn: "Bust", labelAr: "الصدر" },
+  { labelEn: "Waist", labelAr: "الوسط" },
+  { labelEn: "Hips", labelAr: "الأرداف" },
   { labelEn: "Chest width (flat)", labelAr: "عرض الصدر (مفرود)" },
   { labelEn: "Length", labelAr: "الطول" },
   { labelEn: "Sleeve", labelAr: "الكم" },
@@ -71,9 +75,23 @@ export function SizeGuideEditor({ productId, sizes, initial }: {
     <section className="border border-line bg-card p-5">
       <h2 className="font-semibold">Size chart</h2>
       <p className="mt-1 text-sm text-stone">
-        In cm. Shoppers see it under the size buttons, after a line saying imported pieces run about one size large.
+        In cm (shoppers can switch to inches). Shoppers see it under the size buttons, after a line saying imported pieces run about one size large.
         {hasGuide ? " This product has a chart." : " This product has no chart yet."}
       </p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium">Start from a standard body chart:</span>
+        {(Object.keys(STANDARD_CHARTS) as (keyof typeof STANDARD_CHARTS)[]).map((key) => (
+          <button key={key} type="button" className="btn btn-outline"
+            onClick={() => {
+              setKind("BODY");
+              setRows(standardRows(key, sizes));
+            }}>
+            {STANDARD_CHARTS[key].title}
+          </button>
+        ))}
+      </div>
+      <p className="mt-1 text-xs text-stone">Fills the rows below for this product&apos;s sizes. Check the numbers, then save.</p>
 
       <fieldset className="mt-4 flex flex-wrap gap-4 text-sm">
         <legend className="sr-only">What the numbers measure</legend>
