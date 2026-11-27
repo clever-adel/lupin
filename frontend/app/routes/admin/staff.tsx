@@ -21,7 +21,7 @@ const label = "mb-1 block text-xs font-medium";
 
 function StaffRow({ person }: { person: Staff }) {
   const client = useQueryClient();
-  const [mode, setMode] = useState<"idle" | "confirm" | "password" | "twoFactor">("idle");
+  const [mode, setMode] = useState<"idle" | "confirm" | "password" | "twoFactor" | "role">("idle");
   const [password, setPassword] = useState("");
   const refresh = () => client.invalidateQueries({ queryKey: ["admin", "staff"] });
   const active = person.status === "ACTIVE";
@@ -47,7 +47,15 @@ function StaffRow({ person }: { person: Staff }) {
       refresh();
     },
   });
-  const failure = setStatus.error ?? reset.error ?? resetTwoFactor.error;
+  const newRole = person.role === "OWNER" ? "ADMIN" : "OWNER";
+  const setRole = useMutation({
+    mutationFn: () => api("POST", `/api/v1/admin/staff/${person.id}/role`, { role: newRole }),
+    onSuccess: () => {
+      setMode("idle");
+      refresh();
+    },
+  });
+  const failure = setStatus.error ?? reset.error ?? resetTwoFactor.error ?? setRole.error;
 
   return (
     <li className={`border bg-card p-4 text-sm ${active ? "border-line" : "border-line opacity-70"}`}>
@@ -58,7 +66,7 @@ function StaffRow({ person }: { person: Staff }) {
           </p>
           <p className="break-all text-stone">{person.email}</p>
           <p className="text-xs text-stone">
-            {person.role === "OWNER" ? "Owner: everything" : "Admin: daily work, no payment settings, staff or policy publishing"}
+            {person.role === "OWNER" ? "Owner: everything" : "Admin: daily work, no reports, payment settings, staff or policy publishing"}
             {" · "}
             {active ? "Can sign in" : "Switched off"}
             {" · "}
@@ -70,6 +78,9 @@ function StaffRow({ person }: { person: Staff }) {
         </div>
         {!person.you && mode === "idle" && (
           <div className="flex gap-2">
+            <button type="button" className="btn btn-outline" onClick={() => setMode("role")}>
+              {person.role === "OWNER" ? "Make admin" : "Make owner"}
+            </button>
             <button type="button" className="btn btn-outline" onClick={() => setMode("password")}>Set new password</button>
             {person.twoFactor && (
               <button type="button" className="btn btn-outline" onClick={() => setMode("twoFactor")}>Reset two-step</button>
@@ -87,6 +98,23 @@ function StaffRow({ person }: { person: Staff }) {
           <div className="flex gap-2">
             <button type="button" className="btn btn-outline" onClick={() => setMode("idle")}>Back</button>
             <button type="button" className="btn btn-primary" disabled={setStatus.isPending} onClick={() => setStatus.mutate()}>Yes, switch off</button>
+          </div>
+        </div>
+      )}
+      {mode === "role" && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
+          <p className="max-w-md">
+            <span className="font-semibold">
+              Make {person.fullName} {newRole === "OWNER" ? "an owner" : "an admin"}?
+            </span>{" "}
+            {newRole === "OWNER"
+              ? "Owners see sales reports and payment settings and manage staff, including you."
+              : "They keep the daily work but lose reports, payment settings and staff."}{" "}
+            They are signed out and get the new role at their next sign-in.
+          </p>
+          <div className="flex gap-2">
+            <button type="button" className="btn btn-outline" onClick={() => setMode("idle")}>Back</button>
+            <button type="button" className="btn btn-primary" disabled={setRole.isPending} onClick={() => setRole.mutate()}>Yes, change role</button>
           </div>
         </div>
       )}

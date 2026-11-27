@@ -89,6 +89,40 @@ class StaffIT extends IntegrationTest {
     }
 
     @Test
+    void theOwnerCanPromoteAndDemoteAnotherStaffMemberButNotThemselves() throws Exception {
+        String email = uniqueEmail();
+        String id = body(mvc.perform(jsonPost("/api/v1/admin/staff", Map.of("email", email, "fullName", "Role Admin",
+                "role", "ADMIN", "password", STAFF_PASSWORD)).cookie(owner)).andExpect(status().isCreated())
+                .andReturn()).get("id").asText();
+        byte[] secret = enableTwoFactor(cookie(login(email, STAFF_PASSWORD), AuthCookies.ACCESS));
+
+        mvc.perform(jsonPost("/api/v1/admin/staff/" + id + "/role", Map.of("role", "OWNER")).cookie(admin))
+                .andExpect(status().isForbidden());
+        mvc.perform(jsonPost("/api/v1/admin/staff/" + id + "/role", Map.of("role", "CUSTOMER")).cookie(owner))
+                .andExpect(status().isBadRequest());
+        mvc.perform(jsonPost("/api/v1/admin/staff/" + id + "/role", Map.of("role", "OWNER")).cookie(owner))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/admin/staff").cookie(owner))
+                .andExpect(jsonPath("$[?(@.id=='" + id + "')].role").value("OWNER"));
+
+        // Signed in again, they can now manage staff.
+        Cookie promoted = cookie(signInWithCode(email, STAFF_PASSWORD, secret), AuthCookies.ACCESS);
+        mvc.perform(get("/api/v1/admin/staff").cookie(promoted)).andExpect(status().isOk());
+
+        mvc.perform(jsonPost("/api/v1/admin/staff/" + id + "/role", Map.of("role", "ADMIN")).cookie(owner))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/admin/staff").cookie(owner))
+                .andExpect(jsonPath("$[?(@.id=='" + id + "')].role").value("ADMIN"));
+
+        // Nobody changes their own role, so the shop always keeps an owner.
+        String me = body(mvc.perform(get("/api/v1/admin/staff").cookie(owner)).andReturn())
+                .findParents("you").stream().filter(n -> n.get("you").asBoolean()).findFirst().orElseThrow()
+                .get("id").asText();
+        mvc.perform(jsonPost("/api/v1/admin/staff/" + me + "/role", Map.of("role", "ADMIN")).cookie(owner))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void aDisabledStaffMemberLosesAccessImmediatelyEvenWithAValidToken() throws Exception {
         String email = uniqueEmail();
         String id = body(mvc.perform(jsonPost("/api/v1/admin/staff", Map.of("email", email, "fullName", "Temp Admin",
