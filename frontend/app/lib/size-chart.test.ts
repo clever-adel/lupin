@@ -33,6 +33,12 @@ describe("size chart", () => {
     expect(rows[3]?.values).toEqual({ S: "36", M: "38", XXXL: "46" });
   });
 
+  it("fills the Bershka men's hoodie chart for the product's sizes", () => {
+    const rows = standardRows("BERSHKA_MEN_HOODIES", ["XS", "S", "M", "L"]);
+    expect(rows.map((r) => r.labelEn)).toEqual(["Chest", "Waist", "Neck"]);
+    expect(rows[0]?.values).toEqual({ XS: "78-86", S: "86-94", M: "94-102", L: "102-110" });
+  });
+
   it("lists the international rows for the product's sizes, two UK sizes per women's letter size", () => {
     expect(internationalTable("women", ["S", "M"])?.rows.map((r) => r.values[0])).toEqual([8, 10, 12, 14]);
   });
