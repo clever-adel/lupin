@@ -44,6 +44,19 @@ export function sizeGroups(sizes: string[]): { label: string; sizes: string[] }[
 
 type Standard = { labelEn: string; labelAr: string; values: Record<string, string> }[];
 
+const MEN_SIZES = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL"] as const;
+
+/** One value per men's size, XXS to 3XL; 3XL is also filed as XXXL, the other way it is written. */
+function men(values: [string][]): Record<string, string> {
+  const out: Record<string, string> = {};
+  MEN_SIZES.forEach((size, i) => {
+    const value = values[i]?.[0];
+    if (value) out[size] = value;
+  });
+  if (out["3XL"]) out["XXXL"] = out["3XL"];
+  return out;
+}
+
 /** Standard body measurements in cm, by size, that a product's chart can start from. */
 export const STANDARD_CHARTS: Record<"WOMEN_TOPS" | "MEN_TOPS", { title: string; rows: Standard }> = {
   WOMEN_TOPS: {
@@ -56,8 +69,10 @@ export const STANDARD_CHARTS: Record<"WOMEN_TOPS" | "MEN_TOPS", { title: string;
   MEN_TOPS: {
     title: "Men's tops, sweatshirts & T-shirts",
     rows: [
-      { labelEn: "Chest", labelAr: "الصدر", values: { XS: "80-88", S: "88-96", M: "96-104", L: "104-112", XL: "112-124", XXL: "124-136" } },
-      { labelEn: "Waist", labelAr: "الوسط", values: { XS: "68-76", S: "76-84", M: "84-92", L: "92-100", XL: "100-112", XXL: "112-124" } },
+      { labelEn: "Chest", labelAr: "الصدر", values: men([["74-78"], ["78-86"], ["86-90"], ["94-98"], ["102-106"], ["110-114"], ["118-122"], ["126-130"]]) },
+      { labelEn: "Waist", labelAr: "الوسط", values: men([["62-66"], ["66-74"], ["74-78"], ["82-86"], ["90-94"], ["98.5-103"], ["107.5-112"], ["116.5-121"]]) },
+      { labelEn: "Arm length", labelAr: "طول الذراع", values: men([["59"], ["59"], ["59-60"], ["60-61"], ["61-62"], ["62-62.5"], ["62.5-63"], ["63"]]) },
+      { labelEn: "Neck", labelAr: "الرقبة", values: men([["33"], ["34-35"], ["36"], ["38"], ["40"], ["42"], ["44"], ["46"]]) },
     ],
   },
 };
@@ -71,7 +86,7 @@ export function standardRows(key: keyof typeof STANDARD_CHARTS, sizes: string[])
   }));
 }
 
-type Conversion = { columns: readonly string[]; rows: { size: string; values: number[] }[] };
+type Conversion = { columns: readonly string[]; rows: { size: string; values: (number | string)[] }[] };
 
 /** Letter sizes against national sizes, per department. Women's S, M, L, XL and XXL each cover two UK sizes. */
 export const INTERNATIONAL: Record<"women" | "men", Conversion> = {
@@ -92,17 +107,19 @@ export const INTERNATIONAL: Record<"women" | "men", Conversion> = {
       { size: "XXXL", values: [28, 56, 24, 28, 27, 58, 60, 62] },
     ],
   },
-  // Men's tops: EU and IT follow the jacket size, UK and US the chest in inches.
+  // Men's tops: UK is the jacket size (R = regular length), EUR the European size.
   men: {
-    columns: ["EU", "IT", "UK", "US"],
+    columns: ["UK", "EUR"],
     rows: [
-      { size: "XS", values: [44, 44, 34, 34] },
-      { size: "S", values: [46, 46, 36, 36] },
-      { size: "M", values: [48, 48, 38, 38] },
-      { size: "L", values: [50, 50, 40, 40] },
-      { size: "XL", values: [52, 52, 42, 42] },
-      { size: "XXL", values: [54, 54, 44, 44] },
-      { size: "XXXL", values: [56, 56, 46, 46] },
+      { size: "XXS", values: ["28", "38"] },
+      { size: "XS", values: ["30R-32R", "40-42"] },
+      { size: "S", values: ["34R-36R", "44-46"] },
+      { size: "M", values: ["38R-40R", "48-50"] },
+      { size: "L", values: ["42R-44R", "52-54"] },
+      { size: "XL", values: ["46R-48R", "56-58"] },
+      { size: "XXL", values: ["50R-52R", "60-62"] },
+      { size: "3XL", values: ["54R-56R", "64-66"] },
+      { size: "XXXL", values: ["54R-56R", "64-66"] },
     ],
   },
 };
