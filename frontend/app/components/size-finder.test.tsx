@@ -9,13 +9,13 @@ const guide: SizeGuide = {
   rows: [{ labelEn: "Chest", labelAr: "الصدر", values: { XS: "78-86", S: "86-94", M: "94-102", L: "102-110" } }],
 };
 
-function show(available: (s: string) => boolean, onPick = vi.fn()) {
+function show(available: (s: string) => boolean, onPick = vi.fn(), sizes = ["XS", "S", "M", "L"], height = "175", weight = "70") {
   const router = createMemoryRouter([
-    { path: "/:lang?", element: <SizeFinder guide={guide} sizes={["XS", "S", "M", "L"]} department="men" available={available} onPick={onPick} /> },
+    { path: "/:lang?", element: <SizeFinder guide={guide} sizes={sizes} department="men" available={available} onPick={onPick} /> },
   ]);
   render(<RouterProvider router={router} />);
-  fireEvent.change(screen.getByLabelText("Height (cm)"), { target: { value: "175" } });
-  fireEvent.change(screen.getByLabelText("Weight (kg)"), { target: { value: "70" } });
+  fireEvent.change(screen.getByLabelText("Height (cm)"), { target: { value: height } });
+  fireEvent.change(screen.getByLabelText("Weight (kg)"), { target: { value: weight } });
   fireEvent.click(screen.getByRole("button", { name: "Suggest" }));
   return onPick;
 }
@@ -37,6 +37,12 @@ describe("find my size", () => {
   it("says when the suggested size is sold out", () => {
     show((s) => s !== "M");
     expect(screen.getByText("M is sold out in this colour right now.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Choose M" })).toBeNull();
+  });
+
+  it("does not offer a size that would be too small", () => {
+    show(() => true, vi.fn(), ["S", "M"], "185", "90");
+    expect(screen.getByText("This piece only goes up to M, which would likely be too small for you. Take a look at our other pieces.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Choose M" })).toBeNull();
   });
 });

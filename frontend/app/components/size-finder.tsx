@@ -76,7 +76,12 @@ export function SizeFinder({ guide, sizes, department, available, onPick }: {
 
         {asked && (
           <div role="status" className="mt-3 border-s-2 border-gold ps-3 text-sm leading-relaxed">
-            {advice ? (
+            {advice?.fit === "tooSmall" ? (
+              <>
+                <p>{t("product.findSizeTooSmall", { size: advice.size })}</p>
+                <p className="mt-1 text-xs text-stone">{t("product.findSizeEstimate", { chest: advice.chest })}</p>
+              </>
+            ) : advice ? (
               <>
                 <p>
                   {t("product.findSizeResult")} <strong dir="ltr" className="text-base">{advice.size}</strong>

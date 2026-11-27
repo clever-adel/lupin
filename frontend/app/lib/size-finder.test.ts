@@ -25,7 +25,15 @@ describe("find my size", () => {
 
   it("says when the shopper is below the smallest or above the largest size", () => {
     expect(recommendSize(bershka, sizes, 150, 40)).toMatchObject({ size: "XS", fit: "below" });
-    expect(recommendSize(bershka, sizes, 195, 120)).toMatchObject({ size: "L", fit: "above" });
+    expect(recommendSize(bershka, sizes, 185, 95)).toMatchObject({ size: "L", fit: "above" });
+    expect(recommendSize(bershka, sizes, 195, 120)).toMatchObject({ size: "L", fit: "tooSmall" });
+  });
+
+  it("says the piece is too small when the shopper is well past its largest size", () => {
+    // 185 cm / 90 kg is about 109 cm chest; a piece sold only in S and M (up to 102) cannot fit.
+    expect(recommendSize(bershka, ["S", "M"], 185, 90)).toEqual({ size: "M", fit: "tooSmall", chest: 109 });
+    // Within 4 cm of the largest range it is still offered, as snug.
+    expect(recommendSize(bershka, ["S", "M"], 182, 82)).toMatchObject({ size: "M", fit: "above" });
   });
 
   it("only uses the sizes the product is sold in", () => {

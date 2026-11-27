@@ -25,7 +25,15 @@ function range(value: string | undefined): [number, number] | null {
   return [Math.min(from, to), Math.max(from, to)];
 }
 
-export type SizeAdvice = { size: string; fit: "in" | "below" | "above"; chest: number };
+/** How far (cm) past the largest size's chest range a piece may still be suggested, as "may feel snug". */
+export const SNUG_MARGIN = 4;
+
+/**
+ * in: the estimate falls in (or between) the product's ranges; below: smaller than the smallest size,
+ * so it may feel roomy; above: just past the largest size, so it may feel snug; tooSmall: well past
+ * the largest size this piece is sold in, so no size here is suggested.
+ */
+export type SizeAdvice = { size: string; fit: "in" | "below" | "above" | "tooSmall"; chest: number };
 
 /**
  * The size to suggest, or null when the chart cannot tell (no body chart, no chest row, bad input).
@@ -53,6 +61,7 @@ export function recommendSize(
 
   const chest = Math.round(estimateChest(heightCm, weightKg, department));
   if (chest < first.band[0]) return { size: first.size, fit: "below", chest };
+  if (chest > last.band[1] + SNUG_MARGIN) return { size: last.size, fit: "tooSmall", chest };
   if (chest > last.band[1]) return { size: last.size, fit: "above", chest };
   const inside = bands.find((b) => chest >= b.band[0] && chest <= b.band[1]);
   if (inside) return { size: inside.size, fit: "in", chest };
