@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { errorText, type AdminVariant } from "~/features/admin/shared";
 import { SizeGuideEditor } from "~/features/admin/size-guide-editor";
 import { SizesAndStock } from "~/features/admin/sizes-stock";
+import { DuplicateProduct } from "~/features/admin/duplicate-product";
 import { api, deleteUploadedImage, uploadImages } from "~/lib/http";
 import type { Department, SizeGuide } from "~/lib/types";
 
@@ -531,9 +532,12 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
       <Link to="/admin/products" className="text-sm underline">← Products &amp; stock</Link>
       <h1 className="display text-2xl">{existing ? existing.nameEn : "New product"}</h1>
       {existing ? (
-        <p className="text-sm text-stone">
-          Changes apply to what is sold from now on. Orders already placed keep the name and price they were bought at.
-        </p>
+        <>
+          <p className="text-sm text-stone">
+            Changes apply to what is sold from now on. Orders already placed keep the name and price they were bought at.
+          </p>
+          <DuplicateProduct product={existing} />
+        </>
       ) : (
         <p className="text-sm text-stone">
           The product is saved as a hidden draft. Put it on sale from “Products &amp; stock” when it is ready.
