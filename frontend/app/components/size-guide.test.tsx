@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { SizeGuidePanel } from "./size-guide";
 import type { SizeGuide } from "~/lib/types";
 
@@ -16,8 +16,10 @@ function show(department: string) {
   render(<RouterProvider router={router} />);
 }
 
+afterEach(cleanup);
+
 describe("size guide panel", () => {
-  it("splits sizes into tabs, switches to inches and explains how to measure", () => {
+  it("splits sizes into tabs, switches to inches, explains how to measure and converts men's sizes", () => {
     show("men");
     expect(screen.getByText("75-78")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "M-XL" }));
@@ -26,6 +28,12 @@ describe("size guide panel", () => {
     fireEvent.click(screen.getByRole("button", { name: "in" }));
     expect(screen.getByText("35½-38½")).toBeTruthy();
     expect(screen.getByText(/measure around the fullest part, keeping/)).toBeTruthy();
+    expect(screen.getByText("International sizes")).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "IT" })).toBeTruthy();
+  });
+
+  it("has no international conversion for kids", () => {
+    show("kids");
     expect(screen.queryByText("International sizes")).toBeNull();
   });
 

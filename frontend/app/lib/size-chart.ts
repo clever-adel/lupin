@@ -71,25 +71,46 @@ export function standardRows(key: keyof typeof STANDARD_CHARTS, sizes: string[])
   }));
 }
 
-export const INTERNATIONAL_COLUMNS = ["UK", "EU", "US", "AU", "JP", "FR", "IT", "UA/KZ"] as const;
+type Conversion = { columns: readonly string[]; rows: { size: string; values: number[] }[] };
 
-/** Women's letter sizes against national sizes; S, M, L, XL and XXL each cover two UK sizes. */
-export const WOMEN_INTERNATIONAL: { size: string; values: number[] }[] = [
-  { size: "XS", values: [6, 34, 2, 6, 5, 36, 38, 40] },
-  { size: "S", values: [8, 36, 4, 8, 7, 38, 40, 42] },
-  { size: "S", values: [10, 38, 6, 10, 9, 40, 42, 44] },
-  { size: "M", values: [12, 40, 8, 12, 11, 42, 44, 46] },
-  { size: "M", values: [14, 42, 10, 14, 13, 44, 46, 48] },
-  { size: "L", values: [16, 44, 12, 16, 15, 46, 48, 50] },
-  { size: "L", values: [18, 46, 14, 18, 17, 48, 50, 52] },
-  { size: "XL", values: [20, 48, 16, 20, 19, 50, 52, 54] },
-  { size: "XL", values: [22, 50, 18, 22, 21, 52, 54, 56] },
-  { size: "XXL", values: [24, 52, 20, 24, 23, 54, 56, 58] },
-  { size: "XXL", values: [26, 54, 22, 26, 25, 56, 58, 60] },
-  { size: "XXXL", values: [28, 56, 24, 28, 27, 58, 60, 62] },
-];
+/** Letter sizes against national sizes, per department. Women's S, M, L, XL and XXL each cover two UK sizes. */
+export const INTERNATIONAL: Record<"women" | "men", Conversion> = {
+  women: {
+    columns: ["UK", "EU", "US", "AU", "JP", "FR", "IT", "UA/KZ"],
+    rows: [
+      { size: "XS", values: [6, 34, 2, 6, 5, 36, 38, 40] },
+      { size: "S", values: [8, 36, 4, 8, 7, 38, 40, 42] },
+      { size: "S", values: [10, 38, 6, 10, 9, 40, 42, 44] },
+      { size: "M", values: [12, 40, 8, 12, 11, 42, 44, 46] },
+      { size: "M", values: [14, 42, 10, 14, 13, 44, 46, 48] },
+      { size: "L", values: [16, 44, 12, 16, 15, 46, 48, 50] },
+      { size: "L", values: [18, 46, 14, 18, 17, 48, 50, 52] },
+      { size: "XL", values: [20, 48, 16, 20, 19, 50, 52, 54] },
+      { size: "XL", values: [22, 50, 18, 22, 21, 52, 54, 56] },
+      { size: "XXL", values: [24, 52, 20, 24, 23, 54, 56, 58] },
+      { size: "XXL", values: [26, 54, 22, 26, 25, 56, 58, 60] },
+      { size: "XXXL", values: [28, 56, 24, 28, 27, 58, 60, 62] },
+    ],
+  },
+  // Men's tops: EU and IT follow the jacket size, UK and US the chest in inches.
+  men: {
+    columns: ["EU", "IT", "UK", "US"],
+    rows: [
+      { size: "XS", values: [44, 44, 34, 34] },
+      { size: "S", values: [46, 46, 36, 36] },
+      { size: "M", values: [48, 48, 38, 38] },
+      { size: "L", values: [50, 50, 40, 40] },
+      { size: "XL", values: [52, 52, 42, 42] },
+      { size: "XXL", values: [54, 54, 44, 44] },
+      { size: "XXXL", values: [56, 56, 46, 46] },
+    ],
+  },
+};
 
-/** The conversion rows for the sizes this product is sold in. */
-export function internationalRows(sizes: string[]) {
-  return WOMEN_INTERNATIONAL.filter((row) => sizes.includes(row.size));
+/** The conversion table for a department, with only the sizes this product is sold in; null when there is none. */
+export function internationalTable(department: string | undefined, sizes: string[]): Conversion | null {
+  const table = department === "women" || department === "men" ? INTERNATIONAL[department] : null;
+  if (!table) return null;
+  const rows = table.rows.filter((row) => sizes.includes(row.size));
+  return rows.length ? { columns: table.columns, rows } : null;
 }

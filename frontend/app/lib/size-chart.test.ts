@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cmToInches, internationalRows, sizeGroups, standardRows } from "./size-chart";
+import { cmToInches, internationalTable, sizeGroups, standardRows } from "./size-chart";
 
 describe("size chart", () => {
   it("converts cm cells to inches to the nearest quarter", () => {
@@ -26,7 +26,15 @@ describe("size chart", () => {
     expect(rows[1]?.values).toEqual({ S: "65-71", M: "71-79", L: "79-91.5" });
   });
 
-  it("lists the international rows for the product's sizes, two UK sizes per letter size", () => {
-    expect(internationalRows(["S", "M"]).map((r) => r.values[0])).toEqual([8, 10, 12, 14]);
+  it("lists the international rows for the product's sizes, two UK sizes per women's letter size", () => {
+    expect(internationalTable("women", ["S", "M"])?.rows.map((r) => r.values[0])).toEqual([8, 10, 12, 14]);
+  });
+
+  it("has a men's conversion and none for other departments", () => {
+    const men = internationalTable("men", ["S", "M", "L"]);
+    expect(men?.columns).toEqual(["EU", "IT", "UK", "US"]);
+    expect(men?.rows.map((r) => r.values[0])).toEqual([46, 48, 50]);
+    expect(internationalTable("kids", ["S"])).toBeNull();
+    expect(internationalTable("men", ["One size"])).toBeNull();
   });
 });

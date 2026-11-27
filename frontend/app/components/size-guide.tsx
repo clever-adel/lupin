@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useT, type MessageKey } from "~/lib/i18n";
-import { cmToInches, INTERNATIONAL_COLUMNS, internationalRows, sizeGroups } from "~/lib/size-chart";
+import { cmToInches, internationalTable, sizeGroups } from "~/lib/size-chart";
 import type { SizeGuide } from "~/lib/types";
 
 const HOW_TO: { match: RegExp; key: MessageKey }[] = [
@@ -15,7 +15,7 @@ const tab = (active: boolean) =>
 /**
  * The size chart under the size buttons. Always says first that imported pieces run large, then the
  * product's own table: sizes across (split into tabs when there are many), measurements down, in cm
- * or inches. Body charts add how to measure; women's pieces add the international size conversion.
+ * or inches. Body charts add how to measure; men's and women's pieces add the international size conversion.
  * Closed until tapped.
  */
 export function SizeGuidePanel({ guide, sizes, department }: { guide: SizeGuide; sizes: string[]; department?: string }) {
@@ -26,7 +26,7 @@ export function SizeGuidePanel({ guide, sizes, department }: { guide: SizeGuide;
   const shown = groups[Math.min(groupIndex, groups.length - 1)]?.sizes ?? sizes;
   const note = pick(guide, "note");
   const howTo = guide.kind === "BODY" ? HOW_TO.filter((h) => guide.rows.some((r) => h.match.test(r.labelEn))) : [];
-  const international = department === "women" ? internationalRows(sizes) : [];
+  const international = internationalTable(department, sizes);
 
   return (
     <details className="mt-3 border border-line bg-card">
@@ -97,7 +97,7 @@ export function SizeGuidePanel({ guide, sizes, department }: { guide: SizeGuide;
           </div>
         )}
 
-        {international.length > 0 && (
+        {international && (
           <div className="mt-4">
             <h3 className="text-xs font-semibold uppercase tracking-wide">{t("product.sizeGuideInternational")}</h3>
             <div className="mt-2 overflow-x-auto" dir="ltr">
@@ -105,14 +105,14 @@ export function SizeGuidePanel({ guide, sizes, department }: { guide: SizeGuide;
                 <thead>
                   <tr className="border-b border-line text-xs text-stone">
                     <th scope="col" className="py-1.5 pe-2 text-start font-medium">{t("product.size")}</th>
-                    {INTERNATIONAL_COLUMNS.map((c) => <th key={c} scope="col" className="px-1.5 py-1.5 text-center font-medium">{c}</th>)}
+                    {international.columns.map((c) => <th key={c} scope="col" className="px-1.5 py-1.5 text-center font-medium">{c}</th>)}
                   </tr>
                 </thead>
                 <tbody>
-                  {international.map((row) => (
+                  {international.rows.map((row) => (
                     <tr key={`${row.size}-${row.values[0]}`} className="border-b border-line last:border-0">
                       <th scope="row" className="py-1.5 pe-2 text-start font-semibold">{row.size}</th>
-                      {row.values.map((v, i) => <td key={INTERNATIONAL_COLUMNS[i]} className="px-1.5 py-1.5 text-center">{v}</td>)}
+                      {row.values.map((v, i) => <td key={international.columns[i]} className="px-1.5 py-1.5 text-center">{v}</td>)}
                     </tr>
                   ))}
                 </tbody>
