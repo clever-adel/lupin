@@ -41,6 +41,10 @@ class AdminIT extends IntegrationTest {
     String category;
     int optionId;
     long variant;
+    String customerEmail;
+
+    @Autowired
+    store.lupinwear.support.IntegrationTest.FakeMailer mailer;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -70,7 +74,8 @@ class AdminIT extends IntegrationTest {
                 .cookie(owner).contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"ACTIVE\"}"))
                 .andExpect(status().isNoContent());
         variant = created.get("variantIds").get(0).asLong();
-        customer = cookie(register(uniqueEmail()), AuthCookies.ACCESS);
+        customerEmail = uniqueEmail();
+        customer = cookie(register(customerEmail), AuthCookies.ACCESS);
     }
 
     @Test
@@ -252,6 +257,37 @@ class AdminIT extends IntegrationTest {
         mvc.perform(get("/api/v1/admin/reports").cookie(admin)).andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/admin/reports").param("from", "2026-02-01").param("to", "2026-01-01").cookie(owner))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void theCustomerIsEmailedWhenTheyOrderAndWhenItShipsWithTheTrackingLink() throws Exception {
+        String reference = place("COD", 1);
+        var placed = mailTo(customerEmail, reference);
+        assertThat(placed.subject()).startsWith("استلمنا طلبك").contains("We got your order", reference);
+        assertThat(placed.html()).contains("/orders/" + reference, "1,060");
+
+        move(reference, "CONFIRMED", admin).andExpect(status().isOk());
+        assertThat(mailTo(customerEmail, reference).subject()).contains("Your order is confirmed");
+        move(reference, "PROCESSING", admin).andExpect(status().isOk());   // no email for this step
+        mvc.perform(jsonPost("/api/v1/admin/orders/" + reference + "/status",
+                        Map.of("status", "SHIPPED", "carrier", "Mylerz", "trackingReference", "MZ-77",
+                                "trackingUrl", "https://track.example.com/MZ-77")).cookie(admin))
+                .andExpect(status().isOk());
+        var shipped = mailTo(customerEmail, reference);
+        assertThat(shipped.subject()).contains("Your order is on its way");
+        assertThat(shipped.html()).contains("Mylerz", "MZ-77", "https://track.example.com/MZ-77");
+    }
+
+    /** The next email to this address about this order, waiting up to five seconds. */
+    private store.lupinwear.mail.Mailer.Message mailTo(String to, String reference) throws InterruptedException {
+        long until = System.currentTimeMillis() + 5000;
+        while (System.currentTimeMillis() < until) {
+            var mail = mailer.sent.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS);
+            if (mail != null && to.equals(mail.to()) && mail.subject().contains(reference)) {
+                return mail;
+            }
+        }
+        throw new AssertionError("No email to " + to + " about " + reference);
     }
 
     // ── helpers ──

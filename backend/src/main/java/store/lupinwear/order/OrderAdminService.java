@@ -75,14 +75,21 @@ public class OrderAdminService {
             String trackingUrl) {
     }
 
+    /** Staff (or the courier) moved an order to {@code status}; sent after the change is saved. */
+    public record StatusChanged(String reference, String status) {
+    }
+
     private final JdbcClient jdbc;
     private final OrderService orders;
     private final AuditLog audit;
+    private final org.springframework.context.ApplicationEventPublisher events;
 
-    public OrderAdminService(JdbcClient jdbc, OrderService orders, AuditLog audit) {
+    public OrderAdminService(JdbcClient jdbc, OrderService orders, AuditLog audit,
+            org.springframework.context.ApplicationEventPublisher events) {
         this.jdbc = jdbc;
         this.orders = orders;
         this.audit = audit;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -204,6 +211,7 @@ public class OrderAdminService {
             detail.put("note", note);
         }
         audit.record(actor, "ORDER_STATUS", "order", reference, detail);
+        events.publishEvent(new StatusChanged(reference, to));
         return get(reference);
     }
 
