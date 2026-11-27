@@ -301,7 +301,7 @@ function ProductView({ product }: { product: ProductDetail }) {
                 </button>
               ))}
             </div>
-            {product.sizeGuide && <SizeGuidePanel guide={product.sizeGuide} sizes={color.variants.map((v) => v.sizeCode)} />}
+            {product.sizeGuide && <SizeGuidePanel guide={product.sizeGuide} sizes={color.variants.map((v) => v.sizeCode)} department={product.department.slug} />}
           </fieldset>
 
           <div className="mt-7 flex flex-wrap gap-2">
