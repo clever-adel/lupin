@@ -29,6 +29,8 @@ import store.lupinwear.catalog.api.CatalogDtos.AdminProductRow;
 import store.lupinwear.catalog.api.CatalogDtos.ProductUpdateRequest;
 import store.lupinwear.catalog.api.CatalogDtos.AdminVariantRow;
 import store.lupinwear.catalog.api.CatalogDtos.AddColorRequest;
+import store.lupinwear.catalog.api.CatalogDtos.AddSizeRequest;
+import store.lupinwear.catalog.api.CatalogDtos.SizeAdded;
 import store.lupinwear.catalog.api.CatalogDtos.ColorAdded;
 import store.lupinwear.catalog.api.CatalogDtos.ColorUpdateRequest;
 import store.lupinwear.shared.ApiException;
@@ -361,7 +363,8 @@ public class CatalogAdminService {
                         rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7), rs.getString(8),
                         rs.getString(9), rs.getString(10), rs.getString(11), rs.getString(12), rs.getString(13),
                         rs.getString(20), rs.getString(14), rs.getString(18), rs.getString(19), rs.getBigDecimal(15),
-                        rs.getBigDecimal(16), rs.getBoolean(17), List.of(), List.of(), SizeGuides.read(rs.getString(21))))
+                        rs.getBigDecimal(16), rs.getBoolean(17), List.of(), List.of(), SizeGuides.read(rs.getString(21)),
+                        List.of()))
                 .optional().orElseThrow(() -> ApiException.notFound("Product"));
         record ColorHead(long id, String nameEn, String nameAr, String hex, boolean main) {
         }
@@ -387,7 +390,84 @@ public class CatalogAdminService {
                 product.descriptionAr(), product.fabricEn(), product.fabricAr(), product.fitEn(), product.fitAr(),
                 product.brand(), product.badge(), product.badgeEn(), product.badgeAr(), product.price(), product.salePrice(),
                 product.featured(), colors, productSizes(id).stream().map(ProductSize::code).toList(),
-                product.sizeGuide());
+                product.sizeGuide(), variantRows(id));
+    }
+
+    /** Every active variant of a product with its stock, in colour then size order. */
+    private List<AdminVariantRow> variantRows(long productId) {
+        return jdbc.sql("""
+                select v.id, pc.name_en, s.code, v.sku, i.on_hand, i.reserved
+                from product_variants v join product_colors pc on pc.id = v.color_id
+                join sizes s on s.id = v.size_id join inventory i on i.variant_id = v.id
+                where v.product_id = :p and v.active order by pc.sort_order, pc.id, s.size_group, s.sort_order
+                """).param("p", productId)
+                .query((rs, n) -> new AdminVariantRow(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getString(4),
+                        rs.getInt(5), rs.getInt(6), rs.getInt(5) - rs.getInt(6)))
+                .list();
+    }
+
+    /**
+     * Adds a size to a product that already exists, even one on sale: one variant per colour, each with its
+     * starting stock. The size must be in the same size group (adult or kids) as the product's other sizes.
+     * A variant switched off earlier for that colour and size is switched back on rather than duplicated.
+     */
+    public SizeAdded addSize(UUID actor, long productId, AddSizeRequest req) {
+        jdbc.sql("select id from products where id = :id and deleted_at is null for update").param("id", productId)
+                .query(Long.class).optional().orElseThrow(() -> ApiException.notFound("Product"));
+        String code = req.sizeCode().trim().toUpperCase(Locale.ROOT);
+        List<ProductSize> current = productSizes(productId);
+        if (current.stream().anyMatch(s -> s.code().equals(code))) {
+            throw ApiException.conflict("SIZE_EXISTS", "This product is already sold in size " + code + ".");
+        }
+        String group = jdbc.sql("""
+                select s.size_group from product_variants v join sizes s on s.id = v.size_id
+                where v.product_id = :p and v.active limit 1
+                """).param("p", productId).query(String.class).optional().orElse("ADULT");
+        Integer sizeId = jdbc.sql("select id from sizes where size_group = :g and code = :c")
+                .param("g", group).param("c", code).query(Integer.class).optional()
+                .orElseThrow(() -> ApiException.badRequest("UNKNOWN_SIZE", "Size " + code + " is not one of the shop's sizes."));
+        List<Long> colorIds = jdbc.sql("select id from product_colors where product_id = :p order by sort_order, id")
+                .param("p", productId).query(Long.class).list();
+        if (colorIds.isEmpty()) {
+            throw ApiException.badRequest("PRODUCT_INCOMPLETE", "This product has no colours to add a size to.");
+        }
+        Map<Long, Integer> stock = req.stockByColor() == null ? Map.of() : req.stockByColor();
+        for (Long colorId : stock.keySet()) {
+            if (!colorIds.contains(colorId)) {
+                throw ApiException.badRequest("UNKNOWN_COLOR", "This product has no colour " + colorId + ".");
+            }
+        }
+        List<Long> variantIds = new ArrayList<>();
+        for (long colorId : colorIds) {
+            int qty = stock.getOrDefault(colorId, 0);
+            Long existing = jdbc.sql("select id from product_variants where product_id = :p and color_id = :c and size_id = :s")
+                    .param("p", productId).param("c", colorId).param("s", sizeId).query(Long.class).optional().orElse(null);
+            long variantId;
+            if (existing != null) {
+                variantId = existing;
+                jdbc.sql("update product_variants set active = true where id = :v").param("v", variantId).update();
+                jdbc.sql("""
+                        insert into inventory (variant_id, on_hand) values (:v, :q)
+                        on conflict (variant_id) do update set on_hand = inventory.on_hand + :q, updated_at = now()
+                        """).param("v", variantId).param("q", qty).update();
+            } else {
+                variantId = jdbc.sql("""
+                        insert into product_variants (product_id, color_id, size_id, sku)
+                        values (:p, :c, :s, :sku) returning id
+                        """).param("p", productId).param("c", colorId).param("s", sizeId)
+                        .param("sku", "LP-" + productId + "-" + colorId + "-" + sizeId).query(Long.class).single();
+                jdbc.sql("insert into inventory (variant_id, on_hand) values (:v, :q)").param("v", variantId)
+                        .param("q", qty).update();
+            }
+            if (qty > 0) {
+                movement(variantId, "RECEIVE", qty, "Initial stock", actor);
+            }
+            variantIds.add(variantId);
+        }
+        jdbc.sql("update products set updated_at = now(), version = version + 1 where id = :id").param("id", productId)
+                .update();
+        audit.record(actor, "SIZE_ADD", "product", productId, Map.of("size", code));
+        return new SizeAdded(variantIds);
     }
 
     /** Sets or clears (null) a product's size chart. Every size named in it must be one the product is sold in. */

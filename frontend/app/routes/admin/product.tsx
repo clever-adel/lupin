@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { errorText } from "~/features/admin/shared";
+import { errorText, type AdminVariant } from "~/features/admin/shared";
 import { SizeGuideEditor } from "~/features/admin/size-guide-editor";
+import { SizesAndStock } from "~/features/admin/sizes-stock";
 import { api, deleteUploadedImage, uploadImages } from "~/lib/http";
 import type { Department, SizeGuide } from "~/lib/types";
 
@@ -32,6 +33,8 @@ interface Detail {
   /** The sizes the product is sold in; a colour added later gets the same ones. */
   sizes?: string[];
   sizeGuide?: SizeGuide | null;
+  /** Every colour and size with its stock. */
+  variants?: AdminVariant[];
 }
 
 interface ImageInput {
@@ -644,7 +647,7 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
       {!existing && (
         <section className={box}>
           <h2 className="font-semibold">Sizes, colours and first stock</h2>
-          <p className="mt-1 text-sm text-stone">These cannot be changed from the dashboard after the product is created.</p>
+          <p className="mt-1 text-sm text-stone">After the product is created you can add sizes and change stock while editing it.</p>
 
           <fieldset className="mt-4">
             <legend className="mb-2 text-xs font-medium">Sizes</legend>
@@ -793,6 +796,16 @@ function ProductForm({ existing, departments }: { existing: Detail | null; depar
             onAdded={(colour) => setColours((list) => [...list, colour])}
           />
         </section>
+      )}
+
+      {existing && (
+        <SizesAndStock
+          productId={existing.id}
+          sizes={existing.sizes ?? []}
+          colours={(existing.colors ?? []).filter((c) => c.id != null).map((c) => ({ id: c.id as number, nameEn: c.nameEn }))}
+          variants={existing.variants ?? []}
+          sizeOptions={(existing.sizes ?? []).some((s) => KIDS_SIZES.includes(s)) ? KIDS_SIZES : ADULT_SIZES}
+        />
       )}
 
       {existing && (existing.sizes?.length ?? 0) > 0 && (

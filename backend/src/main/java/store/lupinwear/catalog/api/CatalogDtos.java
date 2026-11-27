@@ -199,7 +199,19 @@ public final class CatalogDtos {
             String fabricEn, String fabricAr, String fitEn, String fitAr, String brand, String badge, String badgeEn,
             String badgeAr, BigDecimal price, BigDecimal salePrice, boolean featured, List<AdminColor> colors,
             /** The product's sizes, in size order: a colour added later gets one variant for each. */
-            List<String> sizes, SizeGuide sizeGuide) {
+            List<String> sizes, SizeGuide sizeGuide,
+            /** Every colour and size with its stock, in colour then size order. */
+            List<AdminVariantRow> variants) {
+    }
+
+    /** Adds a size to every colour of a product that already exists, each with its starting stock. */
+    public record AddSizeRequest(
+            @NotBlank @Size(max = 12) String sizeCode,
+            /** Starting stock per colour id; a colour left out starts at 0. */
+            java.util.Map<@NotNull Long, @NotNull @Min(0) @Max(100000) Integer> stockByColor) {
+    }
+
+    public record SizeAdded(List<Long> variantIds) {
     }
 
     /** A colour added to a product that already exists: same sizes as the others, its own stock and photos. */
