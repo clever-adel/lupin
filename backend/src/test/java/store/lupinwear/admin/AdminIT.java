@@ -108,6 +108,32 @@ class AdminIT extends IntegrationTest {
         assertThat(departmentImage("men")).isEqualTo(auto);
     }
 
+    @Test
+    void departmentCardTurnsThroughTheFirstPiecesPhotos() throws Exception {
+        record Ids(long product, long color) {
+        }
+        Ids ids = jdbc.sql("select p.id, pc.id from products p join product_colors pc on pc.product_id = p.id and pc.is_main"
+                + " where p.slug = :s").param("s", productSlug).query((rs, n) -> new Ids(rs.getLong(1), rs.getLong(2))).single();
+        String url = "/media/" + UUID.randomUUID() + ".jpg";
+        mvc.perform(put("/api/v1/admin/products/" + ids.product() + "/colors/" + ids.color() + "/images").with(csrf())
+                .cookie(owner).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"images\":[{\"url\":\"" + url + "\",\"publicId\":\"p1\",\"altEn\":\"\",\"altAr\":\"\"}]}"))
+                .andExpect(status().isNoContent());
+        // First in the store order: in stock, not arranged yet, featured and the newest.
+        jdbc.sql("update products set display_order = null, featured = true, published_at = now() + interval '1 day'"
+                + " where id = :id").param("id", ids.product()).update();
+
+        for (JsonNode d : body(mvc.perform(get("/api/v1/catalog/departments")).andReturn())) {
+            if ("men".equals(d.get("slug").asText())) {
+                List<String> photos = new java.util.ArrayList<>();
+                d.get("pieceImageUrls").forEach(u -> photos.add(u.asText()));
+                assertThat(photos).hasSizeLessThanOrEqualTo(5).first().isEqualTo(url);
+                return;
+            }
+        }
+        throw new AssertionError("No men department");
+    }
+
     private String departmentImage(String slug) throws Exception {
         for (JsonNode d : body(mvc.perform(get("/api/v1/catalog/departments")).andReturn())) {
             if (slug.equals(d.get("slug").asText())) {

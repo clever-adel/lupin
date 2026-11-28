@@ -26,10 +26,13 @@ public final class CatalogDtos {
     /** {@code imageUrl}: the main photo of the department's first piece in the store order; null if none. */
     /**
      * {@code imageUrl} is the card photo: the owner's upload, else the main photo of the first piece.
-     * {@code ownImageUrl} and {@code ownImagePublicId} are the upload alone, for the dashboard only.
+     * {@code ownImageUrl} is the owner's upload alone; {@code pieceImageUrls} the main photos of the first
+     * pieces in the store order, which the home page card shows in turn. {@code ownImagePublicId} is for the
+     * dashboard only.
      */
     public record DepartmentView(String slug, String nameEn, String nameAr, String status, long productCount,
-            List<CategoryView> categories, String imageUrl, String ownImageUrl, String ownImagePublicId) {
+            List<CategoryView> categories, String imageUrl, String ownImageUrl, List<String> pieceImageUrls,
+            String ownImagePublicId) {
     }
 
     /** {@code hoverImageUrl} is the colour's second photo, shown when a shopper points at the card; null if there is one. */

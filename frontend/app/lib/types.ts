@@ -18,6 +18,10 @@ export interface Department {
   categories: Category[];
   /** The card photo: the owner's upload, else the main photo of the department's first piece. */
   imageUrl?: string;
+  /** The wide photo the owner uploaded for the card, if any. */
+  ownImageUrl?: string;
+  /** The main photo of each of the first pieces in the store order, shown in turn on the card. */
+  pieceImageUrls?: string[];
 }
 
 export interface ColorDot {

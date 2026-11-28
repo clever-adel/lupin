@@ -36,6 +36,9 @@ public class CatalogQueryService {
     /** The most one customer can put in one bag line; also caps how much stock a response reveals. */
     public static final int MAX_LINE_QUANTITY = 10;
 
+    /** How many pieces' photos a department's home page card turns through. */
+    static final int CARD_PHOTOS = 5;
+
     /** What makes a product visible to shoppers. Used by every public query. */
     private static final String VISIBLE = """
             from products p
@@ -105,6 +108,21 @@ public class CatalogQueryService {
                                     rs.getString("name_ar"), rs.getString("parent_slug")));
                     return null;
                 }).list();
+        // The main photo of the first pieces of each department, in the store's own order.
+        Map<Integer, List<String>> pieces = new HashMap<>();
+        jdbc.sql("""
+                select department_id, url from (
+                  select p.department_id, photo.url,
+                         row_number() over (partition by p.department_id order by %s) as place
+                  from products p join categories c on c.id = p.category_id
+                  join lateral (select pi.url from product_colors pc join product_images pi on pi.color_id = pc.id
+                                where pc.product_id = p.id and pc.is_main order by pi.position limit 1) photo on true
+                  where p.status = 'ACTIVE' and p.deleted_at is null and c.active
+                ) ranked where place <= :most order by department_id, place
+                """.formatted(Sort.FEATURED.orderBy)).param("most", CARD_PHOTOS).query((rs, n) -> {
+                    pieces.computeIfAbsent(rs.getInt("department_id"), k -> new ArrayList<>()).add(rs.getString("url"));
+                    return null;
+                }).list();
         return jdbc.sql("""
                 select d.id, d.slug, d.name_en, d.name_ar, d.status, d.image_url as own_url, d.image_public_id as own_id,
                        (select count(*) from products p join categories c on c.id = p.category_id
@@ -122,7 +140,8 @@ public class CatalogQueryService {
                         categories.getOrDefault(rs.getInt("id"), List.of()),
                         !"ACTIVE".equals(rs.getString("status")) ? null
                                 : rs.getString("own_url") != null ? rs.getString("own_url") : rs.getString("image_url"),
-                        includeHidden ? rs.getString("own_url") : null,
+                        "ACTIVE".equals(rs.getString("status")) || includeHidden ? rs.getString("own_url") : null,
+                        "ACTIVE".equals(rs.getString("status")) ? pieces.getOrDefault(rs.getInt("id"), List.of()) : List.of(),
                         includeHidden ? rs.getString("own_id") : null))
                 .list();
     }
