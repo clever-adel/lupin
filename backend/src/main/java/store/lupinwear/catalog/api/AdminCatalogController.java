@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import store.lupinwear.catalog.api.CatalogDtos.CategoryRequest;
+import store.lupinwear.catalog.api.CatalogDtos.DepartmentPhotoRequest;
 import store.lupinwear.catalog.api.CatalogDtos.DepartmentStatusRequest;
 import store.lupinwear.catalog.api.CatalogDtos.DepartmentView;
 import store.lupinwear.catalog.api.CatalogDtos.ProductCreated;
@@ -51,6 +52,14 @@ public class AdminCatalogController {
     void departmentStatus(@AuthenticationPrincipal CurrentUser user, @PathVariable String slug,
             @Valid @RequestBody DepartmentStatusRequest body) {
         catalog.setDepartmentStatus(user.id(), slug, body.status());
+    }
+
+    /** Returns the replaced photo's id, if any, so the dashboard can remove that file. */
+    @org.springframework.web.bind.annotation.PutMapping("/departments/{slug}/photo")
+    Map<String, String> departmentPhoto(@AuthenticationPrincipal CurrentUser user, @PathVariable String slug,
+            @Valid @RequestBody DepartmentPhotoRequest body) {
+        String previous = catalog.setDepartmentPhoto(user.id(), slug, body.imageUrl(), body.imagePublicId());
+        return previous == null ? Map.of() : Map.of("imagePublicId", previous);
     }
 
     @PostMapping("/categories")

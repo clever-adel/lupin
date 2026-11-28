@@ -81,6 +81,44 @@ class AdminIT extends IntegrationTest {
     }
 
     @Test
+    void ownerSetsAndClearsADepartmentCardPhoto() throws Exception {
+        String auto = departmentImage("men");
+        mvc.perform(put("/api/v1/admin/departments/men/photo").with(csrf()).cookie(owner)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"imageUrl\":\"https://evil.example/x.jpg\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/v1/admin/departments/men/photo").with(csrf()).cookie(owner)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"imageUrl\":\"/media/men-card.jpg\",\"imagePublicId\":\"men-card.jpg\"}"))
+                .andExpect(status().isOk());
+        assertThat(departmentImage("men")).isEqualTo("/media/men-card.jpg");
+        JsonNode adminView = body(mvc.perform(get("/api/v1/admin/departments").cookie(owner)).andReturn());
+        JsonNode men = null;
+        for (JsonNode d : adminView) {
+            if ("men".equals(d.get("slug").asText())) {
+                men = d;
+            }
+        }
+        assertThat(men).isNotNull();
+        assertThat(men.get("ownImagePublicId").asText()).isEqualTo("men-card.jpg");
+
+        JsonNode cleared = body(mvc.perform(put("/api/v1/admin/departments/men/photo").with(csrf()).cookie(owner)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"imageUrl\":\"\"}"))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(cleared.get("imagePublicId").asText()).isEqualTo("men-card.jpg");
+        assertThat(departmentImage("men")).isEqualTo(auto);
+    }
+
+    private String departmentImage(String slug) throws Exception {
+        for (JsonNode d : body(mvc.perform(get("/api/v1/catalog/departments")).andReturn())) {
+            if (slug.equals(d.get("slug").asText())) {
+                assertThat(d.path("ownImagePublicId").isMissingNode()).isTrue();
+                return d.path("imageUrl").isTextual() ? d.get("imageUrl").asText() : null;
+            }
+        }
+        throw new AssertionError("No department " + slug);
+    }
+
+    @Test
     void cashOrderMovesThroughTheWorkflowAndStockLeavesWhenItShips() throws Exception {
         String reference = place("COD", 2);
         assertThat(stock()).containsExactly(5, 2); // on hand, reserved

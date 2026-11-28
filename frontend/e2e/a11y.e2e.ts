@@ -57,7 +57,8 @@ test("the opening animation has no violations and can be dismissed from the keyb
 
 test("the store can be used with the keyboard alone", async ({ page }) => {
   await skipIntro(page);
-  await page.goto("/");
+  // Wait for the page to hydrate: before that a link press is a full page load, which never moves focus.
+  await gotoReady(page, "/");
 
   // First Tab reaches "Skip to content"; using it lands on the main content.
   await page.keyboard.press("Tab");
