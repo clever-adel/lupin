@@ -3,8 +3,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { errorText, money, type AdminProduct } from "~/features/admin/shared";
 import { StockCell } from "~/features/admin/stock-cell";
-import { api, deleteUploadedImage, imagesWithoutSizes, saveImageSizes, uploadImages } from "~/lib/http";
-import { photoUrl } from "~/lib/photo-sizes";
+import { api, imagesWithoutSizes, saveImageSizes } from "~/lib/http";
 import type { Department, Page } from "~/lib/types";
 
 const PRODUCT_STATUS: Record<string, string> = { DRAFT: "Draft (hidden)", ACTIVE: "On sale", ARCHIVED: "Archived (hidden)" };
@@ -164,75 +163,7 @@ const DEPARTMENT_STATE: Record<AdminDepartment["status"], string> = {
   HIDDEN: "Hidden from the store",
 };
 
-type AdminDepartment = Omit<Department, "status"> & {
-  status: "ACTIVE" | "COMING_SOON" | "HIDDEN";
-  /** The photo the owner uploaded for the home page card; none means the first piece's photo is used. */
-  ownImageUrl?: string;
-  ownImagePublicId?: string;
-};
-
-/**
- * The department's card on the home page: a wide photo the owner uploads, or, without one, the main photo
- * of the department's first piece in the display order.
- */
-function DepartmentPhoto({ department }: { department: AdminDepartment }) {
-  const client = useQueryClient();
-  const [error, setError] = useState("");
-  const own = department.ownImageUrl ?? "";
-  const shown = own || department.imageUrl || "";
-  const replace = useMutation({
-    mutationFn: async (file: File | null) => {
-      let next = { imageUrl: "", imagePublicId: "" };
-      if (file) {
-        const [uploaded] = await uploadImages([file]);
-        if (!uploaded) throw new Error("Could not upload the photo.");
-        next = { imageUrl: uploaded.url, imagePublicId: uploaded.publicId };
-      }
-      let previous: { imagePublicId?: string };
-      try {
-        previous = await api<{ imagePublicId?: string }>("PUT", `/api/v1/admin/departments/${department.slug}/photo`, next);
-      } catch (e) {
-        if (next.imagePublicId) await deleteUploadedImage(next.imagePublicId).catch(() => undefined);
-        throw e;
-      }
-      // The old file is no longer used anywhere; a failed clean-up only leaves an unused file behind.
-      if (previous.imagePublicId) await deleteUploadedImage(previous.imagePublicId).catch(() => undefined);
-    },
-    onMutate: () => setError(""),
-    onError: (e) => setError(e instanceof Error ? e.message : errorText(e)),
-    onSuccess: () => client.invalidateQueries({ queryKey: ["admin", "departments"] }),
-  });
-  return (
-    <div className="flex w-full flex-wrap items-center gap-3 border-t border-line pt-2">
-      <span className="grid aspect-[3/2] w-24 place-items-center overflow-hidden bg-studio text-center text-[10px] text-stone">
-        {shown ? <img src={photoUrl(shown, 320)} alt={`${department.nameEn} card photo`} className="h-full w-full object-cover" /> : "No photo"}
-      </span>
-      <span className="text-xs text-stone">
-        {own ? "Home page card: your photo." : "Home page card: the first piece's photo. Upload a wide photo (3 by 2) to use your own."}
-      </span>
-      <label className={`btn btn-outline h-9 ${replace.isPending ? "pointer-events-none opacity-50" : "cursor-pointer"}`}>
-        {replace.isPending ? "Saving…" : own ? `Change ${department.nameEn} photo` : `Upload ${department.nameEn} photo`}
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/avif"
-          className="sr-only"
-          disabled={replace.isPending}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (file) replace.mutate(file);
-          }}
-        />
-      </label>
-      {own && (
-        <button type="button" className="cursor-pointer text-sm underline" disabled={replace.isPending} onClick={() => replace.mutate(null)}>
-          Use the first piece&apos;s photo
-        </button>
-      )}
-      {error && <p role="alert" className="w-full text-sm text-danger">{error}</p>}
-    </div>
-  );
-}
+type AdminDepartment = Omit<Department, "status"> & { status: "ACTIVE" | "COMING_SOON" | "HIDDEN" };
 
 /**
  * Each department is open, coming soon (name shown with a "Soon" tag, products hidden) or hidden
@@ -290,7 +221,6 @@ function Departments() {
                   {label[s]}
                 </button>
               ))}
-              {!hidden && <DepartmentPhoto department={d} />}
             </li>
           );
         })}

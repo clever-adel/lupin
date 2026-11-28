@@ -1,8 +1,7 @@
-import { Fragment, useState, type CSSProperties } from "react";
+import { Fragment, type CSSProperties } from "react";
 import { Link, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/home";
 import type { loader as layoutLoader } from "./layout";
-import { cardSlides, DepartmentCardPhotos } from "~/components/department-card-photos";
 import { LookLineup } from "~/components/look";
 import { ProductGrid, ProductPhoto } from "~/components/product";
 import { HomeReviews } from "~/components/reviews";
@@ -87,8 +86,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const { t, href, pick } = useT();
   const layout = useRouteLoaderData<typeof layoutLoader>("routes/store/layout");
   const departments = layout?.departments ?? [];
-  /** The department card under the pointer: its photos hold still while the shopper looks at it. */
-  const [hovered, setHovered] = useState<string | null>(null);
   const campaign = layout?.site.hero;
   const products = loaderData.collection.items;
   const hero = products[0];
@@ -169,22 +166,16 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           {departments.map((d, i) => {
             const name = pick(d, "name");
             const live = d.status === "ACTIVE";
-            const slides = live ? cardSlides(d.ownImageUrl, d.pieceImageUrls, d.imageUrl) : [];
             const body = (
-              <div
-                onPointerEnter={() => setHovered(d.slug)}
-                onPointerLeave={() => setHovered((h) => (h === d.slug ? null : h))}
-                className="relative flex aspect-[3/2] flex-col justify-end overflow-hidden bg-ink p-5 text-bone md:aspect-auto md:h-80 md:p-8"
-              >
-                <DepartmentCardPhotos slides={slides} hovering={hovered === d.slug} />
+              <div className="relative flex aspect-[3/2] flex-col justify-end md:aspect-auto md:h-64 overflow-hidden bg-ink p-5 text-bone">
                 <span
                   aria-hidden="true"
                   className="display pointer-events-none absolute -top-2 start-3 text-6xl text-transparent opacity-40 [-webkit-text-stroke:1px_var(--color-bone)]"
                 >
                   {name}
                 </span>
-                <span className="display relative text-lg">{name}</span>
-                <span className="relative mt-1 flex items-center justify-between text-xs text-bone/70">
+                <span className="display text-lg">{name}</span>
+                <span className="mt-1 flex items-center justify-between text-xs text-bone/70">
                   <span>{live ? t("home.styles", { count: d.productCount }) : t("home.comingSoon")}</span>
                   <span className="label border-b border-bone/60 pb-0.5 text-bone">
                     {live ? t("home.shop", { name }) : t("home.comingSoon")}
