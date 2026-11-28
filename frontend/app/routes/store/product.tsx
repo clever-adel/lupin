@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/product";
 import { announceBagAdded } from "~/components/bag-added";
 import { ShareIcon } from "~/components/icons";
+import { PhotoViewer, ZoomablePhoto } from "~/components/photo-zoom";
 import { FavouriteButton, Price, ProductGrid, ProductPhoto } from "~/components/product";
 import { SizeGuidePanel } from "~/components/size-guide";
 import { SizeFinder } from "~/components/size-finder";
@@ -93,6 +94,8 @@ function ProductView({ product }: { product: ProductDetail }) {
     (wanted && product.colors.find((c) => c.nameEn.toLowerCase() === wanted)?.id) || product.colors[0]?.id,
   );
   const [photo, setPhoto] = useState(0);
+  /** The photo open full screen for zooming, or null. */
+  const [viewing, setViewing] = useState<number | null>(null);
   const [variantId, setVariantId] = useState<number | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [notice, setNotice] = useState<"added" | "size" | "copied" | null>(null);
@@ -230,6 +233,8 @@ function ProductView({ product }: { product: ProductDetail }) {
   };
 
   const square = "grid h-12 w-12 place-items-center border border-ink";
+  const photoAlt = (image: (typeof color.images)[number], i: number) =>
+    p(image, "alt") || `${name} — ${p(color, "name")} (${t("product.photoOf", { n: i + 1, total: color.images.length })})`;
 
   return (
     <div className="shell pt-6">
@@ -278,16 +283,24 @@ function ProductView({ product }: { product: ProductDetail }) {
                     data-reveal={i === 0 ? undefined : "photo"}
                     className="w-full shrink-0 snap-center overflow-hidden bg-studio"
                   >
-                    <ProductPhoto
+                    <ZoomablePhoto
                       url={image.url}
-                      alt={p(image, "alt") || `${name} — ${p(color, "name")} (${t("product.photoOf", { n: i + 1, total: color.images.length })})`}
+                      alt={photoAlt(image, i)}
                       sizes="(min-width: 768px) 55vw, 100vw"
                       eager={i === 0}
-                      className="aspect-[4/5] w-full"
+                      onOpen={() => setViewing(i)}
                     />
                   </li>
                 ))}
               </ul>
+              {viewing !== null && (
+                <PhotoViewer
+                  images={color.images.map((image, i) => ({ url: image.url, alt: photoAlt(image, i) }))}
+                  start={viewing}
+                  name={name}
+                  onClose={() => setViewing(null)}
+                />
+              )}
               {color.images.length > 1 && (
                 <p className="mt-3 flex items-center justify-center gap-1.5 md:hidden" aria-hidden="true">
                   {color.images.map((image, i) => (
