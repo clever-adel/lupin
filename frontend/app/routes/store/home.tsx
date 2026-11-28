@@ -2,7 +2,7 @@ import { Fragment, useState, type CSSProperties } from "react";
 import { Link, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/home";
 import type { loader as layoutLoader } from "./layout";
-import { cardSlides, DepartmentCardPhotos, pieceSidePanel } from "~/components/department-card-photos";
+import { cardSlides, DepartmentCardPhotos } from "~/components/department-card-photos";
 import { LookLineup } from "~/components/look";
 import { ProductGrid, ProductPhoto } from "~/components/product";
 import { HomeReviews } from "~/components/reviews";
@@ -174,7 +174,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               <div
                 onPointerEnter={() => setHovered(d.slug)}
                 onPointerLeave={() => setHovered((h) => (h === d.slug ? null : h))}
-                className={`relative flex aspect-[3/2] flex-col justify-end md:aspect-auto md:h-72 overflow-hidden bg-ink p-5 text-bone ${pieceSidePanel(slides) ? "md:pe-[calc(40%+1.25rem)]" : ""}`}
+                className="relative flex aspect-[3/2] flex-col justify-end overflow-hidden bg-ink p-5 text-bone md:aspect-auto md:h-80 md:p-8"
               >
                 <DepartmentCardPhotos slides={slides} hovering={hovered === d.slug} />
                 <span

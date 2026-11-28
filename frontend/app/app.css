@@ -471,3 +471,17 @@
     bottom: 5.5rem;
   }
 }
+
+/* Home page department card on computers: the pieces glide sideways without end. The row holds its
+   pieces twice, so moving it by half brings it back to where it started. Mirrored in Arabic. */
+@keyframes card-strip {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes card-strip-rtl {
+  from { transform: translateX(0); }
+  to { transform: translateX(50%); }
+}
+.card-strip { animation: card-strip 48s linear infinite; }
+[dir="rtl"] .card-strip { animation-name: card-strip-rtl; }
+@media (prefers-reduced-motion: reduce) { .card-strip { animation: none; } }

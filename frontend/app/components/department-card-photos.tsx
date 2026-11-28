@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import { ProductPhoto } from "~/components/product";
 
-/** How long each photo stays before the next fades in. */
+/** How long each photo stays (phones) or each wide photo stays (computers) before the next fades in. */
 const SHOW_MS = 4500;
+/** Seconds the computer strip takes to move by one piece. */
+const STRIP_SECONDS_PER_PIECE = 6;
+/** The strip repeats its pieces until it holds at least this many, so it always spans a wide card. */
+const STRIP_MIN_TILES = 8;
 
 export type CardSlide = { url: string; kind: "campaign" | "piece" };
 
@@ -18,61 +22,106 @@ export function cardSlides(ownImageUrl: string | undefined, pieceImageUrls: stri
   return slides;
 }
 
-/** Whether the card shows a piece's photo in a side panel on wider screens, so its words keep clear of it. */
-export function pieceSidePanel(slides: CardSlide[]): boolean {
-  return slides.some((s) => s.kind === "piece");
+/** One pass of the computer strip: the pieces repeated until there are enough to span the card. */
+export function stripTiles(pieces: string[]): string[] {
+  if (pieces.length === 0) return [];
+  const tiles: string[] = [];
+  while (tiles.length < STRIP_MIN_TILES) tiles.push(...pieces);
+  return tiles;
+}
+
+function useMedia(query: string, initial: boolean): boolean {
+  const [matches, setMatches] = useState(initial);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    setMatches(list.matches);
+    const change = () => setMatches(list.matches);
+    list.addEventListener("change", change);
+    return () => list.removeEventListener("change", change);
+  }, [query]);
+  return matches;
 }
 
 /**
- * The photos behind a department card on the home page, fading from one to the next every few seconds.
- * A wide photo the owner uploaded fills the card. A piece's photo (tall, on a light studio background)
- * fills the card on phones; on wider screens, where the card is long and short, it stands whole in a
- * studio-coloured panel at the end of the card instead of being cut to a thin strip (the card keeps its
- * words clear of that panel: see `pieceSidePanel`).
- * Stops while the pointer is on the card, while the page is hidden, and for visitors who ask for less motion.
+ * The photos behind a department card on the home page.
+ *
+ * - Phones: one photo at a time fills the card (the owner's wide photo, then each piece), fading to the
+ *   next every few seconds.
+ * - Computers, where the card is long and short: the pieces stand side by side across the whole card,
+ *   each whole in its own tile, and the row glides slowly sideways without end. A wide photo the owner
+ *   uploaded takes turns with that row.
+ *
+ * Everything holds still while the pointer is on the card, while the page is hidden, and for visitors who
+ * ask for less motion.
  */
 export function DepartmentCardPhotos({ slides, hovering }: { slides: CardSlide[]; hovering: boolean }) {
+  const wide = useMedia("(min-width: 48rem)", false);
+  const still = useMedia("(prefers-reduced-motion: reduce)", true);
+  const campaign = slides.find((s) => s.kind === "campaign");
+  const pieces = slides.filter((s) => s.kind === "piece").map((s) => s.url);
+  // What takes turns: on computers the wide photo and the whole strip; on phones every photo.
+  const turns = wide ? (campaign ? 1 : 0) + (pieces.length ? 1 : 0) : slides.length;
   const [shown, setShown] = useState(0);
-  const [still, setStill] = useState(true);
 
   useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    setStill(query.matches);
-    const change = () => setStill(query.matches);
-    query.addEventListener("change", change);
-    return () => query.removeEventListener("change", change);
-  }, []);
+    setShown(0);
+  }, [wide]);
 
   useEffect(() => {
-    if (slides.length < 2 || still || hovering) return;
+    if (turns < 2 || still || hovering) return;
     const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") setShown((i) => (i + 1) % slides.length);
+      if (document.visibilityState === "visible") setShown((i) => (i + 1) % turns);
     }, SHOW_MS);
     return () => window.clearInterval(timer);
-  }, [slides.length, still, hovering]);
+  }, [turns, still, hovering]);
 
   if (slides.length === 0) return null;
+  const fade = (on: boolean) => `transition-opacity duration-1000 ${on ? "opacity-100" : "opacity-0"}`;
+  const current = shown % Math.max(turns, 1);
+  const stripTurn = campaign ? 1 : 0;
+  const tiles = stripTiles(pieces);
+
   return (
     <>
-      {slides.map((slide, i) => {
-        const on = i === shown % slides.length;
-        const fade = `transition-opacity duration-1000 ${on ? "opacity-100" : "opacity-0"}`;
-        return slide.kind === "campaign" ? (
-          <span key={slide.url} aria-hidden="true" data-card-slide={on ? "on" : "off"} className={`absolute inset-0 ${fade}`}>
-            <ProductPhoto url={slide.url} alt="" sizes="(min-width: 768px) 50vw, 100vw"
-              className="h-full w-full object-cover opacity-80" />
-            <span className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent" />
+      {/* Phones: one photo at a time. */}
+      {slides.map((slide, i) => (
+        <span key={`phone-${slide.url}`} aria-hidden="true" data-card-slide={!wide ? (i === current ? "on" : "off") : undefined}
+          className={`absolute inset-0 md:hidden ${fade(i === current)}`}>
+          <ProductPhoto url={slide.url} alt="" sizes="100vw"
+            className={`h-full w-full object-cover opacity-80 ${slide.kind === "piece" ? "object-[50%_25%]" : ""}`} />
+        </span>
+      ))}
+
+      {/* Computers: the owner's wide photo, taking turns with the strip of pieces. */}
+      {campaign && (
+        <span aria-hidden="true" data-card-slide={wide ? (current === 0 ? "on" : "off") : undefined}
+          className={`absolute inset-0 max-md:hidden ${fade(current === 0)}`}>
+          <ProductPhoto url={campaign.url} alt="" sizes="100vw" className="h-full w-full object-cover opacity-80" />
+        </span>
+      )}
+      {tiles.length > 0 && (
+        <span aria-hidden="true" data-card-slide={wide ? (current === stripTurn ? "on" : "off") : undefined} data-card-strip
+          className={`absolute inset-0 overflow-hidden bg-studio max-md:hidden ${fade(current === stripTurn)}`}>
+          <span
+            className="card-strip flex h-full w-max"
+            style={{
+              animationDuration: `${tiles.length * STRIP_SECONDS_PER_PIECE}s`,
+              animationPlayState: hovering || still ? "paused" : "running",
+            }}
+          >
+            {[...tiles, ...tiles].map((url, i) => (
+              <span key={i} className="aspect-[4/5] h-full shrink-0 border-e border-bone/70">
+                <ProductPhoto url={url} alt="" sizes="20vw" className="h-full w-full object-cover" />
+              </span>
+            ))}
           </span>
-        ) : (
-          <span key={slide.url} aria-hidden="true" data-card-slide={on ? "on" : "off"}
-            className={`absolute inset-0 md:start-auto md:end-0 md:w-2/5 md:overflow-hidden md:bg-studio ${fade}`}>
-            <ProductPhoto url={slide.url} alt="" sizes="(min-width: 768px) 20vw, 100vw"
-              className="h-full w-full object-cover object-[50%_25%] opacity-80 md:scale-[1.45] md:object-contain md:opacity-100" />
-            {/* Studio shots leave room around the piece: zoomed a little on wide screens so it fills the panel. */}
-            <span className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent md:hidden" />
-          </span>
-        );
-      })}
+        </span>
+      )}
+
+      {/* Keeps the card's words readable over any photo: the name on the start side, the link along the bottom. */}
+      <span aria-hidden="true"
+        className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent md:bg-gradient-to-r md:from-ink/90 md:via-ink/30 md:via-35% md:to-transparent" />
+      <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-ink/85 to-transparent max-md:hidden" />
     </>
   );
 }

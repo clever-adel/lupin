@@ -129,7 +129,7 @@ test.describe.serial("phone-size photos", () => {
     await expect(departments).toContainText("Home page card: the first piece's photo.");
   });
 
-  test("the Men card turns through the first pieces' photos by itself", async ({ browser }) => {
+  test("the Men card shows the first pieces' photos and moves by itself, on a phone and a computer", async ({ browser }) => {
     await page.goto("/admin/products");
     const photo = await bigJpeg(page);
     // Photos on two pieces, through the dashboard's own API.
@@ -155,7 +155,9 @@ test.describe.serial("phone-size photos", () => {
       return done;
     }, { base64: photo.toString("base64") });
 
-    const visitor = await newVisitor(browser);
+    // Phone: one photo at a time, moving on by itself.
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const visitor = await phone.newPage();
     await visitor.addInitScript(() => window.sessionStorage.setItem("lupin.intro", "1"));
     await visitor.goto("/");
     await visitor.locator("html[data-hydrated]").waitFor({ state: "attached" });
@@ -163,7 +165,22 @@ test.describe.serial("phone-size photos", () => {
     await expect(card.locator("[data-card-slide]")).toHaveCount(2);
     const firstOn = await card.locator('[data-card-slide="on"] img').getAttribute("src");
     await expect(card.locator('[data-card-slide="on"] img')).not.toHaveAttribute("src", firstOn!, { timeout: 8000 });
-    await visitor.context().close();
+    await phone.close();
+
+    // Computer: the pieces side by side across the card, gliding sideways.
+    const computer = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const wide = await computer.newPage();
+    await wide.addInitScript(() => window.sessionStorage.setItem("lupin.intro", "1"));
+    await wide.goto("/");
+    await wide.locator("html[data-hydrated]").waitFor({ state: "attached" });
+    const strip = wide.locator('a[href$="/shop/men"] [data-card-strip]');
+    await expect(strip).toBeVisible();
+    expect(await strip.locator("img").count()).toBeGreaterThanOrEqual(16);
+    const moved = async () => strip.locator(".card-strip").evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).m41);
+    const before = await moved();
+    await wide.waitForTimeout(1500);
+    expect(await moved()).not.toBe(before);
+    await computer.close();
 
     await page.evaluate(async (pieces) => {
       const token = ((await (await fetch("/api/v1/auth/csrf")).json()) as { token: string }).token;
