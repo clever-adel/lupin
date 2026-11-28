@@ -18,6 +18,9 @@ import { relatedPieces } from "~/lib/related";
 import { absoluteUrl, layoutOrigin, RETURN_POLICY, seo } from "~/lib/seo";
 import type { LookCard, Page, ProductCard, ProductDetail } from "~/lib/types";
 
+
+/** Only the first two photos of a colour zoom: the front and the back. The rest are detail and styling shots. */
+const ZOOM_PHOTOS = 2;
 export async function loader({ params, context }: Route.LoaderArgs) {
   const product = await apiGet<ProductDetail>(context, `/api/v1/catalog/products/${encodeURIComponent(params.slug)}`);
   return { product };
@@ -283,19 +286,28 @@ function ProductView({ product }: { product: ProductDetail }) {
                     data-reveal={i === 0 ? undefined : "photo"}
                     className="w-full shrink-0 snap-center overflow-hidden bg-studio"
                   >
-                    <ZoomablePhoto
-                      url={image.url}
-                      alt={photoAlt(image, i)}
-                      sizes="(min-width: 768px) 55vw, 100vw"
-                      eager={i === 0}
-                      onOpen={() => setViewing(i)}
-                    />
+                    {i < ZOOM_PHOTOS ? (
+                      <ZoomablePhoto
+                        url={image.url}
+                        alt={photoAlt(image, i)}
+                        sizes="(min-width: 768px) 55vw, 100vw"
+                        eager={i === 0}
+                        onOpen={() => setViewing(i)}
+                      />
+                    ) : (
+                      <ProductPhoto
+                        url={image.url}
+                        alt={photoAlt(image, i)}
+                        sizes="(min-width: 768px) 55vw, 100vw"
+                        className="aspect-[4/5] w-full"
+                      />
+                    )}
                   </li>
                 ))}
               </ul>
               {viewing !== null && (
                 <PhotoViewer
-                  images={color.images.map((image, i) => ({ url: image.url, alt: photoAlt(image, i) }))}
+                  images={color.images.slice(0, ZOOM_PHOTOS).map((image, i) => ({ url: image.url, alt: photoAlt(image, i) }))}
                   start={viewing}
                   name={name}
                   onClose={() => setViewing(null)}

@@ -130,7 +130,8 @@ test.describe.serial("phone-size photos", () => {
   });
 
   test("product photos zoom under the mouse and open full screen at full quality, on a computer and a phone", async ({ browser }) => {
-    // Two photos on the main colour of a demo piece, saved through the dashboard's own API.
+    // Three photos on the main colour of a demo piece, saved through the dashboard's own API. Only the
+    // first two (front and back) zoom.
     await page.goto("/admin/products");
     const photo = await bigJpeg(page);
     const list = await (await page.request.get("/api/v1/admin/products?page=0&q=Nightfall")).json();
@@ -143,6 +144,7 @@ test.describe.serial("phone-size photos", () => {
       const form = new FormData();
       form.append("files", new File([bytes], "a.jpg", { type: "image/jpeg" }));
       form.append("files", new File([bytes], "b.jpg", { type: "image/jpeg" }));
+      form.append("files", new File([bytes], "c.jpg", { type: "image/jpeg" }));
       const uploaded = (await (await fetch("/media/upload", { method: "POST", body: form, headers: { "X-XSRF-TOKEN": token } })).json()) as
         { url: string; publicId: string }[];
       const put = await fetch(`/api/v1/admin/products/${productId}/colors/${colorId}/images`, {
@@ -158,6 +160,9 @@ test.describe.serial("phone-size photos", () => {
     await page.goto(`/product/${detail.slug}`);
     await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
     const first = page.locator("[data-gallery] li").first().getByRole("button");
+    await expect(page.locator("[data-gallery] li").nth(1).getByRole("button")).toHaveCount(1);
+    await expect(page.locator("[data-gallery] li").nth(2).getByRole("button")).toHaveCount(0);
+    await expect(page.locator("[data-gallery] li").nth(2).locator("img")).toHaveCount(1);
     const box = (await first.boundingBox())!;
     await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.3);
     const layer = page.locator("[data-zoom-layer]");
@@ -174,6 +179,8 @@ test.describe.serial("phone-size photos", () => {
     await expect(viewer).toContainText("Photo 1 of 2");
     await viewer.getByRole("button", { name: "Next photo" }).click();
     await expect(viewer).toContainText("Photo 2 of 2");
+    await viewer.getByRole("button", { name: "Next photo" }).click();
+    await expect(viewer).toContainText("Photo 1 of 2");
     await page.keyboard.press("Escape");
     await expect(viewer).toHaveCount(0);
 
