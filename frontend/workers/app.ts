@@ -1,4 +1,5 @@
 import { createRequestHandler } from "react-router";
+import { cacheSeconds, edgeCache, isShareable, shared } from "../app/lib/api-cache";
 import { EDGE_KEY_HEADER, edgeKey, httpsRedirect } from "../app/lib/edge";
 import { isPhotoWidth, PHOTO_WIDTHS, sizedKey } from "../app/lib/photo-sizes";
 
@@ -17,7 +18,22 @@ const requestHandler = createRequestHandler(
  * The browser only ever talks to this origin. /api/* is forwarded to the Spring Boot backend so that
  * auth cookies are first-party and production needs no CORS.
  */
-async function proxyApi(request: Request, env: Env): Promise<Response> {
+async function proxyApi(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const url = new URL(request.url);
+  if (isShareable(request.method, url.pathname, request.headers)) {
+    // Public data, the same for everyone: answered from the edge's short-lived copy when there is one.
+    // Sent without the visitor's cookies, so the answer can never carry anything of theirs.
+    const target = new URL(url.pathname + url.search, env.API_ORIGIN).toString();
+    return shared(edgeCache(), target, cacheSeconds(env.SITE_ORIGIN), (work) => ctx.waitUntil(work), () => {
+      const plain = new Request(request);
+      plain.headers.delete("Cookie");
+      return forward(plain, env);
+    });
+  }
+  return forward(request, env);
+}
+
+async function forward(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const headers = new Headers(request.headers);
   headers.set("X-Forwarded-Host", url.host);
@@ -258,7 +274,7 @@ export default {
       return Response.redirect(target.toString(), 301);
     }
     if (pathname.startsWith("/api/")) {
-      return proxyApi(request, env);
+      return proxyApi(request, env, ctx);
     }
     if (pathname === "/media/upload" && request.method === "POST") {
       return uploadImages(request, env);
