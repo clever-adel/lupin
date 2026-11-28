@@ -1,9 +1,11 @@
 import type { AppLoadContext } from "react-router";
+import { cacheSeconds, edgeCache, shared } from "./api-cache";
 import { EDGE_KEY_HEADER, edgeKey } from "./edge";
 
 /**
  * Server-side data access for loaders. Runs in the Worker and calls the backend directly.
- * Public catalog data only, so no cookies are forwarded and responses may be cached by the caller.
+ * Public catalog data only, so no cookies are forwarded, and answers come from the edge's short-lived
+ * shared copy when there is one (see api-cache.ts): the same copy the browser's /api calls use.
  */
 export async function apiGet<T>(context: AppLoadContext, path: string): Promise<T> {
   const origin = context.cloudflare.env.API_ORIGIN;
@@ -12,7 +14,10 @@ export async function apiGet<T>(context: AppLoadContext, path: string): Promise<
   if (key) headers[EDGE_KEY_HEADER] = key;
   let response: Response;
   try {
-    response = await fetch(new URL(path, origin), { headers });
+    const url = new URL(path, origin);
+    const { env, ctx } = context.cloudflare;
+    response = await shared(edgeCache(), url.toString(), cacheSeconds(env.SITE_ORIGIN), (work) => ctx.waitUntil(work),
+      () => fetch(url, { headers }));
   } catch {
     throw new Response("The store is not reachable right now.", { status: 503 });
   }

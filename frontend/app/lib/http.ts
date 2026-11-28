@@ -33,12 +33,16 @@ async function csrfToken(): Promise<string> {
   return body.token;
 }
 
+import { FRESH_HEADER } from "./api-cache";
+
 async function send(method: string, path: string, body?: unknown): Promise<Response> {
   const headers: Record<string, string> = { Accept: "application/json" };
   // A FormData body (a file upload) sets its own multipart Content-Type with the boundary.
   const form = body instanceof FormData;
   if (body !== undefined && !form) headers["Content-Type"] = "application/json";
   if (method !== "GET") headers["X-XSRF-TOKEN"] = await csrfToken();
+  // Staff must see their own changes at once, not the store's shared copy of a few seconds ago.
+  if (typeof location !== "undefined" && location.pathname.startsWith("/admin")) headers[FRESH_HEADER] = "1";
   return fetch(path, {
     method,
     headers,
