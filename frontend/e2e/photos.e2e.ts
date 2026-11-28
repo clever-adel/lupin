@@ -128,4 +128,91 @@ test.describe.serial("phone-size photos", () => {
     await departments.getByRole("button", { name: "Use the first piece's photo" }).click();
     await expect(departments).toContainText("Home page card: the first piece's photo.");
   });
+
+  test("product photos zoom under the mouse and open full screen at full quality, on a computer and a phone", async ({ browser }) => {
+    // Two photos on the main colour of a demo piece, saved through the dashboard's own API.
+    await page.goto("/admin/products");
+    const photo = await bigJpeg(page);
+    const list = await (await page.request.get("/api/v1/admin/products?page=0&q=Nightfall")).json();
+    const id = list.items[0].id as number;
+    const detail = await (await page.request.get(`/api/v1/admin/products/${id}`)).json();
+    const colour = detail.colors.find((c: { main: boolean }) => c.main) ?? detail.colors[0];
+    const saved = await page.evaluate(async ({ base64, productId, colorId }) => {
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      const token = ((await (await fetch("/api/v1/auth/csrf")).json()) as { token: string }).token;
+      const form = new FormData();
+      form.append("files", new File([bytes], "a.jpg", { type: "image/jpeg" }));
+      form.append("files", new File([bytes], "b.jpg", { type: "image/jpeg" }));
+      const uploaded = (await (await fetch("/media/upload", { method: "POST", body: form, headers: { "X-XSRF-TOKEN": token } })).json()) as
+        { url: string; publicId: string }[];
+      const put = await fetch(`/api/v1/admin/products/${productId}/colors/${colorId}/images`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": token },
+        body: JSON.stringify({ images: uploaded.map((u) => ({ url: u.url, publicId: u.publicId, altEn: "", altAr: "" })) }),
+      });
+      return { status: put.status, urls: uploaded.map((u) => u.url) };
+    }, { base64: photo.toString("base64"), productId: id, colorId: colour.id });
+    expect(saved.status).toBe(204);
+
+    // Computer: resting the mouse on a photo shows the original, enlarged where the pointer is.
+    await page.goto(`/product/${detail.slug}`);
+    await page.locator("html[data-hydrated]").waitFor({ state: "attached" });
+    const first = page.locator("[data-gallery] li").first().getByRole("button");
+    const box = (await first.boundingBox())!;
+    await page.mouse.move(box.x + box.width * 0.25, box.y + box.height * 0.3);
+    const layer = page.locator("[data-zoom-layer]");
+    await expect(layer).toHaveAttribute("src", saved.urls[0]!);
+    await expect(layer).toHaveAttribute("style", /scale\(2\.4\).*25%/);
+    await page.mouse.move(box.x - 40, box.y - 40);
+    await expect(layer).toHaveCount(0);
+
+    // A click opens it full screen; arrows change photo; Escape closes.
+    await first.click();
+    const viewer = page.getByRole("dialog");
+    await expect(viewer).toBeVisible();
+    await expect(viewer.locator("img")).toHaveAttribute("src", saved.urls[0]!);
+    await expect(viewer).toContainText("Photo 1 of 2");
+    await viewer.getByRole("button", { name: "Next photo" }).click();
+    await expect(viewer).toContainText("Photo 2 of 2");
+    await page.keyboard.press("Escape");
+    await expect(viewer).toHaveCount(0);
+
+    // Phone: a tap opens the viewer, a double tap zooms in and another zooms back out.
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const mobile = await phone.newPage();
+    await mobile.addInitScript(() => window.sessionStorage.setItem("lupin.intro", "1"));
+    await mobile.goto(`/product/${detail.slug}`);
+    await mobile.locator("html[data-hydrated]").waitFor({ state: "attached" });
+    await mobile.locator("[data-gallery] li").first().getByRole("button").tap();
+    const mobileViewer = mobile.getByRole("dialog");
+    await expect(mobileViewer).toBeVisible();
+    const img = mobileViewer.locator("img");
+    await expect(img).toHaveAttribute("src", saved.urls[0]!);
+    const frame = (await mobileViewer.locator("div").first().boundingBox())!;
+    const tapAt = async () => {
+      await mobile.mouse.click(frame.x + frame.width / 2, frame.y + frame.height / 2);
+    };
+    await tapAt();
+    await mobile.waitForTimeout(80);
+    await tapAt();
+    await expect(img).toHaveAttribute("style", /scale\(2\.5\)/);
+    await mobile.waitForTimeout(400);
+    await tapAt();
+    await mobile.waitForTimeout(80);
+    await tapAt();
+    await expect(img).toHaveAttribute("style", /scale\(1\)/);
+    await mobileViewer.getByRole("button", { name: "Close" }).tap();
+    await expect(mobileViewer).toHaveCount(0);
+    await phone.close();
+
+    // Put the demo piece back as it was.
+    await page.evaluate(async ({ productId, colorId }) => {
+      const token = ((await (await fetch("/api/v1/auth/csrf")).json()) as { token: string }).token;
+      await fetch(`/api/v1/admin/products/${productId}/colors/${colorId}/images`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": token },
+        body: JSON.stringify({ images: [] }),
+      });
+    }, { productId: id, colorId: colour.id });
+  });
 });
