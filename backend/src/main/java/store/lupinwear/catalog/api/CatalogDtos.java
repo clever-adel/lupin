@@ -24,8 +24,12 @@ public final class CatalogDtos {
     }
 
     /** {@code imageUrl}: the main photo of the department's first piece in the store order; null if none. */
+    /**
+     * {@code imageUrl} is the card photo: the owner's upload, else the main photo of the first piece.
+     * {@code ownImageUrl} and {@code ownImagePublicId} are the upload alone, for the dashboard only.
+     */
     public record DepartmentView(String slug, String nameEn, String nameAr, String status, long productCount,
-            List<CategoryView> categories, String imageUrl) {
+            List<CategoryView> categories, String imageUrl, String ownImageUrl, String ownImagePublicId) {
     }
 
     /** {@code hoverImageUrl} is the colour's second photo, shown when a shopper points at the card; null if there is one. */
@@ -80,6 +84,10 @@ public final class CatalogDtos {
     }
 
     // ── admin write models ──
+
+    /** An uploaded photo (served under /media/), or both empty to go back to the first piece's photo. */
+    public record DepartmentPhotoRequest(@Size(max = 300) String imageUrl, @Size(max = 200) String imagePublicId) {
+    }
 
     public record DepartmentStatusRequest(@NotNull @Pattern(regexp = "ACTIVE|COMING_SOON|HIDDEN") String status) {
     }

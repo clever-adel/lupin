@@ -106,7 +106,7 @@ public class CatalogQueryService {
                     return null;
                 }).list();
         return jdbc.sql("""
-                select d.id, d.slug, d.name_en, d.name_ar, d.status,
+                select d.id, d.slug, d.name_en, d.name_ar, d.status, d.image_url as own_url, d.image_public_id as own_id,
                        (select count(*) from products p join categories c on c.id = p.category_id
                          where p.department_id = d.id and p.status = 'ACTIVE' and p.deleted_at is null and c.active) as product_count,
                        (select pi.url from products p join categories c on c.id = p.category_id
@@ -120,7 +120,10 @@ public class CatalogQueryService {
                         rs.getString("name_ar"), rs.getString("status"),
                         "ACTIVE".equals(rs.getString("status")) ? rs.getLong("product_count") : 0,
                         categories.getOrDefault(rs.getInt("id"), List.of()),
-                        "ACTIVE".equals(rs.getString("status")) ? rs.getString("image_url") : null))
+                        !"ACTIVE".equals(rs.getString("status")) ? null
+                                : rs.getString("own_url") != null ? rs.getString("own_url") : rs.getString("image_url"),
+                        includeHidden ? rs.getString("own_url") : null,
+                        includeHidden ? rs.getString("own_id") : null))
                 .list();
     }
 

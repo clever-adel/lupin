@@ -57,6 +57,29 @@ public class CatalogAdminService {
         audit.record(actor, "DEPARTMENT_STATUS", "department", slug, Map.of("status", status));
     }
 
+    /**
+     * Sets or clears a department's own card photo. Returns the photo id it replaced, if any, so the dashboard
+     * can remove that file from photo storage.
+     */
+    public String setDepartmentPhoto(UUID actor, String slug, String url, String publicId) {
+        String cleanUrl = url == null ? "" : url.strip();
+        if (!cleanUrl.isEmpty() && !cleanUrl.matches("/media/[A-Za-z0-9._-]{1,200}")) {
+            throw ApiException.badRequest("INVALID_PHOTO", "The department photo must be uploaded from the dashboard.");
+        }
+        String previous = jdbc.sql("select image_public_id from departments where slug = :slug").param("slug", slug)
+                .query(String.class).optional().orElse(null);
+        int rows = jdbc.sql("""
+                update departments set image_url = :url, image_public_id = :pid, updated_at = now() where slug = :slug
+                """).param("url", cleanUrl.isEmpty() ? null : cleanUrl)
+                .param("pid", cleanUrl.isEmpty() || publicId == null || publicId.isBlank() ? null : publicId.strip())
+                .param("slug", slug).update();
+        if (rows == 0) {
+            throw ApiException.notFound("Department");
+        }
+        audit.record(actor, "DEPARTMENT_PHOTO", "department", slug, Map.of("url", cleanUrl));
+        return previous;
+    }
+
     public String createCategory(UUID actor, CategoryRequest req) {
         int departmentId = departmentId(req.departmentSlug());
         Integer parentId = req.parentSlug() == null || req.parentSlug().isBlank() ? null

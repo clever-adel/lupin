@@ -16,7 +16,7 @@ export interface Department {
   status: "ACTIVE" | "COMING_SOON";
   productCount: number;
   categories: Category[];
-  /** The main photo of the department's first piece in the store order. */
+  /** The card photo: the owner's upload, else the main photo of the department's first piece. */
   imageUrl?: string;
 }
 

@@ -106,4 +106,26 @@ test.describe.serial("phone-size photos", () => {
     await expect(page.getByRole("heading", { name: "Products & stock" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Phone-size photos" })).toHaveCount(0);
   });
+
+  test("the owner uploads a wide photo for the Men card, the home page shows it, and it can go back", async () => {
+    await page.goto("/admin/products");
+    const departments = page.getByRole("region", { name: "Departments" });
+    const photo = await bigJpeg(page);
+    const saved = page.waitForResponse((r) => r.url().endsWith("/api/v1/admin/departments/men/photo"));
+    await departments.locator("label", { hasText: /(Upload|Change) Men photo/ }).locator('input[type="file"]')
+      .setInputFiles({ name: "men-card.jpg", mimeType: "image/jpeg", buffer: photo });
+    expect((await saved).status()).toBe(200);
+    await expect(departments).toContainText("Home page card: your photo.");
+    const own = (await (await page.request.get("/api/v1/admin/departments")).json())
+      .find((d: { slug: string }) => d.slug === "men").ownImageUrl as string;
+    expect(own).toMatch(/^\/media\//);
+
+    await page.goto("/");
+    const card = page.locator(`a[href$="/men"] img`).first();
+    await expect(card).toHaveAttribute("src", new RegExp(own.replace(/[.]/g, "\\.")));
+
+    await page.goto("/admin/products");
+    await departments.getByRole("button", { name: "Use the first piece's photo" }).click();
+    await expect(departments).toContainText("Home page card: the first piece's photo.");
+  });
 });
