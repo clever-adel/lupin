@@ -1,7 +1,8 @@
-import { Fragment, type CSSProperties } from "react";
+import { Fragment, useState, type CSSProperties } from "react";
 import { Link, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/home";
 import type { loader as layoutLoader } from "./layout";
+import { cardSlides, DepartmentCardPhotos, pieceSidePanel } from "~/components/department-card-photos";
 import { LookLineup } from "~/components/look";
 import { ProductGrid, ProductPhoto } from "~/components/product";
 import { HomeReviews } from "~/components/reviews";
@@ -86,6 +87,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const { t, href, pick } = useT();
   const layout = useRouteLoaderData<typeof layoutLoader>("routes/store/layout");
   const departments = layout?.departments ?? [];
+  /** The department card under the pointer: its photos hold still while the shopper looks at it. */
+  const [hovered, setHovered] = useState<string | null>(null);
   const campaign = layout?.site.hero;
   const products = loaderData.collection.items;
   const hero = products[0];
@@ -166,15 +169,14 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           {departments.map((d, i) => {
             const name = pick(d, "name");
             const live = d.status === "ACTIVE";
+            const slides = live ? cardSlides(d.ownImageUrl, d.pieceImageUrls, d.imageUrl) : [];
             const body = (
-              <div className="relative flex aspect-[3/2] flex-col justify-end md:aspect-auto md:h-64 overflow-hidden bg-ink p-5 text-bone">
-                {live && d.imageUrl && (
-                  <>
-                    <ProductPhoto url={d.imageUrl} alt="" sizes="(min-width: 768px) 50vw, 100vw"
-                      className="absolute inset-0 h-full w-full object-cover object-[50%_25%] opacity-80" />
-                    <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent" />
-                  </>
-                )}
+              <div
+                onPointerEnter={() => setHovered(d.slug)}
+                onPointerLeave={() => setHovered((h) => (h === d.slug ? null : h))}
+                className={`relative flex aspect-[3/2] flex-col justify-end md:aspect-auto md:h-72 overflow-hidden bg-ink p-5 text-bone ${pieceSidePanel(slides) ? "md:pe-[calc(40%+1.25rem)]" : ""}`}
+              >
+                <DepartmentCardPhotos slides={slides} hovering={hovered === d.slug} />
                 <span
                   aria-hidden="true"
                   className="display pointer-events-none absolute -top-2 start-3 text-6xl text-transparent opacity-40 [-webkit-text-stroke:1px_var(--color-bone)]"

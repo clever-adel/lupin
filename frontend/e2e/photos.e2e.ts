@@ -129,6 +129,52 @@ test.describe.serial("phone-size photos", () => {
     await expect(departments).toContainText("Home page card: the first piece's photo.");
   });
 
+  test("the Men card turns through the first pieces' photos by itself", async ({ browser }) => {
+    await page.goto("/admin/products");
+    const photo = await bigJpeg(page);
+    // Photos on two pieces, through the dashboard's own API.
+    const placed = await page.evaluate(async ({ base64 }) => {
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      const token = ((await (await fetch("/api/v1/auth/csrf")).json()) as { token: string }).token;
+      const send = (method: string, url: string, body?: unknown) => fetch(url, {
+        method, headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": token }, body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const done: { productId: number; colorId: number }[] = [];
+      for (const q of ["Nightfall", "Harbour"]) {
+        const id = ((await (await fetch(`/api/v1/admin/products?page=0&q=${q}`)).json()) as { items: { id: number }[] }).items[0]!.id;
+        const detail = (await (await fetch(`/api/v1/admin/products/${id}`)).json()) as { colors: { id: number; main: boolean }[] };
+        const colorId = (detail.colors.find((c) => c.main) ?? detail.colors[0]!).id;
+        const form = new FormData();
+        form.append("files", new File([bytes], `${q}.jpg`, { type: "image/jpeg" }));
+        const [uploaded] = (await (await fetch("/media/upload", { method: "POST", body: form, headers: { "X-XSRF-TOKEN": token } })).json()) as
+          { url: string; publicId: string }[];
+        await send("PUT", `/api/v1/admin/products/${id}/colors/${colorId}/images`,
+          { images: [{ url: uploaded!.url, publicId: uploaded!.publicId, altEn: "", altAr: "" }] });
+        done.push({ productId: id, colorId });
+      }
+      return done;
+    }, { base64: photo.toString("base64") });
+
+    const visitor = await newVisitor(browser);
+    await visitor.addInitScript(() => window.sessionStorage.setItem("lupin.intro", "1"));
+    await visitor.goto("/");
+    await visitor.locator("html[data-hydrated]").waitFor({ state: "attached" });
+    const card = visitor.locator('a[href$="/shop/men"]').filter({ has: visitor.locator("[data-card-slide]") });
+    await expect(card.locator("[data-card-slide]")).toHaveCount(2);
+    const firstOn = await card.locator('[data-card-slide="on"] img').getAttribute("src");
+    await expect(card.locator('[data-card-slide="on"] img')).not.toHaveAttribute("src", firstOn!, { timeout: 8000 });
+    await visitor.context().close();
+
+    await page.evaluate(async (pieces) => {
+      const token = ((await (await fetch("/api/v1/auth/csrf")).json()) as { token: string }).token;
+      for (const { productId, colorId } of pieces) {
+        await fetch(`/api/v1/admin/products/${productId}/colors/${colorId}/images`, {
+          method: "PUT", headers: { "Content-Type": "application/json", "X-XSRF-TOKEN": token }, body: JSON.stringify({ images: [] }),
+        });
+      }
+    }, placed);
+  });
+
   test("product photos zoom under the mouse and open full screen at full quality, on a computer and a phone", async ({ browser }) => {
     // Three photos on the main colour of a demo piece, saved through the dashboard's own API. Only the
     // first two (front and back) zoom.
